@@ -80,6 +80,8 @@ h2 { font-size: 17px; margin: 0 0 10px; letter-spacing: -0.02em; }
 .flowtbl th, .flowtbl td { text-align: right; padding: 3px 0; }
 .flowtbl th:first-child, .flowtbl td:first-child { text-align: left; color: var(--sub); font-weight: 400; }
 .flowtbl th { color: var(--faint); font-weight: 500; font-size: 12px; }
+.udtbl { font-weight: 400; letter-spacing: 0; }
+.udtbl tr:last-child td { font-weight: 700; border-top: 1px solid var(--line); }
 .up { color: var(--up); }
 .down { color: var(--down); }
 .na { color: var(--faint); }

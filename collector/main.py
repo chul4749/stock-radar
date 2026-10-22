@@ -173,7 +173,7 @@ def main(argv):
         temp["hy_spread"] = logic.series_stat(hy, days_back=20)
     temp["fear_greed"] = safe("CNN", lambda: sources.cnn_fear_greed(iso(base)), errors)
     uni_closes = closes[[c for c in universe if c in closes.columns]]
-    b = logic.breadth(uni_closes)
+    b = logic.breadth(uni_closes, markets={c: v["market"] for c, v in universe.items()})
     temp["breadth"] = b
     flows = safe("시장 수급", lambda: sources.market_flows(used_days[-20], base), errors)
     if flows:

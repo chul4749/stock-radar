@@ -103,6 +103,13 @@ def test_breadth_counts_new_lows():
     assert b["new_lows"][-1] == 1 and b["new_highs"][-1] == 1
 
 
+def test_breadth_by_market():
+    closes = pd.DataFrame({"A": [1, 2], "B": [2, 1], "C": [1, 3]}, dtype=float)
+    b = logic.breadth(closes, window=2, markets={"A": "KOSPI", "B": "KOSPI", "C": "KOSDAQ"})
+    assert b["up"] == 2 and b["down"] == 1
+    assert b["by_market"] == {"KOSPI": {"up": 1, "down": 1}, "KOSDAQ": {"up": 1, "down": 0}}
+
+
 def test_pct_rank_and_summary():
     assert logic.pct_rank([1, 2, 3, 4], 4) == 88
     t = {"vix": {"pct_1y": 90}, "korea_vol": {"pct_1y": 80}, "fear_greed": {"score": 20},

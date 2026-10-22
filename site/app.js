@@ -71,7 +71,7 @@ const INFO = {
   vix: "미국 S&P500 옵션 가격으로 계산한 '앞으로 30일 예상 흔들림'입니다. 보통 20 아래면 평온, 30 위면 불안한 편으로 봅니다. 미국 장이 흔들리면 다음 날 한국 장에도 영향을 줍니다.",
   cnn: "CNN이 미국 시장의 주가 추세·신고가 종목 수·옵션·정크본드 수요 등 7가지를 합쳐 만든 투자심리 점수입니다. 0에 가까울수록 공포, 100에 가까울수록 탐욕입니다.",
   breadth: "최근 60일 중 가장 높은 가격(신고가) 또는 가장 낮은 가격(신저가)을 찍은 종목 수입니다. 지수는 대형주 몇 개 때문에 버텨도, 신저가 종목이 늘면 시장 속은 약해지고 있다는 뜻입니다.",
-  updown: "기준일에 오른 종목 수와 내린 종목 수입니다(보통주). 지수와 반대로 움직이면 소수 대형주가 지수를 끌고 있다는 신호입니다.",
+  updown: "기준일에 오른 종목 수와 내린 종목 수입니다(보통주, 코스피·코스닥 따로와 합계). 지수와 반대로 움직이면 소수 대형주가 지수를 끌고 있다는 신호입니다.",
   momentum: "코스피가 최근 20영업일 동안 몇 % 움직였는지입니다. 크게 빠졌으면 공포 쪽, 크게 올랐으면 탐욕 쪽으로 계산합니다.",
   flows: "최근 20영업일 중 외국인과 기관이 합쳐서 코스피 주식을 순매수한 날이 며칠인지입니다. 큰손이 꾸준히 사면 탐욕 쪽, 꾸준히 팔면 공포 쪽입니다.",
   credit: "재무가 약한 미국 기업이 돈을 빌릴 때 국채보다 얼마나 더 높은 이자를 내야 하는지입니다. 이 차이가 벌어지면 주가 공포가 기업 자금줄 문제로 번지고 있다는 신호입니다.",
@@ -242,7 +242,15 @@ function renderTemp() {
   if (t.us10y) tiles.push(tile("미국 10년 국채금리", num(t.us10y.value, 2) + "%", `5일 ${signed(t.us10y.change, 2, "%p")}${pctText(t.us10y.pct_1y)}`, t.us10y.spark, { key: "us10y" }));
   if (t.breadth) {
     const b = t.breadth;
-    tiles.push(tile("오르고 내린 종목", `<span class="up">${num(b.up)}</span> / <span class="down">${num(b.down)}</span>`, "상승 / 하락 (보통주)", null, { key: "updown" }));
+    const bm = b.by_market || {};
+    const ud = [["KOSPI", "코스피"], ["KOSDAQ", "코스닥"]].filter(([m]) => bm[m]).map(([m, name]) => [name, bm[m]]);
+    if (ud.length) {
+      ud.push(["합계", b]);
+      const rows = ud.map(([name, x]) => `<tr><td>${name}</td><td class="up">${num(x.up)}</td><td class="down">${num(x.down)}</td></tr>`).join("");
+      tiles.push(tile("오르고 내린 종목", `<table class="flowtbl udtbl"><thead><tr><th></th><th>상승</th><th>하락</th></tr></thead><tbody>${rows}</tbody></table>`, "보통주 기준", null, { key: "updown" }));
+    } else {
+      tiles.push(tile("오르고 내린 종목", `<span class="up">${num(b.up)}</span> / <span class="down">${num(b.down)}</span>`, "상승 / 하락 (보통주)", null, { key: "updown" }));
+    }
     tiles.push(tile("60일 신저가 종목", num(b.new_lows.at(-1)), `신고가 ${num(b.new_highs.at(-1))} · 최근 20일 추이`, b.new_lows, { key: "breadth" }));
   }
   if (t.flows) {

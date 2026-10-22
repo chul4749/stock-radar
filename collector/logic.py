@@ -59,13 +59,19 @@ def korea_vol(kospi200):
     return series_stat(rows)
 
 
-def breadth(closes, window=60, recent=20):
-    """closes: DataFrame(행=영업일 오래된 순, 열=티커).
+def breadth(closes, window=60, recent=20, markets=None):
+    """closes: DataFrame(행=영업일 오래된 순, 열=티커). markets: 티커 → 시장(KOSPI/KOSDAQ).
 
-    상승·하락 종목 수, window 일 신고가·신저가 종목 수(최근 recent 일 추이).
+    상승·하락 종목 수(전체 + 시장별), window 일 신고가·신저가 종목 수(최근 recent 일 추이).
     """
-    up = int((closes.iloc[-1] > closes.iloc[-2]).sum())
-    down = int((closes.iloc[-1] < closes.iloc[-2]).sum())
+    rose = closes.iloc[-1] > closes.iloc[-2]
+    fell = closes.iloc[-1] < closes.iloc[-2]
+    up, down = int(rose.sum()), int(fell.sum())
+    by_market = {}
+    for m in ("KOSPI", "KOSDAQ"):
+        cols = [c for c in closes.columns if (markets or {}).get(c) == m]
+        if cols:
+            by_market[m] = {"up": int(rose[cols].sum()), "down": int(fell[cols].sum())}
     lows, highs = [], []
     for i in range(max(window, len(closes) - recent), len(closes)):
         win = closes.iloc[i - window + 1:i + 1]
@@ -73,7 +79,7 @@ def breadth(closes, window=60, recent=20):
         valid = win.notna().sum() >= window * 0.9
         lows.append(int(((today <= win.min()) & valid).sum()))
         highs.append(int(((today >= win.max()) & valid).sum()))
-    return {"up": up, "down": down, "new_lows": lows, "new_highs": highs,
+    return {"up": up, "down": down, "by_market": by_market, "new_lows": lows, "new_highs": highs,
             "dates": [d for d in closes.index[-len(lows):]] if lows else []}
 
 
