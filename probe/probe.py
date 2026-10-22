@@ -284,18 +284,24 @@ def vkospi_all():
 @check("VKOSPI (KRX 파생상품지수 후보 경로)", "시장 온도")
 def vkospi_deriv():
     from pykrx.website.krx.krxio import KrxWebIo
+
+    class Io(KrxWebIo):
+        def __init__(self, path):
+            super().__init__()
+            self.path = path
+
+        @property
+        def bld(self):
+            return f"dbms/MDC/STAT/standard/{self.path}"
+
+        def fetch(self):
+            pass
+
     tried = []
     for bld in ("MDCSTAT01201", "MDCSTAT01101", "MDCSTAT01001", "MDCSTAT00901", "MDCSTAT01301"):
-        class Io(KrxWebIo):
-            @property
-            def bld(self, b=bld):
-                return f"dbms/MDC/STAT/standard/{b}"
-
-            def fetch(self):
-                pass
         for params in ({"trdDd": YMD}, {"trdDd": YMD, "idxIndMidclssCd": "01"}):
             try:
-                res = Io().read(**params)
+                res = Io(bld).read(**params)
             except Exception as e:
                 tried.append(f"{bld}:{type(e).__name__}")
                 continue
