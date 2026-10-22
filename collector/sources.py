@@ -242,9 +242,9 @@ def dart_today(ymd, max_pages=15):
     out, seen = [], set()
     for page in range(1, max_pages + 1):
         try:
-            r = retry(lambda: get("https://dart.fss.or.kr/dsac001/mainAll.do",
+            r = retry(lambda: get("https://dart.fss.or.kr/dsac001/mainAll.do", timeout=40,
                                   params={"selectDate": date_dot, "currentPage": page, "maxResults": 100,
-                                          "maxLinks": 10, "sort": "", "series": ""}))
+                                          "maxLinks": 10, "sort": "", "series": ""}), tries=4, wait=5)
         except Exception as e:
             log(f"  DART {page}쪽 실패: {e}")
             break

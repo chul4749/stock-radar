@@ -328,6 +328,9 @@ VALUE_RULES = {
     "min_drop": 20.0,          # 60일 최고가 대비 하락률(%)
     "max_pbr_ratio": 0.8,      # 현재 PBR / 1년 PBR 중앙값
     "min_eps_ratio": 0.8,      # 현재 EPS / 1년 전 EPS (이익이 크게 줄지 않음)
+    # 1년 내내 급등했던 종목은 '자기 중앙값 대비'로는 싸 보여도 비싸다 → 절대 기준도 둔다
+    "max_per": 15.0,
+    "max_pbr": 2.0,
 }
 
 
@@ -369,7 +372,8 @@ def value_screen(universe, closes, fund_now, fund_hist, flows_5d, news_3d, rules
              "value": f"-{drop:.1f}%"},
             {"label": f"PBR이 1년 중앙값의 {rules['max_pbr_ratio']:.0%} 이하", "ok": pbr_ratio <= rules["max_pbr_ratio"],
              "value": f"{pbr:.2f} / {med:.2f}"},
-            {"label": "흑자 (PER·EPS > 0)", "ok": True, "value": f"PER {per:.1f}"},
+            {"label": f"흑자이고 PER {rules['max_per']:.0f} 이하", "ok": per <= rules["max_per"], "value": f"{per:.1f}"},
+            {"label": f"PBR {rules['max_pbr']:.0f} 이하", "ok": pbr <= rules["max_pbr"], "value": f"{pbr:.2f}"},
             {"label": f"EPS가 1년 전의 {rules['min_eps_ratio']:.0%} 이상", "ok": eps_ratio >= rules["min_eps_ratio"],
              "value": f"{eps:,.0f} / {eps0:,.0f}"},
         ]
