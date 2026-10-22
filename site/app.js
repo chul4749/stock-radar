@@ -80,6 +80,7 @@ const INFO = {
   usdkrw: "1달러를 사는 데 드는 원화입니다. 환율이 빠르게 오르면(원화 약세) 외국인이 한국 주식을 팔 유인이 커지는 경우가 많습니다. FRED 자료라 며칠 늦게 반영됩니다.",
   us10y: "미국 10년 만기 국채 금리입니다. 금리가 오르면 성장주·기술주 가치가 낮게 평가되기 쉽고, 위험자산에서 돈이 빠지는 경우가 많습니다.",
   marketflows: "시장 전체에서 외국인·기관이 순매수(산 금액 − 판 금액)한 규모입니다. 단위는 억 원입니다.",
+  selling: "60일 중 가장 낮은 가격(신저가)까지 떨어진 종목 수를 최근 5일 평균과 비교합니다. 신저가 종목이 늘면 버티던 종목까지 팔리고 있다는 뜻이고, 줄면 투매가 잦아들고 있다는 뜻입니다.",
   creditbal: "빚을 내서 산 주식(신용잔고)과, 빚을 못 갚아 강제로 팔린 물량(반대매매)입니다. 강제 매도가 몰리면 좋은 종목도 같이 급락합니다. 아직 수집 경로를 찾지 못했습니다.",
 };
 
@@ -145,7 +146,7 @@ function applyExpAll() {
 document.addEventListener("click", (e) => {
   const b = e.target.closest("button.info");
   if (!b) return;
-  const box = b.closest(".tile, .thermo, .part").querySelector(`[data-exp="${b.dataset.info}"]`);
+  const box = b.closest(".tile, .thermo, .part, .sum").querySelector(`[data-exp="${b.dataset.info}"]`);
   if (box) box.hidden = !box.hidden;
 });
 
@@ -214,14 +215,26 @@ function tile(label, value, sub, sparkVals, opts = {}) {
     `${line ? `<div class="why">${esc(line)}</div>` : ""}${key ? infoBox(key) : ""}</div>`;
 }
 
+// 요약 카드 한 줄 해석 (key → level → 문장)
+const SUM_LINE = {
+  selling: {
+    "커지는 중": "버티던 종목까지 팔리는 중 → 하락이 넓게 퍼지고 있음",
+    "줄어드는 중": "새로 무너지는 종목이 줄어듦 → 투매가 잦아드는 중",
+    "비슷함": "파는 힘이 더 세지지도 약해지지도 않음 → 흐름 유지",
+  },
+};
+
 const pctText = (p) => (p == null ? "" : ` · 1년 중 ${p}% 위치`);
 
 function renderTemp() {
   const t = state.data.temperature;
   renderThermo();
-  $("#summary").innerHTML = (t.summary || []).filter((s) => !(t.thermo && s.key === "fear")).map((s) =>
-    `<div class="sum ${s.tone}"><div class="row"><span class="t">${esc(s.title)}</span><span class="lv">${esc(s.level)}</span></div><p>${esc(s.text)}</p></div>`
-  ).join("") || `<div class="empty">시장 온도 데이터를 받지 못했습니다</div>`;
+  // 온도계가 있으면 공포 크기·자금시장은 온도계 지표와 겹치므로 뺀다
+  $("#summary").innerHTML = (t.summary || []).filter((s) => !(t.thermo && (s.key === "fear" || s.key === "credit"))).map((s) => {
+    const line = SUM_LINE[s.key] && SUM_LINE[s.key][s.level];
+    return `<div class="sum ${s.tone}"><div class="row"><span class="t">${esc(s.title)} ${infoBtn(s.key)}</span><span class="lv">${esc(s.level)}</span></div><p>${esc(s.text)}</p>` +
+      `${line ? `<div class="why">${esc(line)}</div>` : ""}${infoBox(s.key)}</div>`;
+  }).join("") || `<div class="empty">시장 온도 데이터를 받지 못했습니다</div>`;
 
   const tiles = [];
   const ix = t.index || {};
