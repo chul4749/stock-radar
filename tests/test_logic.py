@@ -156,11 +156,42 @@ def test_scorecard_returns_and_excess():
     kospi = pd.Series([1000, 1000, 1000, 1000, 1000, 1050, 1050.0], index=days)
     hist = [("d0", {"swing": [{"code": "A", "name": "가", "close": 100.0}], "scalp": [], "value": []}),
             ("d6", {"swing": [{"code": "A", "name": "가", "close": 120.0}], "scalp": [], "value": []})]
-    stats, recent = logic.scorecard(hist, closes, kospi)
+    stats, recent, feats = logic.scorecard(hist, closes, kospi)
     assert stats["swing"]["1"] == {"n": 1, "avg": 10.0, "win": 100, "excess": 10.0}
     assert stats["swing"]["5"]["avg"] == 20.0 and stats["swing"]["5"]["excess"] == 15.0
     assert "20" not in stats["swing"]
     assert recent[0]["date"] == "d6" and "r1" not in recent[0]
+    streak = next(f for f in feats if f["key"] == "streak3")
+    assert streak["yes"] is None and streak["no"]["n"] == 1 and streak["no"]["avg"] == 20.0
+
+
+def test_risk_codes_and_enrich():
+    m = logic.NameMatcher({"A00000": "가나전자", "B00000": "다라화학"})
+    items = [{"corp": "가나전자", "title": "주요사항보고서(유상증자결정)", "bad": True, "at": "2026-10-20T16:00+09:00"},
+             {"corp": "다라화학", "title": "단일판매ㆍ공급계약체결", "bad": False, "at": "2026-10-20T16:00+09:00"}]
+    risk = logic.risk_codes(items, m, {"B00000": "투자주의환기종목"})
+    assert set(risk) == {"A00000", "B00000"} and "유상증자" in risk["A00000"][0]
+    days = [f"d{i:02d}" for i in range(70)]
+    closes = pd.DataFrame({"A00000": [100.0 + i for i in range(70)]}, index=days)
+    x = logic.enrich([{"code": "A00000"}], closes, pd.Series({"A00000": "반도체"}),
+                     {"pension": pd.Series({"A00000": 3 * EOK}), "fratio_now": pd.Series({"A00000": 12.5}),
+                      "fratio_prev": pd.Series({"A00000": 12.0})})[0]
+    assert x["sector"] == "반도체" and len(x["chart"]["close"]) == 60
+    assert x["quality"]["pension_5d"] == 3.0 and x["quality"]["fratio_chg"] == 0.5 and x["quality"]["trust_5d"] == 0
+
+
+def test_sector_flows_groups_and_sorts():
+    days = [f"d{i:02d}" for i in range(10)]
+    codes = ["A", "B", "C", "D", "E", "F"]
+    closes = pd.DataFrame({c: [100.0 + i for i in range(10)] for c in codes}, index=days)
+    universe = {c: {"name": c + "사"} for c in codes}
+    sec = pd.Series({"A": "조선", "B": "조선", "C": "조선", "D": "은행", "E": "은행", "F": "은행"})
+    flows = {"foreign": pd.Series({"A": 5 * EOK, "B": 1 * EOK, "C": 1 * EOK, "D": -2 * EOK, "E": -2 * EOK, "F": -2 * EOK}),
+             "inst": pd.Series(dtype=float)}
+    got = logic.sector_flows(universe, sec, flows, closes)
+    assert got["inflow"][0]["sector"] == "조선" and got["inflow"][0]["flow_eok"] == 7
+    assert got["inflow"][0]["top"][0] == "A사"
+    assert got["outflow"][0]["sector"] == "은행" and got["outflow"][0]["flow_eok"] == -6
 
 
 def test_realized_vol_flat_is_zero():

@@ -44,6 +44,7 @@ function render() {
   const gen = d.generated_at.replace("T", " ").slice(0, 16);
   $("#meta").textContent = `기준일 ${ymd(d.base_date)} · 업데이트 ${gen}` + (d.backfill ? " · 나중에 다시 계산한 기록" : "");
   renderTemp();
+  renderSectors();
   renderFilter();
   renderRules();
   const n = d.filter.news_count;
@@ -88,6 +89,8 @@ function renderTemp() {
     tiles.push(tile("CNN 공포·탐욕", `${num(fg.score)} <small style="font-size:13px;font-weight:500">${esc(kr)}</small>`, `1주 전 ${num(fg.week_ago)} · 1달 전 ${num(fg.month_ago)}`));
   }
   if (t.hy_spread) tiles.push(tile("미국 하이일드 스프레드", num(t.hy_spread.value, 2) + "%p", `20일 ${signed(t.hy_spread.change, 2, "%p")}${pctText(t.hy_spread.pct_1y)}`, t.hy_spread.spark));
+  if (t.usdkrw) tiles.push(tile("원/달러 환율", num(t.usdkrw.value, 1) + "원", `5일 ${signed(t.usdkrw.change, 1)}${pctText(t.usdkrw.pct_1y)} · ${t.usdkrw.date.slice(5)} 기준`, t.usdkrw.spark));
+  if (t.us10y) tiles.push(tile("미국 10년 국채금리", num(t.us10y.value, 2) + "%", `5일 ${signed(t.us10y.change, 2, "%p")}${pctText(t.us10y.pct_1y)}`, t.us10y.spark));
   if (t.breadth) {
     const b = t.breadth;
     tiles.push(tile("오르고 내린 종목", `<span class="up">${num(b.up)}</span> / <span class="down">${num(b.down)}</span>`, "상승 / 하락 (보통주)"));
@@ -124,6 +127,7 @@ function renderFilter() {
   $("#n-scalp").textContent = f.scalp_total;
   $("#n-value").textContent = f.value_total ?? "–";
   renderOverlap();
+  renderExcluded();
   document.querySelectorAll(".tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === state.tab));
   $("#tab-hint").textContent = TAB_HINT[state.tab];
   const list = f[state.tab] || [];
@@ -178,13 +182,15 @@ function valueCard(x) {
       <div><small>5일 기관+외국인</small><b class="${cls(x.flow5_eok)}">${signed(x.flow5_eok, 0, "억")}</b></div>
     </div>
     <ul class="checks">${x.checks.map((c) => `<li><span>${esc(c.label)}</span><span>${esc(c.value)}</span></li>`).join("")}</ul>
+    ${qualityRow(x)}
     ${news ? `<ul class="news">${news}</ul>` : `<p class="hint" style="margin:8px 0 0">최근 3일 관련 기사 없음</p>`}
+    ${detailBtn(x)}
   </article>`;
 }
 
 function cardHead(x) {
   return `<div class="hd">
-      <a class="nm" href="https://m.stock.naver.com/domestic/stock/${x.code}" target="_blank" rel="noopener">${esc(x.name)}<span class="mk">${esc(x.market)} ${x.code}</span></a>
+      <a class="nm" href="https://m.stock.naver.com/domestic/stock/${x.code}" target="_blank" rel="noopener">${esc(x.name)}<span class="mk">${esc(x.market)} ${x.code}${x.sector ? " · " + esc(x.sector) : ""}</span></a>
       <div class="px"><b>${num(x.close)}</b><span class="${cls(x.change)}">${signed(x.change, 1, "%")}</span></div>
     </div>${x.overlap ? `<span class="tag both">두 관점 겹침</span>` : ""}`;
 }
@@ -205,7 +211,7 @@ function card(x) {
   const nums = state.tab === "swing"
     ? [["5일 기관+외국인", `<span class="${cls(both5)}">${signed(both5, 0, "억")}</span>`],
        ["연속 순매수", `${fl.streak}일`],
-       ["연기금 5일", `<span class="${cls(fl.pension_5d)}">${signed(fl.pension_5d, 0, "억")}</span>`]]
+       ["외국인 지분율", x.quality && x.quality.fratio != null ? `${num(x.quality.fratio, 1)}% <small style="display:inline;font-size:11px" class="${cls(x.quality.fratio_chg)}">${signed(x.quality.fratio_chg, 2, "p")}</small>` : "–"]]
     : [["거래대금", `${num(x.value_eok, 0)}억`],
        ["평소 대비", `${num(x.value_mult, 1)}배`],
        ["오늘 기관+외국인", `<span class="${cls(bothToday)}">${signed(bothToday, 0, "억")}</span>`]];
@@ -215,8 +221,10 @@ function card(x) {
     <div class="nums">${nums.map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join("")}</div>
     <div class="l" style="font-size:12px;color:var(--sub)">최근 5일 기관+외국인 순매수 (억)</div>
     ${bars(fl.daily)}
+    ${qualityRow(x)}
     <ul class="checks">${x.checks.map((c) => `<li><span>${esc(c.label)}</span><span>${esc(c.value)}</span></li>`).join("")}</ul>
     <ul class="news">${news}</ul>
+    ${detailBtn(x)}
   </article>`;
 }
 
@@ -243,15 +251,111 @@ function renderScore() {
     hs.map((h) => `<td class="${cls(e["r" + h])}">${e["r" + h] == null ? "–" : signed(e["r" + h], 1, "%")}</td>`).join("") + "</tr>").join("");
   $("#scorecard").innerHTML = `<div class="tile wide"><table class="score">
       <thead><tr><th></th>${hs.map((h) => `<th>${h}일 뒤</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>${warn}
+    ${featureTable(sc.features)}
     ${recent ? `<details class="rules"><summary>최근 기록 보기</summary><table class="score recent"><thead><tr><th>날짜</th><th>구분</th><th style="text-align:left">종목</th>${hs.map((h) => `<th>${h}일</th>`).join("")}</tr></thead><tbody>${recent}</tbody></table></details>` : ""}`;
 }
+
+function featureTable(fs) {
+  if (!fs || !fs.length) return "";
+  const cell = (s) => (s ? `<b class="${cls(s.avg)}">${signed(s.avg, 1, "%")}</b><br><small>상승 ${s.win}% · ${s.n}건</small>` : `<span class="na">–</span>`);
+  const rows = fs.map((f) => `<tr><th>${esc(f.label)}</th><td>${cell(f.yes)}</td><td>${cell(f.no)}</td></tr>`).join("");
+  return `<h3 class="sub">조건별 성적 <small>스윙·단타 후보, ${fs[0].horizon}일 뒤</small></h3>
+    <div class="tile wide"><table class="score"><thead><tr><th></th><th>조건 있음</th><th>없음</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="hint">기록이 쌓이면 어떤 조건이 실제로 도움이 됐는지 보입니다. 건수가 적을 때는 참고만 하세요.</p>`;
+}
+
+/* ---------------- 업종·제외·상세 ---------------- */
+
+function renderSectors() {
+  const s = state.data.sectors;
+  if (!s || (!s.inflow.length && !s.outflow.length)) {
+    $("#sector-list").innerHTML = `<div class="empty">이 날짜는 업종 데이터가 없습니다.</div>`;
+    return;
+  }
+  const max = Math.max(1, ...s.inflow.map((r) => Math.abs(r.flow_eok)), ...s.outflow.map((r) => Math.abs(r.flow_eok)));
+  const row = (r) => {
+    const w = Math.max(2, (Math.abs(r.flow_eok) / max) * 100);
+    const names = r.flow_eok > 0 ? r.top : r.bottom;
+    return `<div class="sec"><div class="sec-hd"><b>${esc(r.sector)}</b><span class="${cls(r.flow_eok)}">${signed(r.flow_eok, 0, "억")}</span></div>
+      <div class="sec-bar"><i style="width:${w}%;background:var(--${r.flow_eok > 0 ? "up" : "down"})"></i></div>
+      <small>${r.n}종목 · 5일 등락 중앙값 <span class="${cls(r.rise_5d)}">${signed(r.rise_5d, 1, "%")}</span>${names.length ? " · " + names.map(esc).join(", ") : ""}</small></div>`;
+  };
+  $("#sector-list").innerHTML = `<div class="tile wide">${s.inflow.map(row).join("")}</div>` +
+    (s.outflow.length ? `<details class="rules"><summary>빠져나간 업종 보기</summary><div class="tile wide">${s.outflow.map(row).join("")}</div></details>` : "");
+}
+
+function renderExcluded() {
+  const ex = state.data.filter.excluded || [];
+  if (!ex.length) { $("#excluded").innerHTML = ""; return; }
+  $("#excluded").innerHTML = `<details class="rules"><summary>위험 공시로 뺀 종목 ${ex.length}개</summary><ul class="exlist">` +
+    ex.map((x) => `<li><b>${esc(x.name)}</b> <small>${x.reasons.map(esc).join(" / ")}</small></li>`).join("") + `</ul></details>`;
+}
+
+function qualityRow(x) {
+  const q = x.quality;
+  if (!q) return "";
+  const it = (k, v) => `<span>${k} <b class="${cls(v)}">${signed(v, 0, "억")}</b></span>`;
+  return `<div class="qrow"><small>5일 기관 세부</small>${it("연기금", q.pension_5d)}${it("투신", q.trust_5d)}${it("사모", q.private_5d)}</div>`;
+}
+
+function detailBtn(x) {
+  return x.chart ? `<button class="more" type="button" data-code="${x.code}">차트·상세 보기</button>` : "";
+}
+
+function lineChart(ch) {
+  const series = [["close", "var(--text)", 1.8], ["ma20", "var(--up)", 1.2], ["ma60", "var(--down)", 1.2]];
+  const all = series.flatMap(([k]) => ch[k]).filter((v) => v != null);
+  const min = Math.min(...all), max = Math.max(...all), w = 320, h = 150, n = ch.close.length;
+  const y = (v) => h - 8 - ((v - min) / (max - min || 1)) * (h - 16);
+  const lines = series.map(([k, c, sw]) => {
+    const pts = ch[k].map((v, i) => (v == null ? null : `${(i / (n - 1)) * w},${y(v)}`)).filter(Boolean).join(" ");
+    return `<polyline points="${pts}" fill="none" stroke="${c}" stroke-width="${sw}" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>`;
+  }).join("");
+  return `<svg class="chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="60일 주가와 이동평균">${lines}</svg>
+    <div class="legend"><span><i style="background:var(--text)"></i>종가</span><span><i style="background:var(--up)"></i>20일선</span><span><i style="background:var(--down)"></i>60일선</span>
+    <span class="rng">${num(min)} ~ ${num(max)}</span></div>
+    <div class="barlab"><span style="text-align:left">${ymd(ch.dates[0])}</span><span style="text-align:right">${ymd(ch.dates[n - 1])}</span></div>`;
+}
+
+function openDetail(code) {
+  const f = state.data.filter;
+  const x = [...(f.swing || []), ...(f.scalp || []), ...(f.value || [])].find((y) => y.code === code);
+  if (!x) return;
+  const groups = ["swing", "scalp", "value"].filter((g) => (f[g] || []).some((y) => y.code === code)).map((g) => TAB_NAME[g]);
+  const q = x.quality || {};
+  const fl = x.flow;
+  $("#detail-body").innerHTML = `${cardHead(x)}
+    <p class="hint">${groups.join(" · ")} 후보${x.sector ? " · " + esc(x.sector) : ""} · 시가총액 ${num(x.cap_eok)}억 · 거래대금 ${num(x.value_eok)}억</p>
+    ${x.chart ? lineChart(x.chart) : ""}
+    <div class="nums">
+      <div><small>외국인 지분율</small><b>${q.fratio == null ? "–" : num(q.fratio, 1) + "%"}</b></div>
+      <div><small>지분율 20일 변화</small><b class="${cls(q.fratio_chg)}">${signed(q.fratio_chg, 2, "%p")}</b></div>
+      <div><small>연기금 5일</small><b class="${cls(q.pension_5d)}">${signed(q.pension_5d, 0, "억")}</b></div>
+      <div><small>투신 5일</small><b class="${cls(q.trust_5d)}">${signed(q.trust_5d, 0, "억")}</b></div>
+      <div><small>사모 5일</small><b class="${cls(q.private_5d)}">${signed(q.private_5d, 0, "억")}</b></div>
+      <div><small>외국인 5일</small><b class="${cls(fl ? fl.foreign_5d : x.flow5_eok)}">${fl ? signed(fl.foreign_5d, 0, "억") : "–"}</b></div>
+    </div>
+    ${fl ? `<div class="l" style="font-size:12px;color:var(--sub)">최근 5일 기관+외국인 순매수 (억)</div>${bars(fl.daily)}` : ""}
+    <ul class="checks">${x.checks.map((c) => `<li><span>${esc(c.label)}</span><span>${esc(c.value)}</span></li>`).join("")}</ul>
+    <ul class="news">${newsList(x.news)}</ul>
+    <p class="links"><a href="https://m.stock.naver.com/domestic/stock/${x.code}" target="_blank" rel="noopener">네이버 증권</a>
+      <a href="https://dart.fss.or.kr/dsab007/main.do?option=corp&textCrpNm=${encodeURIComponent(x.name)}" target="_blank" rel="noopener">DART 공시</a></p>`;
+  $("#detail").showModal();
+}
+
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button.more");
+  if (b) openDetail(b.dataset.code);
+  if (e.target.closest("#detail .close") || e.target.id === "detail") $("#detail").close();
+});
 
 function renderRules() {
   const r = state.data.filter.rules;
   const eok = (v) => num(v / 1e8) + "억";
   $("#rules").innerHTML = `
     <h3>공통</h3>
-    <ul><li>보통주만 (우선주·스팩·관리종목 제외)</li><li>시가총액 ${eok(r.min_cap)} 이상, 거래대금 ${eok(r.min_value)} 이상</li>
+    <ul><li>보통주만 (우선주·스팩·관리종목·투자주의환기종목 제외)</li>
+    <li>최근 5영업일 안에 유상증자·전환사채·최대주주 변경·횡령·거래정지 같은 악재성 공시가 있으면 제외</li><li>시가총액 ${eok(r.min_cap)} 이상, 거래대금 ${eok(r.min_value)} 이상</li>
     <li>기사 제목에 종목명이 나온 종목만. 종목을 4개 이상 나열한 시황 기사는 제외</li>
     <li>공시는 계약·수주·자사주 취득·실적·특허 등 호재성 제목만</li></ul>
     <h3>단타</h3>

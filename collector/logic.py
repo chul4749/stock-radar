@@ -406,6 +406,94 @@ def mark_overlap(scalp, swing, value):
     return both
 
 
+# ---------------------------------------------------------------- 위험 종목
+
+def risk_codes(dart_items, matcher, sections=None):
+    """최근 악재성 공시(유상증자·CB 등) 또는 투자주의환기 종목 → {코드: [사유]}"""
+    out = {}
+    for it in dart_items:
+        if not it.get("bad"):
+            continue
+        for c in matcher.find(it["corp"])[:1]:
+            reasons = out.setdefault(c, [])
+            label = f"{it['at'][5:10].replace('-', '/')} {it['title']}"
+            if label not in reasons:
+                reasons.append(label)
+    for c, sec in (sections or {}).items():
+        if "투자주의환기" in sec:
+            out.setdefault(c, []).append(sec)
+    return out
+
+
+# ---------------------------------------------------------------- 종목 정보 보강
+
+def enrich(items, closes, sectors, quality):
+    """후보 종목에 업종, 60일 차트, 수급의 질(연기금·투신·사모·외국인 지분율)을 붙인다.
+
+    quality: {"pension": S, "trust": S, "private": S, "fratio_now": S, "fratio_prev": S} (값은 원·%)
+    """
+    def get(s, code):
+        if s is None:
+            return None
+        v = s.get(code)
+        return None if v is None or (isinstance(v, float) and math.isnan(v)) else float(v)
+
+    for x in items:
+        code = x["code"]
+        x["sector"] = (sectors.get(code) if sectors is not None else None) or ""
+        if code in closes.columns:
+            col = closes[code]
+            x["chart"] = {
+                "dates": list(closes.index[-60:]),
+                "close": [r1(v) for v in col.iloc[-60:]],
+                "ma20": [r1(v) for v in col.rolling(20).mean().iloc[-60:]],
+                "ma60": [r1(v) for v in col.rolling(60).mean().iloc[-60:]],
+            }
+        fr_now, fr_prev = get(quality.get("fratio_now"), code), get(quality.get("fratio_prev"), code)
+        x["quality"] = {
+            "pension_5d": r1((get(quality.get("pension"), code) or 0) / EOK),
+            "trust_5d": r1((get(quality.get("trust"), code) or 0) / EOK),
+            "private_5d": r1((get(quality.get("private"), code) or 0) / EOK),
+            "fratio": r1(fr_now) if fr_now is not None else None,
+            "fratio_chg": round(fr_now - fr_prev, 2) if fr_now is not None and fr_prev is not None else None,
+        }
+    return items
+
+
+# ---------------------------------------------------------------- 업종별 돈 흐름
+
+def sector_flows(universe, sectors, flows_5d, closes, top=8):
+    """업종별 5일 기관+외국인 순매수 합(억)과 5일 등락률 중앙값."""
+    if sectors is None or len(sectors) == 0:
+        return {"inflow": [], "outflow": []}
+    groups = {}
+    for code, info in universe.items():
+        sec = sectors.get(code)
+        if not sec or code not in closes.columns:
+            continue
+        f = float(flows_5d["foreign"].get(code, 0) or 0) + float(flows_5d["inst"].get(code, 0) or 0)
+        col = closes[code]
+        rise = (col.iloc[-1] / col.iloc[-6] - 1) * 100 if len(col) >= 6 and col.iloc[-6] else None
+        g = groups.setdefault(sec, {"flow": 0.0, "rises": [], "stocks": []})
+        g["flow"] += f
+        if rise is not None and not math.isnan(rise):
+            g["rises"].append(rise)
+        g["stocks"].append((f, info["name"]))
+    rows = []
+    for sec, g in groups.items():
+        if len(g["stocks"]) < 3:
+            continue
+        rises = sorted(g["rises"])
+        g["stocks"].sort(reverse=True)
+        rows.append({"sector": sec, "flow_eok": round(g["flow"] / EOK), "n": len(g["stocks"]),
+                     "rise_5d": r1(rises[len(rises) // 2]) if rises else None,
+                     "top": [n for f, n in g["stocks"][:3] if f > 0],
+                     "bottom": [n for f, n in g["stocks"][::-1][:3] if f < 0]})
+    rows.sort(key=lambda r: -r["flow_eok"])
+    return {"inflow": [r for r in rows if r["flow_eok"] > 0][:top],
+            "outflow": [r for r in rows[::-1] if r["flow_eok"] < 0][:5]}
+
+
 # ---------------------------------------------------------------- 성적표
 
 HORIZONS = (1, 5, 20)
@@ -445,13 +533,53 @@ def scorecard(history, closes, index_closes):
                     if ex is not None:
                         s["ex"].append(ex)
                 recent.append(entry)
+                entry["features"] = features_of(x)
     out = {}
     for g, by_n in stats.items():
         out[g] = {}
         for n, s in by_n.items():
-            rets = s["rets"]
-            out[g][str(n)] = {"n": len(rets), "avg": r1(sum(rets) / len(rets)),
-                              "win": round(100 * sum(1 for r in rets if r > 0) / len(rets)),
-                              "excess": r1(sum(s["ex"]) / len(s["ex"])) if s["ex"] else None}
+            out[g][str(n)] = summarize_returns(s["rets"], s["ex"])
     recent.sort(key=lambda e: e["date"], reverse=True)
-    return out, recent[:60]
+    return out, recent[:60], feature_stats(recent)
+
+
+def summarize_returns(rets, ex=None):
+    if not rets:
+        return None
+    return {"n": len(rets), "avg": r1(sum(rets) / len(rets)),
+            "win": round(100 * sum(1 for r in rets if r > 0) / len(rets)),
+            "excess": r1(sum(ex) / len(ex)) if ex else None}
+
+
+# 조건별 성적: 후보 안에서 이 조건이 있을 때와 없을 때 5일 뒤 수익률 비교
+FEATURES = {
+    "pension": "연기금 5일 순매수",
+    "trust": "투신 5일 순매수",
+    "streak3": "3일 이상 연속 순매수",
+    "fratio_up": "외국인 지분율 20일 증가",
+    "overlap": "두 관점 겹침",
+}
+
+
+def features_of(x):
+    q = x.get("quality") or {}
+    fl = x.get("flow") or {}
+    return {
+        "pension": (q.get("pension_5d") or 0) > 0,
+        "trust": (q.get("trust_5d") or 0) > 0,
+        "streak3": (fl.get("streak") or 0) >= 3,
+        "fratio_up": (q.get("fratio_chg") or 0) > 0,
+        "overlap": bool(x.get("overlap")),
+    }
+
+
+def feature_stats(entries, horizon=5):
+    """스윙·단타 후보(수급 관점)만 대상으로 조건 있음/없음 비교."""
+    out = []
+    pool = [e for e in entries if e["group"] in ("swing", "scalp") and e.get(f"r{horizon}") is not None]
+    for key, label in FEATURES.items():
+        yes = [e[f"r{horizon}"] for e in pool if e.get("features", {}).get(key)]
+        no = [e[f"r{horizon}"] for e in pool if not e.get("features", {}).get(key)]
+        out.append({"key": key, "label": label, "horizon": horizon,
+                    "yes": summarize_returns(yes), "no": summarize_returns(no)})
+    return out

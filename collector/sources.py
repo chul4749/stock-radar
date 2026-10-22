@@ -103,6 +103,20 @@ def fundamentals(ymd):
     return df.astype(float)
 
 
+def foreign_ratio(ymd):
+    """전종목 외국인 지분율(%). 반환: Series(index=티커)"""
+    from pykrx import stock
+    df = retry(lambda: stock.get_exhaustion_rates_of_foreign_investment_by_ticker(ymd, "ALL"))
+    return df["지분율"].astype(float)
+
+
+def sectors(ymd):
+    """업종명. 반환: Series(index=티커)"""
+    from pykrx import stock
+    parts = [retry(lambda: stock.get_market_sector_classifications(ymd, m))["업종명"] for m in ("KOSPI", "KOSDAQ")]
+    return pd.concat(parts)
+
+
 def index_history(ticker, fromdate, todate):
     from pykrx import stock
     df = retry(lambda: stock.get_index_ohlcv(fromdate, todate, ticker))
@@ -232,6 +246,11 @@ def _parse_naver_time(v):
         return None
 
 
+# 주가에 부담이 되는 공시 — 이런 공시가 최근 있으면 후보에서 뺀다
+DART_BAD = ["유상증자", "전환사채", "신주인수권부사채", "교환사채", "최대주주변경", "최대주주 변경", "감자결정",
+            "불성실공시", "상장적격성", "횡령", "배임", "회생절차", "파산", "매매거래정지", "거래정지", "감사의견",
+            "관리종목", "투자경고", "투자위험", "상장폐지"]
+
 DART_GOOD = ["공급계약", "판매", "수주", "자기주식취득", "자기주식 취득", "무상증자", "영업(잠정)실적",
              "실적", "특허", "기술이전", "기술도입", "신규시설투자", "타법인주식", "합병", "현금ㆍ현물배당"]
 
@@ -269,7 +288,9 @@ def dart_today(ymd, max_pages=15):
                         "url": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={m.group(1)}",
                         "at": f"{ymd[:4]}-{ymd[4:6]}-{ymd[6:]}T{hhmm.group(1) if hhmm else '00:00'}+09:00",
                         "kind": "공시", "source": "DART",
-                        "good": any(k in title for k in DART_GOOD) and "정정" not in title[:4]})
+                        "good": any(k in title for k in DART_GOOD) and not any(k in title for k in DART_BAD)
+                                and "정정" not in title[:4],
+                        "bad": any(k in title for k in DART_BAD) and "철회" not in title})
         if new == 0:
             break
         time.sleep(0.5)

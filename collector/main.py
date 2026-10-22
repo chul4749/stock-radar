@@ -75,6 +75,14 @@ def main(argv):
     flows_5d = {"foreign": sources.net_purchase(last5[0], base, "외국인"),
                 "inst": sources.net_purchase(last5[0], base, "기관합계")}
     pension_5d = safe("연기금", lambda: sources.net_purchase(last5[0], base, "연기금"), errors)
+    quality = {
+        "pension": pension_5d,
+        "trust": safe("투신", lambda: sources.net_purchase(last5[0], base, "투신"), errors),
+        "private": safe("사모", lambda: sources.net_purchase(last5[0], base, "사모"), errors),
+        "fratio_now": safe("외국인 지분율", lambda: sources.foreign_ratio(base), errors),
+        "fratio_prev": safe("외국인 지분율(20일 전)", lambda: sources.foreign_ratio(used_days[-21]), errors),
+    }
+    sectors = safe("업종", lambda: sources.sectors(base), errors)
     if all(len(fl["foreign"]) == 0 for _, fl in flows_daily):
         errors.append("일별 수급이 모두 비어 있음")
 
@@ -91,6 +99,10 @@ def main(argv):
     dart = safe("DART", lambda: sources.dart_today(base), errors) or []
     log(f"  DART {len(dart)} (호재성 {sum(1 for x in dart if x['good'])})")
     all_items = news + nv + dart
+    # 악재성 공시는 최근 5영업일을 본다 (기준일은 위에서 받음)
+    dart_bad = [x for x in dart if x["bad"]]
+    for d in used_days[-5:-1]:
+        dart_bad += [x for x in (safe(f"DART {d}", lambda: sources.dart_today(d), errors) or []) if x["bad"]]
 
     matcher = logic.NameMatcher({c: v["name"] for c, v in universe.items()})
     base_dt = datetime.strptime(base, "%Y%m%d").replace(tzinfo=KST)
@@ -100,6 +112,11 @@ def main(argv):
     news_today = logic.attach_news(all_items, matcher, prev_close, until)
     news_3d = logic.attach_news(all_items, matcher, since_3d, until)
     log(f"  기사 걸린 종목: 오늘 {len(news_today)} · 3일 {len(news_3d)}")
+
+    risk = logic.risk_codes(dart_bad, matcher, {c: v["section"] for c, v in universe.items()})
+    excluded = [{"code": c, "name": universe[c]["name"], "reasons": r[:3]} for c, r in risk.items() if c in universe]
+    universe = {c: v for c, v in universe.items() if c not in risk}
+    log(f"  위험 공시·투자주의환기로 제외 {len(excluded)}")
 
     t = step("종목 필터")
     scalp, swing = logic.screen(universe, closes, values, flows_daily, flows_5d, pension_5d,
@@ -126,6 +143,10 @@ def main(argv):
         log(f"   저평가 {x['name']} -{x['drop_60d']}% PBR {x['pbr']}/{x['pbr_med']}")
     overlap = logic.mark_overlap(scalp, swing, value)
     log(f"  겹침 {len(overlap)}")
+    for group in (scalp[:10], swing[:10], value[:10]):
+        logic.enrich(group, closes, sectors, quality)
+    sector_flow = logic.sector_flows(universe, sectors, flows_5d, closes)
+    log(f"  업종 유입 상위 {[r['sector'] for r in sector_flow['inflow'][:5]]}")
 
     t = step("시장 온도")
     temp = {}
@@ -156,6 +177,10 @@ def main(argv):
     flows = safe("시장 수급", lambda: sources.market_flows(used_days[-20], base), errors)
     if flows:
         temp["flows"] = {m: logic.flows_summary(df) for m, df in flows.items()}
+    for key, sid in (("usdkrw", "DEXKOUS"), ("us10y", "DGS10")):
+        rows = safe(sid, lambda: sources.fred(sid), errors)
+        if rows:
+            temp[key] = logic.series_stat(rows)
     temp["credit_balance"] = None  # 신용잔고·반대매매: 수집 경로 미확인
     temp["summary"] = logic.summarize_temperature(temp)
 
@@ -174,7 +199,9 @@ def main(argv):
             "value_rules": logic.VALUE_RULES,
             "value": value[:10], "value_total": len(value),
             "overlap": overlap,
+            "excluded": excluded,
         },
+        "sectors": sector_flow,
         "errors": errors,
     }
     os.makedirs(DATA, exist_ok=True)
@@ -195,9 +222,9 @@ def main(argv):
             with open(os.path.join(DATA, f"{d}.json"), encoding="utf-8") as f:
                 flt = json.load(f)["filter"]
             history.append((d, {g: flt.get(g, []) for g in ("swing", "scalp", "value")}))
-        stats, recent = logic.scorecard(history, closes, kospi)
+        stats, recent, features = logic.scorecard(history, closes, kospi)
         card = {"generated_at": out["generated_at"], "base_date": base, "days": len(history),
-                "horizons": list(logic.HORIZONS), "stats": stats, "recent": recent}
+                "horizons": list(logic.HORIZONS), "stats": stats, "recent": recent, "features": features}
         with open(os.path.join(DATA, "scorecard.json"), "w", encoding="utf-8") as f:
             json.dump(card, f, ensure_ascii=False, separators=(",", ":"), default=_json_default)
         log(f"  기록 {len(history)}일, 통계 {json.dumps(stats, ensure_ascii=False)}")

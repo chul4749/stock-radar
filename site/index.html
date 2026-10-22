@@ -26,6 +26,11 @@
     <div id="tiles" class="tiles"></div>
   </section>
 
+  <section class="block" id="sectors">
+    <h2>업종별 돈 흐름 <small class="h2s">최근 5일 기관+외국인</small></h2>
+    <div id="sector-list"></div>
+  </section>
+
   <section class="block" id="filter">
     <div class="h2row">
       <h2>종목 필터</h2>
@@ -38,6 +43,7 @@
     <div id="overlap"></div>
     <p class="hint" id="tab-hint"></p>
     <div id="cards"></div>
+    <div id="excluded"></div>
     <details class="rules">
       <summary>필터 기준 보기</summary>
       <div id="rules"></div>
@@ -56,6 +62,12 @@
     <p id="errors" class="err"></p>
   </footer>
 </main>
+<dialog id="detail" aria-label="종목 상세">
+  <div class="dlg-in">
+    <button class="close" type="button" aria-label="닫기">✕</button>
+    <div id="detail-body"></div>
+  </div>
+</dialog>
 <script src="app.js"></script>
 </body>
 </html>
