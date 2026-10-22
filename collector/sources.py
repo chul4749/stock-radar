@@ -290,7 +290,8 @@ def dart_today(ymd, max_pages=15):
                         "kind": "공시", "source": "DART",
                         "good": any(k in title for k in DART_GOOD) and not any(k in title for k in DART_BAD)
                                 and "정정" not in title[:4],
-                        "bad": any(k in title for k in DART_BAD) and "철회" not in title})
+                        "bad": any(k in title for k in DART_BAD)
+                               and not any(k in title for k in ("미지정", "철회", "해제", "취소", "지정유예"))})
         if new == 0:
             break
         time.sleep(0.5)
