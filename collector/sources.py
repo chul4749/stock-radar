@@ -137,6 +137,27 @@ def vix():
     return rows
 
 
+def kofia(obj, start_ymd, end_ymd):
+    """금융투자협회 FreeSIS 일별 통계 → 날짜 오름차순 [{TMPV1: 날짜, TMPV2...}]. 금액 단위 백만 원, T+1 영업일 공표.
+
+    화면에 먼저 접속해 세션 쿠키를 받아야 JSON을 준다 (2026-10 시험, probe/credit.py).
+    """
+    base = "https://freesis.kofia.or.kr"
+    page = f"{base}/stat/FreeSIS.do?parentDivId=MSIS10000000000000&serviceId={obj[:-2]}"
+    body = {"dmSearch": {"tmpV40": "1000000", "tmpV41": "1", "tmpV1": "D",
+                         "tmpV45": start_ymd, "tmpV46": end_ymd, "OBJ_NM": obj}}
+
+    def once():
+        s = requests.Session()
+        s.headers.update(UA)
+        s.get(page, timeout=30).raise_for_status()
+        r = s.post(f"{base}/meta/getMetaDataList.do", json=body, timeout=60, headers={"Referer": page})
+        r.raise_for_status()
+        return r.json()["ds1"]
+
+    return sorted(retry(once), key=lambda x: x["TMPV1"])
+
+
 def fred(series_id):
     # 브라우저 UA 를 붙이면 FRED 가 응답하지 않는다 (2026-10 시험)
     r = retry(lambda: get("https://fred.stlouisfed.org/graph/fredgraph.csv",

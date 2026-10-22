@@ -52,6 +52,28 @@ def series_stat(rows, days_back=5, year=252):
     }
 
 
+def credit_summary(loans, funds):
+    """FreeSIS 신용공여 잔고(STATSCU0100000070BO) + 증시자금(STATSCU0100000060BO) → 억 원 단위 요약.
+
+    loans: TMPV2 신용거래융자 전체, TMPV3 코스피, TMPV4 코스닥
+    funds: TMPV5 위탁매매 미수금, TMPV6 반대매매 금액, TMPV7 미수금 대비 반대매매 비중(%)
+    """
+    eok = lambda v: None if v is None else v / 100  # 백만 원 → 억 원
+    iso = lambda d: f"{d[:4]}-{d[4:6]}-{d[6:]}"
+    out = {}
+    if loans:
+        last = loans[-1]
+        out["loan"] = {**series_stat([(iso(r["TMPV1"]), eok(r["TMPV2"])) for r in loans]),
+                       "kospi": r1(eok(last.get("TMPV3"))), "kosdaq": r1(eok(last.get("TMPV4")))}
+    if funds:
+        last = funds[-1]
+        forced = [(iso(r["TMPV1"]), eok(r["TMPV6"])) for r in funds]
+        recent = [v for _, v in forced[-20:]]
+        out["forced"] = {**series_stat(forced), "unpaid": r1(eok(last.get("TMPV5"))),
+                         "ratio": last.get("TMPV7"), "avg20": r1(sum(recent) / len(recent))}
+    return out or None
+
+
 def korea_vol(kospi200):
     """VKOSPI 대체: 코스피200 20일 실제 변동성."""
     vol = realized_vol(kospi200).dropna()

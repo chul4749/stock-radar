@@ -20,4 +20,4 @@
 | VKOSPI | 네이버·pykrx·KRX 추정 경로 | ❌ | 로그인 후에도 경로 못 찾음 (주가지수 목록에 없음, 파생상품지수 메뉴 경로 미확인) |
 | KRX 전체 (pykrx) | data.krx.co.kr | ✅ | 회원 로그인 필요 → Secrets `KRX_ID`/`KRX_PW` 등록 후 성공 (전종목 2,867·투자자별 순매수 2,598·PER/PBR 2,714) |
 | 옛 네이버 금융 페이지 | finance.naver.com/item, sise, news | ❌ | Npay 증권 신형 화면으로 바뀌어 표를 못 읽음 |
-| 신용잔고·반대매매 | 금융투자협회 freesis | △ | 접속만 확인, 데이터 경로 미확인 |
+| 신용잔고·반대매매 | 금융투자협회 FreeSIS `meta/getMetaDataList.do` | ✅ | 화면 GET으로 세션 쿠키 받은 뒤 JSON POST. `STATSCU0100000070BO` 신용공여 잔고(TMPV2 융자 전체·3 코스피·4 코스닥), `STATSCU0100000060BO` 증시자금(TMPV5 미수금·6 반대매매·7 비중%). 백만 원, T+1 공표 (2026-10-23 시험, `probe/credit.py`) |

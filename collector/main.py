@@ -183,7 +183,11 @@ def main(argv):
         rows = [r for r in rows if r[0] < iso(base)] if rows else rows
         if rows:
             temp[key] = logic.series_stat(rows)
-    temp["credit_balance"] = None  # 신용잔고·반대매매: 수집 경로 미확인
+    # 신용잔고·반대매매: 금융투자협회 FreeSIS (T+1 공표라 기준일 전날까지가 최신). 1년 백분위를 위해 400일치
+    kofia_from = (datetime.strptime(base, "%Y%m%d") - timedelta(days=400)).strftime("%Y%m%d")
+    loans = safe("신용잔고", lambda: sources.kofia("STATSCU0100000070BO", kofia_from, base), errors)
+    funds = safe("반대매매", lambda: sources.kofia("STATSCU0100000060BO", kofia_from, base), errors)
+    temp["credit_balance"] = logic.credit_summary(loans, funds)
     temp["summary"] = logic.summarize_temperature(temp)
     temp["thermo"] = logic.thermometer(temp)
     # 전일·1주 전·1달 전 온도: 이전 기록 파일에서

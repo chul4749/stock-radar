@@ -8,7 +8,7 @@
 - `collector/` — 수집기 (Python 3.12)
   - `main.py` — 하루치 결과를 `site/data/{기준일}.json`으로 쓰고 `index.json`, `scorecard.json`을 갱신한다.
     실행: `python -m collector.main [YYYYMMDD]` (기준일을 안 주면 18시 이후는 오늘, 그 전은 전 영업일)
-  - `sources.py` — 외부 데이터 접속 (KRX/pykrx, 네이버, 구글 뉴스, DART, CBOE, FRED, CNN)
+  - `sources.py` — 외부 데이터 접속 (KRX/pykrx, 네이버, 구글 뉴스, DART, CBOE, FRED, CNN, 금융투자협회 FreeSIS)
   - `logic.py` — 시장 온도계, 종목 필터, 위험 공시 제외, 저평가, 성적표 계산
   - `util.py` — KST, EOK(억), log
 - `site/` — 빌드 없는 정적 페이지 (`index.html`, `app.js`, `style.css`), 데이터는 `site/data/`
@@ -21,7 +21,8 @@
 - `.github/workflows/collect.yml`: 평일 18:10 KST에 실행 → 테스트 → 수집 → `data: YYYY-MM-DD` 커밋 → (설정 시) Pages 배포.
   수동 실행 때 `dates`에 과거 기준일을 넣으면 다시 계산한다(성적표 채우기용).
 - KRX는 로그인 필요: Secrets `KRX_ID`/`KRX_PW`.
-- VKOSPI는 경로를 못 찾아 코스피200 20일 실현 변동성으로 대신한다. 신용잔고·반대매매는 아직 수집 경로 없음.
+- VKOSPI는 경로를 못 찾아 코스피200 20일 실현 변동성으로 대신한다.
+- 신용잔고·반대매매는 금융투자협회 FreeSIS(`sources.kofia`)에서 받는다. T+1 공표라 기준일 전날 값이 최신.
 - 네이버·CNN은 비공식 경로라 바뀌면 빠질 수 있다. 수집 실패는 `errors`에 남기고 나머지는 계속 진행한다.
 
 ## 화면 규칙

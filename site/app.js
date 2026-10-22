@@ -81,7 +81,8 @@ const INFO = {
   us10y: "미국 10년 만기 국채 금리입니다. 금리가 오르면 성장주·기술주 가치가 낮게 평가되기 쉽고, 위험자산에서 돈이 빠지는 경우가 많습니다.",
   marketflows: "시장 전체에서 외국인·기관이 순매수(산 금액 − 판 금액)한 규모입니다. 단위는 억 원입니다.",
   selling: "60일 중 가장 낮은 가격(신저가)까지 떨어진 종목 수를 최근 5일 평균과 비교합니다. 신저가 종목이 늘면 버티던 종목까지 팔리고 있다는 뜻이고, 줄면 투매가 잦아들고 있다는 뜻입니다.",
-  creditbal: "빚을 내서 산 주식(신용잔고)과, 빚을 못 갚아 강제로 팔린 물량(반대매매)입니다. 강제 매도가 몰리면 좋은 종목도 같이 급락합니다. 아직 수집 경로를 찾지 못했습니다.",
+  loan: "개인이 증권사에서 돈을 빌려 산 주식 금액(신용거래융자 잔고)입니다. 많이 쌓일수록 주가가 빠질 때 담보 부족으로 강제로 팔리는 물량(반대매매)이 커질 수 있습니다. 금융투자협회 자료라 하루 늦게 나옵니다.",
+  forced: "외상으로 산 주식 대금(미수금)을 기한 안에 못 갚아 증권사가 강제로 판 금액입니다. 급락장에서 반대매매가 몰리면 좋은 종목도 같이 떨어집니다. 금융투자협회 자료라 하루 늦게 나옵니다.",
 };
 
 // 1년 중 위치(백분위)로 쓰는 한 줄 해석. high = 값이 높을 때의 의미
@@ -122,6 +123,12 @@ function interpret(key, t) {
       if (k && k.change < -0.5 && r > 0.55) return base + " (지수는 내렸는데 다수는 오름)";
       return base;
     }
+    case "loan": {
+      const l = (t.credit_balance || {}).loan; if (!l) return "";
+      const p = pctLine(l.pct_1y, "빚투 많이 쌓임", "빚투 부담 작음");
+      return l.change != null && Math.abs(l.change) >= 5000 ? `${p} · 5일 새 ${eokText(Math.abs(l.change))} ${l.change > 0 ? "늘어남" : "줄어듦 (빚 정리 중)"}` : p;
+    }
+    case "forced": return pctLine(((t.credit_balance || {}).forced || {}).pct_1y, "강제 매도가 많은 편 → 투매 압력", "강제 매도 적음");
     case "kospi": case "kosdaq": {
       const x = (t.index || {})[key]; if (!x) return "";
       return x.change_20d <= -10 ? "20일 새 10% 넘게 하락 — 조정 폭이 큼" : x.change_20d >= 10 ? "20일 새 10% 넘게 상승 — 단기 과열 주의" : "20일 흐름은 보통 범위";
@@ -237,6 +244,8 @@ function zoneFor(key, t) {
     case "korea_vol": return pct(t.korea_vol, "잠잠", "출렁임");
     case "credit": return pct(t.hy_spread, "여유", "돈줄 조임");
     case "usdkrw": return pct(t.usdkrw, "원화 강세", "원화 약세");
+    case "loan": return pct((t.credit_balance || {}).loan, "적음", "빚투 과열");
+    case "forced": return pct((t.credit_balance || {}).forced, "적음", "많음");
     case "us10y": return pct(t.us10y, "부담 작음", "부담 큼");
     case "cnn": return t.fear_greed ? zoneBar([[25, "var(--g0)", "극단 공포"], [45, "var(--g1)", ""], [55, "var(--g2)", "중립"], [75, "var(--g3)", ""], [100, "var(--g4)", "탐욕"]], t.fear_greed.score) : "";
     case "kospi": case "kosdaq": {
@@ -293,6 +302,9 @@ function highLowChart(b) {
     (d0 && d1 ? `<div class="barlab"><span style="text-align:left">${ymd(d0)}</span><span style="text-align:right">${ymd(d1)}</span></div>` : "");
 }
 
+// 억 원 → "1.23조" / "456억"
+const eokText = (v) => (v == null ? "–" : Math.abs(v) >= 10000 ? `${num(v / 10000, 2)}조` : `${num(v)}억`);
+
 const pctText = (p) => (p == null ? "" : ` · 1년 중 ${p}% 위치`);
 
 function renderTemp() {
@@ -348,7 +360,16 @@ function renderTemp() {
     }
     tiles.push(`<div class="tile wide"><div class="l">시장 전체 순매수 (억 원) ${infoBtn("marketflows")}</div>${infoBox("marketflows")}<table class="flowtbl"><thead><tr><th></th><th>오늘</th><th>5일</th><th>20일</th></tr></thead><tbody>${rows.join("")}</tbody></table></div>`);
   }
-  tiles.push(tile("신용잔고·반대매매", `<span class="na">–</span>`, "아직 수집 경로를 찾지 못함", null, { key: "creditbal" }));
+  const cb = t.credit_balance || {};
+  if (cb.loan) {
+    const l = cb.loan;
+    tiles.push(tile("신용융자 잔고 (빚투)", eokText(l.value), `코스피 ${eokText(l.kospi)} · 코스닥 ${eokText(l.kosdaq)}<br>5일 ${l.change == null ? "–" : (l.change > 0 ? "+" : "−") + eokText(Math.abs(l.change))} · ${l.date.slice(5)} 기준`, l.spark, { key: "loan" }));
+  }
+  if (cb.forced) {
+    const f = cb.forced;
+    tiles.push(tile("반대매매 (강제 매도)", eokText(f.value), `미수금 ${eokText(f.unpaid)} 중 ${num(f.ratio, 1)}% · 20일 평균 ${eokText(f.avg20)}<br>${f.date.slice(5)} 기준`, f.spark, { key: "forced" }));
+  }
+  if (!cb.loan && !cb.forced) tiles.push(tile("신용잔고·반대매매", `<span class="na">–</span>`, "이번 기준일엔 받지 못함", null));
   $("#tiles").innerHTML = tiles.join("");
 }
 

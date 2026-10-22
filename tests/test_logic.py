@@ -218,3 +218,14 @@ def test_thermometer_averages_parts_and_labels():
     assert th["score"] == 16 and th["label"] == "극단적 공포"
     assert logic.thermometer({"vix": {"value": 1, "pct_1y": 1}}) is None
     assert logic.thermo_label(50) == ("중립", "neutral") and logic.thermo_label(80)[0] == "극단적 탐욕"
+
+
+def test_credit_summary_units_and_ratio():
+    loans = [{"TMPV1": f"202610{d:02d}", "TMPV2": 30000000 + d * 100000, "TMPV3": 23000000, "TMPV4": 7000000} for d in range(1, 11)]
+    funds = [{"TMPV1": f"202610{d:02d}", "TMPV5": 1000000, "TMPV6": 10000 * d, "TMPV7": d / 10} for d in range(1, 11)]
+    c = logic.credit_summary(loans, funds)
+    assert c["loan"]["value"] == 310000.0 and c["loan"]["date"] == "2026-10-10"
+    assert c["loan"]["change"] == 5000.0 and c["loan"]["kospi"] == 230000.0
+    assert c["forced"]["value"] == 1000.0 and c["forced"]["unpaid"] == 10000.0
+    assert c["forced"]["ratio"] == 1.0 and c["forced"]["avg20"] == 550.0
+    assert logic.credit_summary(None, None) is None
