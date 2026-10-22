@@ -52,6 +52,8 @@ main { max-width: 760px; margin: 0 auto; padding: 8px 16px 40px; }
 h2 { font-size: 17px; margin: 0 0 10px; letter-spacing: -0.02em; }
 .h2row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
 .h2row h2 { margin: 0; }
+.opt { font-size: 13px; color: var(--sub); display: inline-flex; align-items: center; gap: 4px; cursor: pointer; white-space: nowrap; }
+.opt input { margin: 0; accent-color: var(--text); }
 .hint { color: var(--sub); font-size: 13px; margin: 6px 0 10px; }
 
 /* 시장 온도 요약 */

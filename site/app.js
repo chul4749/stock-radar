@@ -7,8 +7,11 @@ const signed = (v, d = 1, unit = "") => (v == null ? "–" : (v > 0 ? "+" : "") 
 const cls = (v) => (v == null ? "na" : v > 0 ? "up" : v < 0 ? "down" : "");
 const ymd = (s) => `${s.slice(0, 4)}.${s.slice(4, 6)}.${s.slice(6, 8)}`;
 
-let state = { data: null, tab: "swing", score: null };
-try { state.tab = localStorage.getItem("tab") || "swing"; } catch (e) { /* 저장 불가 환경 */ }
+let state = { data: null, tab: "swing", score: null, expAll: false };
+try {
+  state.tab = localStorage.getItem("tab") || "swing";
+  state.expAll = localStorage.getItem("expAll") === "1";
+} catch (e) { /* 저장 불가 환경 */ }
 
 async function load(date) {
   const r = await fetch(`data/${date}.json`, { cache: "no-cache" });
@@ -30,6 +33,13 @@ async function init() {
   } catch (e) {
     $("#cards").innerHTML = `<div class="empty">${esc(e.message || "데이터가 아직 없습니다")}</div>`;
   }
+  const ea = $("#exp-all");
+  ea.checked = state.expAll;
+  ea.onchange = () => {
+    state.expAll = ea.checked;
+    try { localStorage.setItem("expAll", state.expAll ? "1" : "0"); } catch (e) { /* 무시 */ }
+    applyExpAll();
+  };
   document.querySelectorAll(".tabs button").forEach((b) => {
     b.onclick = () => {
       state.tab = b.dataset.tab;
@@ -123,7 +133,14 @@ const THERMO_KR = (s) => (s < 25 ? "극단적 공포" : s < 45 ? "공포" : s < 
 const THERMO_COLOR = (s) => (s < 25 ? "var(--g0)" : s < 45 ? "var(--g1)" : s < 55 ? "var(--g2)" : s < 75 ? "var(--g3)" : "var(--g4)");
 
 const infoBtn = (key) => (INFO[key] ? `<button class="info" type="button" data-info="${key}" aria-label="설명 보기">ⓘ</button>` : "");
-const infoBox = (key) => (INFO[key] ? `<p class="exp" data-exp="${key}" hidden>${esc(INFO[key])}</p>` : "");
+const infoBox = (key) => (INFO[key] ? `<p class="exp" data-exp="${key}"${state.expAll ? "" : " hidden"}>${esc(INFO[key])}</p>` : "");
+
+// '설명 항상 펼치기': 모든 ⓘ 설명과 온도계 지표 목록을 펼치거나 접는다
+function applyExpAll() {
+  document.querySelectorAll("[data-exp]").forEach((b) => { b.hidden = !state.expAll; });
+  const d = $("#thermo details");
+  if (d) d.open = state.expAll;
+}
 
 document.addEventListener("click", (e) => {
   const b = e.target.closest("button.info");
@@ -175,7 +192,7 @@ function renderThermo() {
       <ul class="th-cmp">${cmp}</ul>
     </div>
     ${infoBox("thermo")}
-    <details class="rules"><summary>무엇으로 계산했나 (${th.parts.length}개 지표)</summary>${parts}</details>
+    <details class="rules"${state.expAll ? " open" : ""}><summary>무엇으로 계산했나 (${th.parts.length}개 지표)</summary>${parts}</details>
   </div>`;
 }
 
