@@ -79,10 +79,15 @@ def main(argv):
         errors.append("일별 수급이 모두 비어 있음")
 
     t = step("뉴스·공시")
-    news = safe("구글 뉴스", sources.google_news, errors) or []
-    log(f"  구글 뉴스 {len(news)}")
-    nv = safe("네이버 주요뉴스", sources.naver_main_news, errors) or []
-    log(f"  네이버 주요뉴스 {len(nv)}")
+    iso = lambda d: f"{d[:4]}-{d[4:6]}-{d[6:]}"
+    g_start = iso(used_days[-4])
+    g_end = (datetime.strptime(base, "%Y%m%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+    news = safe("구글 뉴스", lambda: sources.google_news(g_start, g_end), errors) or []
+    log(f"  구글 뉴스 {len(news)} ({g_start} ~ {g_end} 전)")
+    # 네이버 주요뉴스는 최신 목록만 주므로 기준일이 최근일 때만 쓴다
+    backfill = (datetime.now(KST).date() - datetime.strptime(base, "%Y%m%d").date()).days > 3
+    nv = [] if backfill else (safe("네이버 주요뉴스", sources.naver_main_news, errors) or [])
+    log(f"  네이버 주요뉴스 {len(nv)}{' (과거 기준일이라 생략)' if backfill else ''}")
     dart = safe("DART", lambda: sources.dart_today(base), errors) or []
     log(f"  DART {len(dart)} (호재성 {sum(1 for x in dart if x['good'])})")
     all_items = news + nv + dart
@@ -104,6 +109,23 @@ def main(argv):
         log(f"   스윙 {x['name']} {x['score']}")
     for x in scalp[:5]:
         log(f"   단타 {x['name']} {x['score']}")
+
+    t = step("공포 속 저평가")
+    value = []
+    fund_now = safe("PER·PBR(기준일)", lambda: sources.fundamentals(base), errors)
+    year_days = safe("1년 영업일", lambda: sources.business_days(base, 250), errors) or []
+    fund_hist = []
+    for d in [year_days[i] for i in (0, 62, 125, 187) if i < len(year_days)]:
+        f = safe(f"PER·PBR({d})", lambda: sources.fundamentals(d), errors)
+        if f is not None and len(f):
+            fund_hist.append(f)
+    if fund_now is not None and fund_hist:
+        value = logic.value_screen(universe, closes, fund_now, fund_hist, flows_5d, news_3d)
+    log(f"  저평가 {len(value)} (과거 스냅샷 {len(fund_hist)}개)")
+    for x in value[:5]:
+        log(f"   저평가 {x['name']} -{x['drop_60d']}% PBR {x['pbr']}/{x['pbr_med']}")
+    overlap = logic.mark_overlap(scalp, swing, value)
+    log(f"  겹침 {len(overlap)}")
 
     t = step("시장 온도")
     temp = {}
@@ -141,6 +163,7 @@ def main(argv):
         "version": 1,
         "base_date": base,
         "generated_at": datetime.now(KST).isoformat(timespec="minutes"),
+        "backfill": backfill,
         "temperature": temp,
         "filter": {
             "rules": logic.RULES,
@@ -148,6 +171,9 @@ def main(argv):
                            "matched_today": len(news_today), "matched_3d": len(news_3d)},
             "scalp": scalp[:10], "scalp_total": len(scalp),
             "swing": swing[:10], "swing_total": len(swing),
+            "value_rules": logic.VALUE_RULES,
+            "value": value[:10], "value_total": len(value),
+            "overlap": overlap,
         },
         "errors": errors,
     }
@@ -159,6 +185,22 @@ def main(argv):
     with open(os.path.join(DATA, "index.json"), "w", encoding="utf-8") as f:
         json.dump({"dates": dates[::-1], "latest": dates[-1]}, f, ensure_ascii=False)
     log(f"\n저장 {path} ({os.path.getsize(path) // 1024}KB), 오류 {errors or '없음'}")
+
+    t = step("성적표")
+    kospi = safe("코스피 기간", lambda: sources.index_history("1001", used_days[0], base), errors)
+    if kospi is not None:
+        kospi.index = [d.strftime("%Y%m%d") for d in kospi.index]
+        history = []
+        for d in dates:
+            with open(os.path.join(DATA, f"{d}.json"), encoding="utf-8") as f:
+                flt = json.load(f)["filter"]
+            history.append((d, {g: flt.get(g, []) for g in ("swing", "scalp", "value")}))
+        stats, recent = logic.scorecard(history, closes, kospi)
+        card = {"generated_at": out["generated_at"], "base_date": base, "days": len(history),
+                "horizons": list(logic.HORIZONS), "stats": stats, "recent": recent}
+        with open(os.path.join(DATA, "scorecard.json"), "w", encoding="utf-8") as f:
+            json.dump(card, f, ensure_ascii=False, separators=(",", ":"), default=_json_default)
+        log(f"  기록 {len(history)}일, 통계 {json.dumps(stats, ensure_ascii=False)}")
     return 0
 
 

@@ -96,6 +96,13 @@ def market_flows(fromdate, todate):
             for m in ("KOSPI", "KOSDAQ")}
 
 
+def fundamentals(ymd):
+    """전종목 BPS·PER·PBR·EPS·DIV. 반환: DataFrame(index=티커)"""
+    from pykrx import stock
+    df = retry(lambda: stock.get_market_fundamental(ymd, market="ALL"))
+    return df.astype(float)
+
+
 def index_history(ticker, fromdate, todate):
     from pykrx import stock
     df = retry(lambda: stock.get_index_ohlcv(fromdate, todate, ticker))
@@ -152,13 +159,17 @@ NEWS_QUERIES = [
 ]
 
 
-def google_news(days=3):
-    """구글 뉴스 RSS. 검색어별 최대 100건, 최근 days 일."""
+def google_news(start, end):
+    """구글 뉴스 RSS. 검색어별 최대 100건, start ≤ 날짜 < end (YYYY-MM-DD).
+
+    날짜 범위를 직접 주므로 과거 기준일도 그날 기준으로 다시 계산할 수 있다.
+    """
     items = {}
     for q in NEWS_QUERIES:
         try:
             r = retry(lambda: get("https://news.google.com/rss/search",
-                                  params={"q": f"{q} when:{days}d", "hl": "ko", "gl": "KR", "ceid": "KR:ko"}))
+                                  params={"q": f"{q} after:{start} before:{end}", "hl": "ko", "gl": "KR",
+                                          "ceid": "KR:ko"}))
         except Exception as e:
             log(f"  구글 뉴스 '{q}' 실패: {e}")
             continue

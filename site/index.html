@@ -32,14 +32,22 @@
       <div class="tabs" role="tablist">
         <button role="tab" data-tab="swing" aria-selected="true">스윙 <span id="n-swing"></span></button>
         <button role="tab" data-tab="scalp" aria-selected="false">단타 <span id="n-scalp"></span></button>
+        <button role="tab" data-tab="value" aria-selected="false">저평가 <span id="n-value"></span></button>
       </div>
     </div>
+    <div id="overlap"></div>
     <p class="hint" id="tab-hint"></p>
     <div id="cards"></div>
     <details class="rules">
       <summary>필터 기준 보기</summary>
       <div id="rules"></div>
     </details>
+  </section>
+
+  <section class="block" id="score">
+    <h2>성적표</h2>
+    <p class="hint">필터에 걸렸던 종목이 그 뒤 실제로 얼마나 움직였는지. 같은 기간 코스피와 비교한 값이 '초과'입니다.</p>
+    <div id="scorecard"></div>
   </section>
 
   <footer>

@@ -114,6 +114,55 @@ def test_pct_rank_and_summary():
     assert s["credit"]["level"] == "안정"
 
 
+def _value_setup(drop=0.7, pbr_now=0.6, eps_now=900):
+    days = [f"d{i:03d}" for i in range(80)]
+    # 50일째 고점 뒤로 30% 하락
+    path = [10000 + 100 * i for i in range(50)] + [14900 * (1 - (1 - drop) * k / 29) for k in range(30)]
+    closes = pd.DataFrame({"A00000": path}, index=days)
+    universe = {"A00000": {"name": "가나전자", "market": "KOSPI", "section": "", "close": path[-1],
+                           "change": -1.0, "value": 30 * EOK, "cap": 3000 * EOK}}
+    now = pd.DataFrame({"PBR": [pbr_now], "PER": [8.0], "EPS": [eps_now]}, index=["A00000"])
+    hist = [pd.DataFrame({"PBR": [p], "PER": [10.0], "EPS": [1000.0]}, index=["A00000"]) for p in (1.0, 1.1, 0.9, 1.0)]
+    flows = {"foreign": pd.Series({"A00000": 2 * EOK}), "inst": pd.Series({"A00000": -1 * EOK})}
+    return universe, closes, now, hist, flows
+
+
+def test_value_screen_passes_cheap_stock_with_steady_eps():
+    u, c, now, hist, fl = _value_setup()
+    got = logic.value_screen(u, c, now, hist, fl, {})
+    assert [x["code"] for x in got] == ["A00000"]
+    assert got[0]["drop_60d"] >= 20 and got[0]["pbr_med"] == 1.0 and got[0]["flow5_eok"] == 1.0
+
+
+def test_value_screen_rejects_falling_earnings_or_not_cheap():
+    u, c, now, hist, fl = _value_setup(eps_now=500)
+    assert logic.value_screen(u, c, now, hist, fl, {}) == []
+    u, c, now, hist, fl = _value_setup(pbr_now=0.95)
+    assert logic.value_screen(u, c, now, hist, fl, {}) == []
+    u, c, now, hist, fl = _value_setup(drop=0.95)
+    assert logic.value_screen(u, c, now, hist, fl, {}) == []
+
+
+def test_overlap_marks_both_groups():
+    swing = [{"code": "A"}, {"code": "B"}]
+    value = [{"code": "B"}, {"code": "C"}]
+    assert logic.mark_overlap([], swing, value) == ["B"]
+    assert [x["overlap"] for x in swing] == [False, True]
+
+
+def test_scorecard_returns_and_excess():
+    days = ["d0", "d1", "d2", "d3", "d4", "d5", "d6"]
+    closes = pd.DataFrame({"A": [100, 110, 110, 110, 110, 120, 120.0]}, index=days)
+    kospi = pd.Series([1000, 1000, 1000, 1000, 1000, 1050, 1050.0], index=days)
+    hist = [("d0", {"swing": [{"code": "A", "name": "가", "close": 100.0}], "scalp": [], "value": []}),
+            ("d6", {"swing": [{"code": "A", "name": "가", "close": 120.0}], "scalp": [], "value": []})]
+    stats, recent = logic.scorecard(hist, closes, kospi)
+    assert stats["swing"]["1"] == {"n": 1, "avg": 10.0, "win": 100, "excess": 10.0}
+    assert stats["swing"]["5"]["avg"] == 20.0 and stats["swing"]["5"]["excess"] == 15.0
+    assert "20" not in stats["swing"]
+    assert recent[0]["date"] == "d6" and "r1" not in recent[0]
+
+
 def test_realized_vol_flat_is_zero():
     s = pd.Series([100.0] * 30)
     assert logic.realized_vol(s).dropna().iloc[-1] == 0

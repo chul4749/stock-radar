@@ -8,6 +8,9 @@ on:
       base_date:
         description: "기준일 YYYYMMDD (비우면 자동)"
         required: false
+      dates:
+        description: "먼저 다시 계산할 과거 기준일들 (공백으로 구분, 성적표 채우기용)"
+        required: false
 
 permissions:
   contents: write
@@ -21,7 +24,7 @@ concurrency:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -30,7 +33,9 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - run: python -m pytest -q tests
-      - run: python -m collector.main ${{ inputs.base_date }}
+      - run: |
+          for d in ${{ inputs.dates }}; do python -m collector.main "$d"; done
+          python -m collector.main ${{ inputs.base_date }}
         env:
           KRX_ID: ${{ secrets.KRX_ID }}
           KRX_PW: ${{ secrets.KRX_PW }}

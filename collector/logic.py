@@ -318,3 +318,136 @@ def screen(universe, closes, values, flows_daily, flows_5d, pension_5d, news_tod
     scalp.sort(key=lambda x: -x["score"])
     swing.sort(key=lambda x: -x["score"])
     return scalp, swing
+
+
+# ---------------------------------------------------------------- 공포 속 저평가
+
+VALUE_RULES = {
+    "min_cap": 1000 * EOK,
+    "min_value": 5 * EOK,
+    "min_drop": 20.0,          # 60일 최고가 대비 하락률(%)
+    "max_pbr_ratio": 0.8,      # 현재 PBR / 1년 PBR 중앙값
+    "min_eps_ratio": 0.8,      # 현재 EPS / 1년 전 EPS (이익이 크게 줄지 않음)
+}
+
+
+def value_screen(universe, closes, fund_now, fund_hist, flows_5d, news_3d, rules=VALUE_RULES):
+    """많이 떨어졌는데 장부가치 대비 싸졌고, 이익은 크게 줄지 않은 종목.
+
+    fund_now: DataFrame(index=티커, BPS/PER/PBR/EPS)
+    fund_hist: [DataFrame] 1년 동안의 과거 스냅샷 (오래된 순, 첫 번째가 약 1년 전)
+    """
+    out = []
+    if fund_now is None or len(fund_now) == 0 or not fund_hist:
+        return out
+    pbr_hist = pd.DataFrame({i: f["PBR"] for i, f in enumerate(fund_hist)})
+    pbr_hist = pbr_hist.where(pbr_hist > 0)
+    pbr_med = pbr_hist.median(axis=1)
+    eps_year_ago = fund_hist[0]["EPS"]
+
+    for code, info in universe.items():
+        if code not in closes.columns or code not in fund_now.index:
+            continue
+        if info["cap"] < rules["min_cap"] or info["value"] < rules["min_value"]:
+            continue
+        col = closes[code].dropna()
+        if len(col) < 60:
+            continue
+        close, high60 = col.iloc[-1], col.iloc[-60:].max()
+        drop = (1 - close / high60) * 100
+        f = fund_now.loc[code]
+        pbr, per, eps = f.get("PBR", 0), f.get("PER", 0), f.get("EPS", 0)
+        med = pbr_med.get(code)
+        eps0 = eps_year_ago.get(code)
+        if not (pbr > 0 and per > 0 and eps > 0) or med is None or math.isnan(med) or med <= 0:
+            continue
+        if eps0 is None or math.isnan(eps0) or eps0 <= 0:
+            continue
+        pbr_ratio, eps_ratio = pbr / med, eps / eps0
+        checks = [
+            {"label": f"60일 최고가 대비 {rules['min_drop']:.0f}% 이상 하락", "ok": drop >= rules["min_drop"],
+             "value": f"-{drop:.1f}%"},
+            {"label": f"PBR이 1년 중앙값의 {rules['max_pbr_ratio']:.0%} 이하", "ok": pbr_ratio <= rules["max_pbr_ratio"],
+             "value": f"{pbr:.2f} / {med:.2f}"},
+            {"label": "흑자 (PER·EPS > 0)", "ok": True, "value": f"PER {per:.1f}"},
+            {"label": f"EPS가 1년 전의 {rules['min_eps_ratio']:.0%} 이상", "ok": eps_ratio >= rules["min_eps_ratio"],
+             "value": f"{eps:,.0f} / {eps0:,.0f}"},
+        ]
+        if not all(c["ok"] for c in checks):
+            continue
+        f5 = float(flows_5d["foreign"].get(code, 0) or 0)
+        i5 = float(flows_5d["inst"].get(code, 0) or 0)
+        out.append({
+            "code": code, "name": info["name"], "market": info["market"],
+            "close": close, "change": r1(info["change"]),
+            "value_eok": r1(info["value"] / EOK), "cap_eok": round(info["cap"] / EOK),
+            "drop_60d": r1(drop), "pbr": round(pbr, 2), "pbr_med": round(med, 2), "per": r1(per),
+            "eps_ratio": round(eps_ratio, 2),
+            "flow5_eok": r1((f5 + i5) / EOK),
+            "checks": checks,
+            "score": round(drop * (med / pbr), 1),
+            "news": news_3d.get(code, [])[:3],
+        })
+    out.sort(key=lambda x: -x["score"])
+    return out
+
+
+def mark_overlap(scalp, swing, value):
+    """수급·추세 관점(단타·스윙)과 저평가 관점에 동시에 걸린 종목 코드."""
+    flow_codes = {x["code"] for x in scalp} | {x["code"] for x in swing}
+    both = sorted(flow_codes & {x["code"] for x in value})
+    for group in (scalp, swing, value):
+        for x in group:
+            x["overlap"] = x["code"] in both
+    return both
+
+
+# ---------------------------------------------------------------- 성적표
+
+HORIZONS = (1, 5, 20)
+
+
+def scorecard(history, closes, index_closes):
+    """과거 후보가 N영업일 뒤 얼마나 움직였나.
+
+    history: [(기준일, {"scalp": [...], "swing": [...], "value": [...]})]
+    closes:  DataFrame(행=영업일, 열=티커)
+    index_closes: Series(index=영업일) 코스피
+    반환: {그룹: {N: {n, avg, win, excess}}}, 최근 기록 목록
+    """
+    days = list(closes.index)
+    pos = {d: i for i, d in enumerate(days)}
+    stats, recent = {}, []
+    for date, groups in history:
+        if date not in pos:
+            continue
+        i0 = pos[date]
+        for g, items in groups.items():
+            for x in items:
+                code = x["code"]
+                entry = {"date": date, "group": g, "code": code, "name": x["name"], "close": x["close"]}
+                for n in HORIZONS:
+                    if i0 + n >= len(days) or code not in closes.columns:
+                        continue
+                    c1 = closes[code].iloc[i0 + n]
+                    if c1 is None or math.isnan(c1) or not x["close"]:
+                        continue
+                    ret = (c1 / x["close"] - 1) * 100
+                    k0, k1 = index_closes.get(days[i0]), index_closes.get(days[i0 + n])
+                    ex = ret - ((k1 / k0 - 1) * 100) if k0 and k1 else None
+                    entry[f"r{n}"] = r1(ret)
+                    s = stats.setdefault(g, {}).setdefault(n, {"rets": [], "ex": []})
+                    s["rets"].append(ret)
+                    if ex is not None:
+                        s["ex"].append(ex)
+                recent.append(entry)
+    out = {}
+    for g, by_n in stats.items():
+        out[g] = {}
+        for n, s in by_n.items():
+            rets = s["rets"]
+            out[g][str(n)] = {"n": len(rets), "avg": r1(sum(rets) / len(rets)),
+                              "win": round(100 * sum(1 for r in rets if r > 0) / len(rets)),
+                              "excess": r1(sum(s["ex"]) / len(s["ex"])) if s["ex"] else None}
+    recent.sort(key=lambda e: e["date"], reverse=True)
+    return out, recent[:60]

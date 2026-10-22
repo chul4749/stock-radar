@@ -7,7 +7,7 @@ const signed = (v, d = 1, unit = "") => (v == null ? "–" : (v > 0 ? "+" : "") 
 const cls = (v) => (v == null ? "na" : v > 0 ? "up" : v < 0 ? "down" : "");
 const ymd = (s) => `${s.slice(0, 4)}.${s.slice(4, 6)}.${s.slice(6, 8)}`;
 
-let state = { data: null, tab: "swing" };
+let state = { data: null, tab: "swing", score: null };
 try { state.tab = localStorage.getItem("tab") || "swing"; } catch (e) { /* 저장 불가 환경 */ }
 
 async function load(date) {
@@ -25,6 +25,8 @@ async function init() {
     sel.innerHTML = idx.dates.map((d) => `<option value="${d}">${ymd(d)}</option>`).join("");
     sel.onchange = () => load(sel.value);
     await load(idx.latest);
+    fetch("data/scorecard.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null))
+      .then((sc) => { state.score = sc; renderScore(); }).catch(() => renderScore());
   } catch (e) {
     $("#cards").innerHTML = `<div class="empty">${esc(e.message || "데이터가 아직 없습니다")}</div>`;
   }
@@ -40,7 +42,7 @@ async function init() {
 function render() {
   const d = state.data;
   const gen = d.generated_at.replace("T", " ").slice(0, 16);
-  $("#meta").textContent = `기준일 ${ymd(d.base_date)} · 업데이트 ${gen}`;
+  $("#meta").textContent = `기준일 ${ymd(d.base_date)} · 업데이트 ${gen}` + (d.backfill ? " · 나중에 다시 계산한 기록" : "");
   renderTemp();
   renderFilter();
   renderRules();
@@ -112,18 +114,25 @@ function renderTemp() {
 const TAB_HINT = {
   swing: "최근 3일 안에 기사·공시가 있고, 기관·외국인 돈이 며칠째 들어오며, 차트가 올라가는 흐름인 종목.",
   scalp: "오늘 기사·공시가 나왔고, 거래대금이 평소의 몇 배로 터지며, 오늘 기관·외국인도 산 종목.",
+  value: "최근 많이 떨어져 장부가치 대비 1년 중 싼 편인데, 이익은 크게 줄지 않은 종목. 시장 공포로 싸진 건지 볼 후보.",
 };
+const TAB_NAME = { swing: "스윙", scalp: "단타", value: "저평가" };
 
 function renderFilter() {
   const f = state.data.filter;
   $("#n-swing").textContent = f.swing_total;
   $("#n-scalp").textContent = f.scalp_total;
+  $("#n-value").textContent = f.value_total ?? "–";
+  renderOverlap();
   document.querySelectorAll(".tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === state.tab));
   $("#tab-hint").textContent = TAB_HINT[state.tab];
-  const list = f[state.tab];
-  const total = f[state.tab + "_total"];
+  const list = f[state.tab] || [];
+  const total = f[state.tab + "_total"] || 0;
   if (!list.length) {
-    $("#cards").innerHTML = `<div class="empty">이 날은 조건을 모두 통과한 종목이 없습니다.<br><small>기사 걸린 종목 ${f.news_count.matched_3d}개 중 0개</small></div>`;
+    const why = state.tab === "value"
+      ? (f.value_total == null ? "이 날짜는 저평가 필터가 생기기 전 기록입니다." : "많이 떨어지면서도 이익이 버틴 종목이 없었습니다.")
+      : `기사 걸린 종목 ${f.news_count.matched_3d}개 중 0개`;
+    $("#cards").innerHTML = `<div class="empty">이 날은 조건을 모두 통과한 종목이 없습니다.<br><small>${why}</small></div>`;
     return;
   }
   const more = total > list.length ? `<p class="hint">통과 ${total}개 중 점수 상위 ${list.length}개</p>` : "";
@@ -146,7 +155,50 @@ function bars(daily) {
   return `<div class="bars">${cols}</div><div class="barlab">${labs}</div>`;
 }
 
+function renderOverlap() {
+  const f = state.data.filter;
+  const codes = f.overlap || [];
+  if (!codes.length) { $("#overlap").innerHTML = ""; return; }
+  const all = [...(f.swing || []), ...(f.scalp || []), ...(f.value || [])];
+  const names = codes.map((c) => {
+    const x = all.find((y) => y.code === c);
+    const groups = ["swing", "scalp", "value"].filter((g) => (f[g] || []).some((y) => y.code === c)).map((g) => TAB_NAME[g]);
+    return `<b>${esc(x ? x.name : c)}</b> <small>(${groups.join("·")})</small>`;
+  });
+  $("#overlap").innerHTML = `<div class="overlap">두 관점에 함께 걸린 종목: ${names.join(", ")}<br><small>돈이 들어오는 흐름(스윙·단타)과 공포 속 저평가에 동시에 해당</small></div>`;
+}
+
+function valueCard(x) {
+  const news = newsList(x.news);
+  return `<article class="card">
+    ${cardHead(x)}
+    <div class="nums">
+      <div><small>60일 고점 대비</small><b class="down">-${num(x.drop_60d, 1)}%</b></div>
+      <div><small>PBR (1년 중앙)</small><b>${num(x.pbr, 2)} <small style="display:inline;font-size:12px;color:var(--sub)">(${num(x.pbr_med, 2)})</small></b></div>
+      <div><small>5일 기관+외국인</small><b class="${cls(x.flow5_eok)}">${signed(x.flow5_eok, 0, "억")}</b></div>
+    </div>
+    <ul class="checks">${x.checks.map((c) => `<li><span>${esc(c.label)}</span><span>${esc(c.value)}</span></li>`).join("")}</ul>
+    ${news ? `<ul class="news">${news}</ul>` : `<p class="hint" style="margin:8px 0 0">최근 3일 관련 기사 없음</p>`}
+  </article>`;
+}
+
+function cardHead(x) {
+  return `<div class="hd">
+      <a class="nm" href="https://m.stock.naver.com/domestic/stock/${x.code}" target="_blank" rel="noopener">${esc(x.name)}<span class="mk">${esc(x.market)} ${x.code}</span></a>
+      <div class="px"><b>${num(x.close)}</b><span class="${cls(x.change)}">${signed(x.change, 1, "%")}</span></div>
+    </div>${x.overlap ? `<span class="tag both">두 관점 겹침</span>` : ""}`;
+}
+
+function newsList(items) {
+  return (items || []).map((n) => {
+    const at = n.at.slice(5, 16).replace("T", " ").replace("-", "/");
+    const tag = n.kind === "공시" ? `<span class="tag dart">공시</span>` : "";
+    return `<li>${tag}<a href="${esc(n.url)}" target="_blank" rel="noopener">${esc(n.title)}</a><small>${esc(n.source)} ${at}</small></li>`;
+  }).join("");
+}
+
 function card(x) {
+  if (state.tab === "value") return valueCard(x);
   const fl = x.flow;
   const both5 = (fl.foreign_5d || 0) + (fl.inst_5d || 0);
   const bothToday = (fl.foreign_today || 0) + (fl.inst_today || 0);
@@ -157,22 +209,41 @@ function card(x) {
     : [["거래대금", `${num(x.value_eok, 0)}억`],
        ["평소 대비", `${num(x.value_mult, 1)}배`],
        ["오늘 기관+외국인", `<span class="${cls(bothToday)}">${signed(bothToday, 0, "억")}</span>`]];
-  const news = (x.news || []).map((n) => {
-    const at = n.at.slice(5, 16).replace("T", " ").replace("-", "/");
-    const tag = n.kind === "공시" ? `<span class="tag dart">공시</span>` : "";
-    return `<li>${tag}<a href="${esc(n.url)}" target="_blank" rel="noopener">${esc(n.title)}</a><small>${esc(n.source)} ${at}</small></li>`;
-  }).join("");
+  const news = newsList(x.news);
   return `<article class="card">
-    <div class="hd">
-      <a class="nm" href="https://m.stock.naver.com/domestic/stock/${x.code}" target="_blank" rel="noopener">${esc(x.name)}<span class="mk">${esc(x.market)} ${x.code}</span></a>
-      <div class="px"><b>${num(x.close)}</b><span class="${cls(x.change)}">${signed(x.change, 1, "%")}</span></div>
-    </div>
+    ${cardHead(x)}
     <div class="nums">${nums.map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join("")}</div>
     <div class="l" style="font-size:12px;color:var(--sub)">최근 5일 기관+외국인 순매수 (억)</div>
     ${bars(fl.daily)}
     <ul class="checks">${x.checks.map((c) => `<li><span>${esc(c.label)}</span><span>${esc(c.value)}</span></li>`).join("")}</ul>
     <ul class="news">${news}</ul>
   </article>`;
+}
+
+function renderScore() {
+  const sc = state.score;
+  if (!sc || !sc.stats) {
+    $("#scorecard").innerHTML = `<div class="empty">아직 기록이 없습니다.</div>`;
+    return;
+  }
+  const hs = sc.horizons || [1, 5, 20];
+  const rows = ["swing", "scalp", "value"].map((g) => {
+    const st = sc.stats[g] || {};
+    const cells = hs.map((h) => {
+      const s = st[String(h)];
+      if (!s) return `<td class="na">–</td>`;
+      return `<td><b class="${cls(s.avg)}">${signed(s.avg, 1, "%")}</b><br><small>상승 ${s.win}% · 초과 <span class="${cls(s.excess)}">${signed(s.excess, 1, "%p")}</span> · ${s.n}건</small></td>`;
+    }).join("");
+    return `<tr><th>${TAB_NAME[g]}</th>${cells}</tr>`;
+  }).join("");
+  const minN = Math.min(...["swing", "scalp", "value"].map((g) => ((sc.stats[g] || {})["5"] || { n: 0 }).n));
+  const warn = minN < 30 ? `<p class="hint">기록이 ${sc.days}일치뿐이라 표본이 적습니다 (5일 기준 30건 미만인 구분이 있음). 지금 숫자는 우연일 수 있습니다.</p>` : "";
+  const recent = (sc.recent || []).filter((e) => e.r1 != null).slice(0, 15).map((e) =>
+    `<tr><td>${e.date.slice(4, 6)}/${e.date.slice(6)}</td><td>${TAB_NAME[e.group]}</td><td style="text-align:left">${esc(e.name)}</td>` +
+    hs.map((h) => `<td class="${cls(e["r" + h])}">${e["r" + h] == null ? "–" : signed(e["r" + h], 1, "%")}</td>`).join("") + "</tr>").join("");
+  $("#scorecard").innerHTML = `<div class="tile wide"><table class="score">
+      <thead><tr><th></th>${hs.map((h) => `<th>${h}일 뒤</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>${warn}
+    ${recent ? `<details class="rules"><summary>최근 기록 보기</summary><table class="score recent"><thead><tr><th>날짜</th><th>구분</th><th style="text-align:left">종목</th>${hs.map((h) => `<th>${h}일</th>`).join("")}</tr></thead><tbody>${recent}</tbody></table></details>` : ""}`;
 }
 
 function renderRules() {
@@ -190,8 +261,17 @@ function renderRules() {
     <ul><li>최근 3영업일 안에 기사·공시</li><li>최근 5일 중 ${r.swing_min_days}일 이상 기관+외국인 순매수</li>
     <li>5일 순매수 합이 시가총액의 ${r.swing_min_ratio}% 이상</li><li>주가 &gt; 20일 이동평균 &gt; 60일 이동평균, 20일선 상승 중</li>
     <li>5일 상승률 ${r.swing_max_5d_rise}% 이하 (이미 급등한 종목 제외)</li></ul>
+    ${state.data.filter.value_rules ? valueRules(state.data.filter.value_rules, eok) : ""}
     <h3>점수 (정렬용)</h3>
     <ul><li>단타: 거래대금 배수 × (1 + 기관·외국인 순매수 / 거래대금)</li><li>스윙: 시총 대비 5일 순매수 비율 × (1 + 연속일 / 5)</li></ul>`;
+}
+
+function valueRules(v, eok) {
+  return `<h3>저평가</h3>
+    <ul><li>시가총액 ${eok(v.min_cap)} 이상, 거래대금 ${eok(v.min_value)} 이상 (기사 없어도 됨)</li>
+    <li>60일 최고가 대비 ${v.min_drop}% 이상 하락</li><li>PBR이 최근 1년(분기마다 1번, 4번) 중앙값의 ${Math.round(v.max_pbr_ratio * 100)}% 이하</li>
+    <li>흑자이고, EPS가 1년 전의 ${Math.round(v.min_eps_ratio * 100)}% 이상 (KRX EPS는 결산 실적이라 늦게 바뀜)</li>
+    <li>점수: 하락률 × (1년 중앙 PBR / 현재 PBR)</li></ul>`;
 }
 
 init();
