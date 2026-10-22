@@ -281,6 +281,32 @@ def vkospi_all():
     raise RuntimeError("못 찾음 " + " ".join(seen))
 
 
+@check("VKOSPI (KRX 파생상품지수 후보 경로)", "시장 온도")
+def vkospi_deriv():
+    from pykrx.website.krx.krxio import KrxWebIo
+    tried = []
+    for bld in ("MDCSTAT01201", "MDCSTAT01101", "MDCSTAT01001", "MDCSTAT00901", "MDCSTAT01301"):
+        class Io(KrxWebIo):
+            @property
+            def bld(self, b=bld):
+                return f"dbms/MDC/STAT/standard/{b}"
+
+            def fetch(self):
+                pass
+        for params in ({"trdDd": YMD}, {"trdDd": YMD, "idxIndMidclssCd": "01"}):
+            try:
+                res = Io().read(**params)
+            except Exception as e:
+                tried.append(f"{bld}:{type(e).__name__}")
+                continue
+            rows = next((v for v in res.values() if isinstance(v, list)), []) if isinstance(res, dict) else []
+            tried.append(f"{bld}:{len(rows)}")
+            for row in rows:
+                if any("변동성" in str(v) or "VKOSPI" in str(v) for v in row.values()):
+                    return 1, [bld, str(row)[:200]]
+    raise RuntimeError("못 찾음 " + " ".join(tried))
+
+
 @check("네이버 VKOSPI 페이지", "시장 온도")
 def naver_vkospi():
     r = get("https://m.stock.naver.com/api/index/VKOSPI/basic")
