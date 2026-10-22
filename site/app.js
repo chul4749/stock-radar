@@ -224,6 +224,28 @@ const SUM_LINE = {
   },
 };
 
+// 최근 20일 신고가(위)·신저가(아래) 막대, 점선 = 신저가 직전 5일 평균 (매도 압력 판정 기준)
+function highLowChart(b) {
+  const lo = b.new_lows, hi = b.new_highs, n = lo.length;
+  if (n < 2) return "";
+  const w = 200, h = 64, mid = h / 2, gap = 1.2, bw = w / n - gap;
+  const max = Math.max(1, ...lo, ...hi);
+  const y = (v) => (v / max) * (mid - 2);
+  const rects = lo.map((l, i) => {
+    const x = (i * w) / n, op = i === n - 1 ? 1 : 0.4;
+    return `<rect x="${x.toFixed(1)}" y="${(mid - y(hi[i])).toFixed(1)}" width="${bw.toFixed(1)}" height="${y(hi[i]).toFixed(1)}" fill="var(--up)" opacity="${op}"/>` +
+      `<rect x="${x.toFixed(1)}" y="${mid}" width="${bw.toFixed(1)}" height="${y(l).toFixed(1)}" fill="var(--down)" opacity="${op}"/>`;
+  }).join("");
+  const avg = n >= 6 ? lo.slice(-6, -1).reduce((a, v) => a + v, 0) / 5 : null;
+  const avgLine = avg == null ? "" : `<line x1="${((n - 6) * w) / n}" x2="${w}" y1="${(mid + y(avg)).toFixed(1)}" y2="${(mid + y(avg)).toFixed(1)}" stroke="var(--text)" stroke-width="1" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/>`;
+  const d0 = b.dates && b.dates[0], d1 = b.dates && b.dates[n - 1];
+  return `<svg class="hilo" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="최근 ${n}일 신고가·신저가 종목 수">` +
+    `${rects}<line x1="0" x2="${w}" y1="${mid}" y2="${mid}" stroke="var(--line)" stroke-width="1" vector-effect="non-scaling-stroke"/>${avgLine}</svg>` +
+    `<div class="legend"><span><i style="background:var(--up)"></i>신고가 ${num(hi[n - 1])}</span><span><i style="background:var(--down)"></i>신저가 ${num(lo[n - 1])}</span>` +
+    `${avg == null ? "" : `<span><i class="dash"></i>신저가 5일 평균</span>`}</div>` +
+    (d0 && d1 ? `<div class="barlab"><span style="text-align:left">${ymd(d0)}</span><span style="text-align:right">${ymd(d1)}</span></div>` : "");
+}
+
 const pctText = (p) => (p == null ? "" : ` · 1년 중 ${p}% 위치`);
 
 function renderTemp() {
@@ -232,7 +254,8 @@ function renderTemp() {
   // 온도계가 있으면 공포 크기·자금시장은 온도계 지표와 겹치므로 뺀다
   $("#summary").innerHTML = (t.summary || []).filter((s) => !(t.thermo && (s.key === "fear" || s.key === "credit"))).map((s) => {
     const line = SUM_LINE[s.key] && SUM_LINE[s.key][s.level];
-    return `<div class="sum ${s.tone}"><div class="row"><span class="t">${esc(s.title)} ${infoBtn(s.key)}</span><span class="lv">${esc(s.level)}</span></div><p>${esc(s.text)}</p>` +
+    const viz = s.key === "selling" && t.breadth ? highLowChart(t.breadth) : "";
+    return `<div class="sum ${s.tone}"><div class="row"><span class="t">${esc(s.title)} ${infoBtn(s.key)}</span><span class="lv">${esc(s.level)}</span></div><p>${esc(s.text)}</p>${viz}` +
       `${line ? `<div class="why">${esc(line)}</div>` : ""}${infoBox(s.key)}</div>`;
   }).join("") || `<div class="empty">시장 온도 데이터를 받지 못했습니다</div>`;
 
@@ -264,7 +287,7 @@ function renderTemp() {
     } else {
       tiles.push(tile("오르고 내린 종목", `<span class="up">${num(b.up)}</span> / <span class="down">${num(b.down)}</span>`, "상승 / 하락 (보통주)", null, { key: "updown" }));
     }
-    tiles.push(tile("60일 신저가 종목", num(b.new_lows.at(-1)), `신고가 ${num(b.new_highs.at(-1))} · 최근 20일 추이`, b.new_lows, { key: "breadth" }));
+    if (!(t.summary || []).some((s) => s.key === "selling")) tiles.push(tile("60일 신저가 종목", num(b.new_lows.at(-1)), `신고가 ${num(b.new_highs.at(-1))} · 최근 20일 추이`, b.new_lows, { key: "breadth" }));
   }
   if (t.flows) {
     const rows = [];
