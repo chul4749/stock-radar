@@ -43,10 +43,14 @@ jobs:
         run: |
           git config user.name "stock-radar-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add site/data
+          # 대기열에서 기다린 실행은 예전 커밋으로 시작하므로, 최신 브랜치 위에 방금 만든 데이터를 통째로 얹는다
+          mv site/data "$RUNNER_TEMP/data"
+          git fetch -q origin "$GITHUB_REF_NAME"
+          git checkout -q -f -B "$GITHUB_REF_NAME" "origin/$GITHUB_REF_NAME"
+          rm -rf site/data && mv "$RUNNER_TEMP/data" site/data
+          git add -A site/data
           git diff --cached --quiet || git commit -m "data: $(date -u +%F)"
-          git pull --rebase -q || true
-          git push
+          git push origin "$GITHUB_REF_NAME"
       - uses: actions/upload-artifact@v4
         with:
           name: site
