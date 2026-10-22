@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>주식 레이더</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#f6f5f2" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141414" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="top-in">
+    <h1>주식 레이더</h1>
+    <select id="date" aria-label="기준일"></select>
+  </div>
+  <p class="meta" id="meta"></p>
+</header>
+
+<main>
+  <section class="block" id="temp">
+    <h2>시장 온도</h2>
+    <div id="summary" class="summary"></div>
+    <div id="tiles" class="tiles"></div>
+  </section>
+
+  <section class="block" id="filter">
+    <div class="h2row">
+      <h2>종목 필터</h2>
+      <div class="tabs" role="tablist">
+        <button role="tab" data-tab="swing" aria-selected="true">스윙 <span id="n-swing"></span></button>
+        <button role="tab" data-tab="scalp" aria-selected="false">단타 <span id="n-scalp"></span></button>
+      </div>
+    </div>
+    <p class="hint" id="tab-hint"></p>
+    <div id="cards"></div>
+    <details class="rules">
+      <summary>필터 기준 보기</summary>
+      <div id="rules"></div>
+    </details>
+  </section>
+
+  <footer>
+    <p><b>조건에 맞는 종목을 보여 줄 뿐, 매수·매도 추천이 아닙니다.</b> 조건을 통과해도 떨어지는 종목은 있습니다.</p>
+    <p id="sources"></p>
+    <p id="errors" class="err"></p>
+  </footer>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
