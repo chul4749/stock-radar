@@ -17,7 +17,7 @@
 | 하이일드 스프레드 | FRED csv (UA 없이, 60초) | ✅ | 브라우저 UA를 붙이면 시간초과 |
 | 공포·탐욕 | CNN graphdata | ✅ | 비공식 |
 | 코스피200 지수 | 네이버 `api/index/KPI200/basic` | ✅ | |
-| VKOSPI | 네이버·pykrx | ❌ | KRX 로그인 필요 |
-| KRX 전체 (pykrx) | data.krx.co.kr | ❌ | 2026년 현재 KRX 회원 로그인(KRX_ID/KRX_PW) 필요 |
+| VKOSPI | 네이버·pykrx·KRX 추정 경로 | ❌ | 로그인 후에도 경로 못 찾음 (주가지수 목록에 없음, 파생상품지수 메뉴 경로 미확인) |
+| KRX 전체 (pykrx) | data.krx.co.kr | ✅ | 회원 로그인 필요 → Secrets `KRX_ID`/`KRX_PW` 등록 후 성공 (전종목 2,867·투자자별 순매수 2,598·PER/PBR 2,714) |
 | 옛 네이버 금융 페이지 | finance.naver.com/item, sise, news | ❌ | Npay 증권 신형 화면으로 바뀌어 표를 못 읽음 |
 | 신용잔고·반대매매 | 금융투자협회 freesis | △ | 접속만 확인, 데이터 경로 미확인 |
