@@ -172,6 +172,12 @@ function gauge(score) {
   </svg>`;
 }
 
+// 점수와 원래 숫자가 왜 다른지 VIX로 예시
+function vixEx(th) {
+  const v = state.data.temperature.vix, p = th.parts.find((x) => x.key === "vix");
+  return v && p && v.pct_1y != null ? ` 예: VIX ${num(v.value, 1)}은 1년 중 ${v.pct_1y}% 위치라, 높을수록 공포이므로 100 − ${v.pct_1y} = ${p.score}점.` : "";
+}
+
 function renderThermo() {
   const th = state.data.temperature.thermo;
   if (!th) { $("#thermo").innerHTML = ""; return; }
@@ -182,7 +188,7 @@ function renderThermo() {
     return `<li><div><small>${name}</small><b style="color:${x ? THERMO_COLOR(x.score) : "var(--faint)"}">${x ? esc(x.label) : "기록 없음"}</b></div>${x ? badge(x.score) : ""}</li>`;
   }).join("");
   const parts = th.parts.map((p) => `<div class="part">
-      <div class="part-hd"><span>${esc(p.name)} ${infoBtn(p.key)}</span><b style="color:${THERMO_COLOR(p.score)}">${p.score} <small>${THERMO_KR(p.score)}</small></b></div>
+      <div class="part-hd"><span>${esc(p.name)} ${infoBtn(p.key)}</span><b style="color:${THERMO_COLOR(p.score)}">${p.score}점 <small>${THERMO_KR(p.score)}</small></b></div>
       <div class="part-bar"><i style="left:${p.score}%"></i></div>
       <small>${esc(p.raw)}</small>${infoBox(p.key)}
     </div>`).join("");
@@ -193,7 +199,7 @@ function renderThermo() {
       <ul class="th-cmp">${cmp}</ul>
     </div>
     ${infoBox("thermo")}
-    <details class="rules"${state.expAll ? " open" : ""}><summary>무엇으로 계산했나 (${th.parts.length}개 지표)</summary>${parts}</details>
+    <details class="rules"${state.expAll ? " open" : ""}><summary>무엇으로 계산했나 (${th.parts.length}개 지표)</summary><p class="hint">오른쪽은 각 지표를 0(공포)~100(탐욕) 점수로 바꾼 값이고, 막대 아래 작은 글씨가 지표의 원래 숫자입니다.${vixEx(th)}</p>${parts}</details>
   </div>`;
 }
 
@@ -207,10 +213,27 @@ function spark(vals, color = "currentColor") {
   return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
 }
 
+// 타일 색: 온도계와 같은 0(공포·위험)~100(탐욕·안정) 점수. 온도계 지표가 있으면 그 점수를 그대로 쓴다
+function toneScore(key, t) {
+  const part = (k) => ((t.thermo || {}).parts || []).find((p) => p.key === k);
+  const clamp = (v) => Math.max(0, Math.min(100, v));
+  const inv = (x) => (x && x.pct_1y != null ? 100 - x.pct_1y : null);
+  switch (key) {
+    case "korea_vol": case "vix": case "cnn": case "credit": return part(key) ? part(key).score : null;
+    case "kospi": return part("momentum") ? part("momentum").score : null;
+    case "kosdaq": { const x = (t.index || {}).kosdaq; return x && x.change_20d != null ? clamp(50 + x.change_20d * 3) : null; }
+    case "usdkrw": return inv(t.usdkrw);
+    case "us10y": return inv(t.us10y);
+    case "updown": { const b = t.breadth; return b && b.up + b.down ? (100 * b.up) / (b.up + b.down) : null; }
+    default: return null;
+  }
+}
+
 function tile(label, value, sub, sparkVals, opts = {}) {
   const key = opts.key;
   const line = key ? interpret(key, state.data.temperature) : "";
-  return `<div class="tile${opts.wide ? " wide" : ""}"><div class="l">${label} ${key ? infoBtn(key) : ""}</div><div class="v ${opts.vcls || ""}">${value}</div>` +
+  const tone = key ? toneScore(key, state.data.temperature) : null;
+  return `<div class="tile${opts.wide ? " wide" : ""}${tone != null ? " toned" : ""}"${tone != null ? ` style="--tone:${THERMO_COLOR(tone)}"` : ""}><div class="l">${label} ${key ? infoBtn(key) : ""}</div><div class="v ${opts.vcls || ""}">${value}</div>` +
     `<div class="s">${sub}</div>${sparkVals ? `<div style="color:var(--faint)">${spark(sparkVals)}</div>` : ""}${opts.extra || ""}` +
     `${line ? `<div class="why">${esc(line)}</div>` : ""}${key ? infoBox(key) : ""}</div>`;
 }
