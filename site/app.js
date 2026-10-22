@@ -213,28 +213,52 @@ function spark(vals, color = "currentColor") {
   return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;
 }
 
-// 타일 색: 온도계와 같은 0(공포·위험)~100(탐욕·안정) 점수. 온도계 지표가 있으면 그 점수를 그대로 쓴다
-function toneScore(key, t) {
-  const part = (k) => ((t.thermo || {}).parts || []).find((p) => p.key === k);
-  const clamp = (v) => Math.max(0, Math.min(100, v));
-  const inv = (x) => (x && x.pct_1y != null ? 100 - x.pct_1y : null);
+// 지표 구간 막대: 지금 값이 어느 구간(평온·보통·위험 등)에 있는지 색으로 보여 준다
+// zones = [[끝값(0~100 눈금), 색, 이름], ...], pos = 0~100 눈금 위 현재 위치
+function zoneBar(zones, pos) {
+  let from = 0;
+  const segs = zones.map(([to, color, name]) => {
+    const w = to - from; from = to;
+    return { w, color, name };
+  });
+  const bar = segs.map((z) => `<span style="flex:${z.w};background:${z.color}"></span>`).join("");
+  // 이름은 칸이 좁아 구간 너비에 맞추지 않고 양 끝·가운데에 나눠 둔다
+  const labs = segs.filter((z) => z.name).map((z) => `<span>${esc(z.name)}</span>`).join("");
+  const at = Math.max(1, Math.min(99, pos));
+  return `<div class="zb"><div class="zb-bar">${bar}<i style="left:${at.toFixed(1)}%"></i></div><div class="zb-lab">${labs}</div></div>`;
+}
+
+const PCT_ZONES = (low, high) => [[20, "var(--g4)", low], [80, "var(--g2)", "보통"], [100, "var(--g0)", high]];
+
+function zoneFor(key, t) {
+  const pct = (x, low, high) => (x && x.pct_1y != null ? zoneBar(PCT_ZONES(low, high), x.pct_1y) : "");
   switch (key) {
-    case "korea_vol": case "vix": case "cnn": case "credit": return part(key) ? part(key).score : null;
-    case "kospi": return part("momentum") ? part("momentum").score : null;
-    case "kosdaq": { const x = (t.index || {}).kosdaq; return x && x.change_20d != null ? clamp(50 + x.change_20d * 3) : null; }
-    case "usdkrw": return inv(t.usdkrw);
-    case "us10y": return inv(t.us10y);
-    case "updown": { const b = t.breadth; return b && b.up + b.down ? (100 * b.up) / (b.up + b.down) : null; }
-    default: return null;
+    case "vix": return t.vix ? zoneBar([[33.3, "var(--g4)", "평온"], [66.7, "var(--g1)", "경계"], [100, "var(--g0)", "불안"]], ((t.vix.value - 10) / 30) * 100) : "";
+    case "korea_vol": return pct(t.korea_vol, "잠잠", "출렁임");
+    case "credit": return pct(t.hy_spread, "여유", "돈줄 조임");
+    case "usdkrw": return pct(t.usdkrw, "원화 강세", "원화 약세");
+    case "us10y": return pct(t.us10y, "부담 작음", "부담 큼");
+    case "cnn": return t.fear_greed ? zoneBar([[25, "var(--g0)", "극단 공포"], [45, "var(--g1)", ""], [55, "var(--g2)", "중립"], [75, "var(--g3)", ""], [100, "var(--g4)", "탐욕"]], t.fear_greed.score) : "";
+    case "kospi": case "kosdaq": {
+      const x = (t.index || {})[key];
+      return x && x.change_20d != null ? zoneBar([[16.7, "var(--g0)", "급락"], [83.3, "var(--g2)", "보통"], [100, "var(--g1)", "과열"]], ((x.change_20d + 15) / 30) * 100) : "";
+    }
+    case "updown": {
+      const b = t.breadth; if (!b || !(b.up + b.down)) return "";
+      const r = (100 * b.up) / (b.up + b.down);
+      return `<div class="zb"><div class="zb-bar"><span style="flex:${r.toFixed(1)};background:var(--up)"></span><span style="flex:${(100 - r).toFixed(1)};background:var(--down)"></span><i style="left:50%" class="mid"></i></div>` +
+        `<div class="zb-lab"><span>상승 ${Math.round(r)}%</span><span>하락 ${Math.round(100 - r)}%</span></div></div>`;
+    }
+    default: return "";
   }
 }
 
 function tile(label, value, sub, sparkVals, opts = {}) {
   const key = opts.key;
   const line = key ? interpret(key, state.data.temperature) : "";
-  const tone = key ? toneScore(key, state.data.temperature) : null;
-  return `<div class="tile${opts.wide ? " wide" : ""}${tone != null ? " toned" : ""}"${tone != null ? ` style="--tone:${THERMO_COLOR(tone)}"` : ""}><div class="l">${label} ${key ? infoBtn(key) : ""}</div><div class="v ${opts.vcls || ""}">${value}</div>` +
-    `<div class="s">${sub}</div>${sparkVals ? `<div style="color:var(--faint)">${spark(sparkVals)}</div>` : ""}${opts.extra || ""}` +
+  const zb = key ? zoneFor(key, state.data.temperature) : "";
+  return `<div class="tile${opts.wide ? " wide" : ""}"><div class="l">${label} ${key ? infoBtn(key) : ""}</div><div class="v ${opts.vcls || ""}">${value}</div>` +
+    `<div class="s">${sub}</div>${sparkVals ? `<div style="color:var(--faint)">${spark(sparkVals)}</div>` : ""}${opts.extra || ""}${zb}` +
     `${line ? `<div class="why">${esc(line)}</div>` : ""}${key ? infoBox(key) : ""}</div>`;
 }
 
