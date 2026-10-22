@@ -85,7 +85,64 @@ def flows_summary(df):
             s = df[col].astype(float)
             out[key] = {"today": r1(s.iloc[-1] / EOK), "d5": r1(s.iloc[-5:].sum() / EOK),
                         "d20": r1(s.iloc[-20:].sum() / EOK)}
+    if "외국인합계" in df and "기관합계" in df:
+        both = (df["외국인합계"].astype(float) + df["기관합계"].astype(float)).iloc[-20:]
+        out["pos_days20"] = int((both > 0).sum())
+        out["days20"] = int(len(both))
     return out
+
+
+THERMO_LABELS = [(25, "극단적 공포", "xfear"), (45, "공포", "fear"), (55, "중립", "neutral"),
+                 (75, "탐욕", "greed"), (101, "극단적 탐욕", "xgreed")]
+
+
+def thermo_label(score):
+    for limit, label, tone in THERMO_LABELS:
+        if score < limit:
+            return label, tone
+    return THERMO_LABELS[-1][1:]
+
+
+def thermometer(t):
+    """국내 시장 온도계: 0 = 극단적 공포, 100 = 극단적 탐욕. CNN 방식처럼 여러 지표를 같은 무게로 평균.
+
+    각 항목은 '탐욕 쪽일수록 높은' 0~100 점수로 바꾼다.
+    """
+    parts = []
+
+    def add(key, name, score, raw):
+        if score is None:
+            return
+        parts.append({"key": key, "name": name, "score": round(max(0, min(100, score))), "raw": raw})
+
+    kv = t.get("korea_vol")
+    if kv and kv.get("pct_1y") is not None:
+        add("korea_vol", "국내 변동성", 100 - kv["pct_1y"], f"{kv['value']}% · 1년 중 {kv['pct_1y']}% 위치")
+    vix = t.get("vix")
+    if vix and vix.get("pct_1y") is not None:
+        add("vix", "미국 VIX", 100 - vix["pct_1y"], f"{vix['value']} · 1년 중 {vix['pct_1y']}% 위치")
+    fg = t.get("fear_greed")
+    if fg and fg.get("score") is not None:
+        add("cnn", "미국 투자심리 (CNN)", fg["score"], f"{fg['score']}점")
+    b = t.get("breadth")
+    if b and b.get("new_lows"):
+        hi, lo = b["new_highs"][-1], b["new_lows"][-1]
+        add("breadth", "신고가 vs 신저가", 50 if hi + lo == 0 else 100 * hi / (hi + lo), f"신고가 {hi} · 신저가 {lo}")
+    k = (t.get("index") or {}).get("kospi")
+    if k and k.get("change_20d") is not None:
+        add("momentum", "코스피 20일 추세", 50 + k["change_20d"] * 3, f"20일 {k['change_20d']:+.1f}%")
+    fl = (t.get("flows") or {}).get("KOSPI")
+    if fl and fl.get("days20"):
+        add("flows", "큰손 수급 (코스피)", 100 * fl["pos_days20"] / fl["days20"],
+            f"20일 중 {fl['pos_days20']}일 외국인+기관 순매수")
+    hy = t.get("hy_spread")
+    if hy and hy.get("pct_1y") is not None:
+        add("credit", "자금시장 (하이일드)", 100 - hy["pct_1y"], f"{hy['value']}%p · 1년 중 {hy['pct_1y']}% 위치")
+    if len(parts) < 3:
+        return None
+    score = round(sum(p["score"] for p in parts) / len(parts))
+    label, tone = thermo_label(score)
+    return {"score": score, "label": label, "tone": tone, "parts": parts}
 
 
 def summarize_temperature(t):

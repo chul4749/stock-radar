@@ -52,6 +52,133 @@ function render() {
   $("#errors").textContent = d.errors && d.errors.length ? `수집 실패: ${d.errors.join(", ")}` : "";
 }
 
+
+/* ---------------- 지표 설명(ⓘ)과 한 줄 해석 ---------------- */
+
+const INFO = {
+  thermo: "여러 지표를 0(극단적 공포)~100(극단적 탐욕) 점수로 바꿔 같은 무게로 평균한 국내 시장 온도계입니다. CNN 공포·탐욕지수와 같은 방식이지만 한국 시장 지표를 섞었습니다. 공포가 크다고 바닥이라는 뜻은 아니고, 지금 시장 분위기가 어느 쪽에 쏠려 있는지 보는 용도입니다.",
+  korea_vol: "코스피200이 최근 20일 동안 실제로 얼마나 출렁였는지를 연율(%)로 나타낸 값입니다. VKOSPI(앞으로의 예상 흔들림)를 구하지 못해 대신 쓰는 지표입니다. 높을수록 시장이 불안하다는 뜻입니다.",
+  vix: "미국 S&P500 옵션 가격으로 계산한 '앞으로 30일 예상 흔들림'입니다. 보통 20 아래면 평온, 30 위면 불안한 편으로 봅니다. 미국 장이 흔들리면 다음 날 한국 장에도 영향을 줍니다.",
+  cnn: "CNN이 미국 시장의 주가 추세·신고가 종목 수·옵션·정크본드 수요 등 7가지를 합쳐 만든 투자심리 점수입니다. 0에 가까울수록 공포, 100에 가까울수록 탐욕입니다.",
+  breadth: "최근 60일 중 가장 높은 가격(신고가) 또는 가장 낮은 가격(신저가)을 찍은 종목 수입니다. 지수는 대형주 몇 개 때문에 버텨도, 신저가 종목이 늘면 시장 속은 약해지고 있다는 뜻입니다.",
+  updown: "기준일에 오른 종목 수와 내린 종목 수입니다(보통주). 지수와 반대로 움직이면 소수 대형주가 지수를 끌고 있다는 신호입니다.",
+  momentum: "코스피가 최근 20영업일 동안 몇 % 움직였는지입니다. 크게 빠졌으면 공포 쪽, 크게 올랐으면 탐욕 쪽으로 계산합니다.",
+  flows: "최근 20영업일 중 외국인과 기관이 합쳐서 코스피 주식을 순매수한 날이 며칠인지입니다. 큰손이 꾸준히 사면 탐욕 쪽, 꾸준히 팔면 공포 쪽입니다.",
+  credit: "재무가 약한 미국 기업이 돈을 빌릴 때 국채보다 얼마나 더 높은 이자를 내야 하는지입니다. 이 차이가 벌어지면 주가 공포가 기업 자금줄 문제로 번지고 있다는 신호입니다.",
+  kospi: "코스피 지수와 기준일 등락률, 최근 20영업일 등락률입니다.",
+  kosdaq: "코스닥 지수와 기준일 등락률, 최근 20영업일 등락률입니다. 중소형·성장주 분위기를 봅니다.",
+  usdkrw: "1달러를 사는 데 드는 원화입니다. 환율이 빠르게 오르면(원화 약세) 외국인이 한국 주식을 팔 유인이 커지는 경우가 많습니다. FRED 자료라 며칠 늦게 반영됩니다.",
+  us10y: "미국 10년 만기 국채 금리입니다. 금리가 오르면 성장주·기술주 가치가 낮게 평가되기 쉽고, 위험자산에서 돈이 빠지는 경우가 많습니다.",
+  marketflows: "시장 전체에서 외국인·기관이 순매수(산 금액 − 판 금액)한 규모입니다. 단위는 억 원입니다.",
+  creditbal: "빚을 내서 산 주식(신용잔고)과, 빚을 못 갚아 강제로 팔린 물량(반대매매)입니다. 강제 매도가 몰리면 좋은 종목도 같이 급락합니다. 아직 수집 경로를 찾지 못했습니다.",
+};
+
+// 1년 중 위치(백분위)로 쓰는 한 줄 해석. high = 값이 높을 때의 의미
+function pctLine(p, high, low) {
+  if (p == null) return "";
+  if (p >= 80) return `1년 중 높은 편 → ${high}`;
+  if (p <= 20) return `1년 중 낮은 편 → ${low}`;
+  return "1년 기준 보통 범위";
+}
+
+function interpret(key, t) {
+  switch (key) {
+    case "korea_vol": return pctLine(t.korea_vol && t.korea_vol.pct_1y, "국내 시장이 크게 출렁이는 중", "국내 시장이 잠잠함");
+    case "vix": {
+      const v = t.vix; if (!v) return "";
+      const lv = v.value >= 30 ? "불안 구간(30 이상)" : v.value >= 20 ? "경계 구간(20~30)" : "평온 구간(20 미만)";
+      return `${lv}${v.change != null ? `, 5일 ${v.change > 0 ? "상승" : v.change < 0 ? "하락" : "변화 없음"}` : ""}`;
+    }
+    case "cnn": {
+      const f = t.fear_greed; if (!f) return "";
+      const d = f.week_ago != null ? f.score - f.week_ago : null;
+      return `미국 투자심리 ${THERMO_KR(f.score)}${d != null ? `, 1주 전보다 ${d > 0 ? "개선" : d < 0 ? "악화" : "비슷"}` : ""}`;
+    }
+    case "credit": return pctLine(t.hy_spread && t.hy_spread.pct_1y, "돈줄이 조여지는 쪽", "자금시장 여유");
+    case "usdkrw": return pctLine(t.usdkrw && t.usdkrw.pct_1y, "원화 약세, 외국인 매도 압력 주의", "원화 강세");
+    case "us10y": return pctLine(t.us10y && t.us10y.pct_1y, "금리 부담 큼 (성장주에 불리)", "금리 부담 작음");
+    case "breadth": {
+      const b = t.breadth; if (!b) return "";
+      const lo = b.new_lows.at(-1), hi = b.new_highs.at(-1);
+      return lo > hi * 2 ? "신저가가 훨씬 많음 → 시장 속이 약함" : hi > lo * 2 ? "신고가가 훨씬 많음 → 시장 속이 강함" : "신고가·신저가 비슷";
+    }
+    case "updown": {
+      const b = t.breadth; if (!b) return "";
+      const k = (t.index || {}).kospi;
+      const r = b.up / Math.max(1, b.up + b.down);
+      const base = r >= 0.6 ? "오른 종목이 많음" : r <= 0.4 ? "내린 종목이 많음" : "오른 종목·내린 종목 비슷";
+      if (k && k.change > 0.5 && r < 0.45) return base + " (지수는 올랐는데 다수는 내림 → 대형주 쏠림)";
+      if (k && k.change < -0.5 && r > 0.55) return base + " (지수는 내렸는데 다수는 오름)";
+      return base;
+    }
+    case "kospi": case "kosdaq": {
+      const x = (t.index || {})[key]; if (!x) return "";
+      return x.change_20d <= -10 ? "20일 새 10% 넘게 하락 — 조정 폭이 큼" : x.change_20d >= 10 ? "20일 새 10% 넘게 상승 — 단기 과열 주의" : "20일 흐름은 보통 범위";
+    }
+    default: return "";
+  }
+}
+
+const THERMO_KR = (s) => (s < 25 ? "극단적 공포" : s < 45 ? "공포" : s < 55 ? "중립" : s < 75 ? "탐욕" : "극단적 탐욕");
+const THERMO_COLOR = (s) => (s < 25 ? "var(--g0)" : s < 45 ? "var(--g1)" : s < 55 ? "var(--g2)" : s < 75 ? "var(--g3)" : "var(--g4)");
+
+const infoBtn = (key) => (INFO[key] ? `<button class="info" type="button" data-info="${key}" aria-label="설명 보기">ⓘ</button>` : "");
+const infoBox = (key) => (INFO[key] ? `<p class="exp" data-exp="${key}" hidden>${esc(INFO[key])}</p>` : "");
+
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button.info");
+  if (!b) return;
+  const box = b.closest(".tile, .thermo, .part").querySelector(`[data-exp="${b.dataset.info}"]`);
+  if (box) box.hidden = !box.hidden;
+});
+
+/* ---------------- 시장 온도계(게이지) ---------------- */
+
+function gauge(score) {
+  const cx = 120, cy = 120, r = 88, sw = 18;
+  const pt = (deg, rad) => [cx + rad * Math.cos((Math.PI * deg) / 180), cy - rad * Math.sin((Math.PI * deg) / 180)];
+  const seg = (from, to, color) => {
+    const [x1, y1] = pt(180 - from * 1.8, r), [x2, y2] = pt(180 - to * 1.8, r);
+    return `<path d="M${x1.toFixed(1)},${y1.toFixed(1)} A${r},${r} 0 0 1 ${x2.toFixed(1)},${y2.toFixed(1)}" stroke="${color}" stroke-width="${sw}" fill="none"/>`;
+  };
+  const arcs = [[0, 25, "var(--g0)"], [25.6, 45, "var(--g1)"], [45.6, 55, "var(--g2)"], [55.6, 75, "var(--g3)"], [75.6, 100, "var(--g4)"]]
+    .map(([a, b, c]) => seg(a, b, c)).join("");
+  const [nx, ny] = pt(180 - score * 1.8, r - 22);
+  const ticks = `<text x="${cx}" y="${cy - r - 14}" text-anchor="middle">50</text>` +
+    `<text x="${cx - r}" y="${cy + 15}" text-anchor="middle">0</text><text x="${cx + r}" y="${cy + 15}" text-anchor="middle">100</text>`;
+  return `<svg viewBox="0 0 240 150" class="gauge" role="img" aria-label="시장 온도 ${score}점">
+    ${arcs}${ticks}
+    <line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" stroke="var(--text)" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="${cx}" cy="${cy}" r="8" fill="var(--card)" stroke="var(--text)" stroke-width="3"/>
+    <text x="${cx - r}" y="${cy + 27}" text-anchor="middle" class="end">극단적 공포</text><text x="${cx + r}" y="${cy + 27}" text-anchor="middle" class="end">극단적 탐욕</text>
+  </svg>`;
+}
+
+function renderThermo() {
+  const th = state.data.temperature.thermo;
+  if (!th) { $("#thermo").innerHTML = ""; return; }
+  const badge = (s) => `<span class="badge" style="background:${THERMO_COLOR(s)}">${s}</span>`;
+  const h = th.history || {};
+  const cmp = [["prev", "전일"], ["week", "1주 전"], ["month", "1달 전"]].map(([k, name]) => {
+    const x = h[k];
+    return `<li><div><small>${name}</small><b style="color:${x ? THERMO_COLOR(x.score) : "var(--faint)"}">${x ? esc(x.label) : "기록 없음"}</b></div>${x ? badge(x.score) : ""}</li>`;
+  }).join("");
+  const parts = th.parts.map((p) => `<div class="part">
+      <div class="part-hd"><span>${esc(p.name)} ${infoBtn(p.key)}</span><b style="color:${THERMO_COLOR(p.score)}">${p.score} <small>${THERMO_KR(p.score)}</small></b></div>
+      <div class="part-bar"><i style="left:${p.score}%"></i></div>
+      <small>${esc(p.raw)}</small>${infoBox(p.key)}
+    </div>`).join("");
+  $("#thermo").innerHTML = `<div class="thermo">
+    <div class="th-top">
+      <div class="th-now"><small>지금 ${infoBtn("thermo")}</small><b style="color:${THERMO_COLOR(th.score)}">${esc(th.label)}</b>${gauge(th.score)}
+        <div class="th-score" style="color:${THERMO_COLOR(th.score)}">${th.score}<small>/100</small></div></div>
+      <ul class="th-cmp">${cmp}</ul>
+    </div>
+    ${infoBox("thermo")}
+    <details class="rules"><summary>무엇으로 계산했나 (${th.parts.length}개 지표)</summary>${parts}</details>
+  </div>`;
+}
+
 /* ---------------- 시장 온도 ---------------- */
 
 function spark(vals, color = "currentColor") {
@@ -63,15 +190,19 @@ function spark(vals, color = "currentColor") {
 }
 
 function tile(label, value, sub, sparkVals, opts = {}) {
-  return `<div class="tile${opts.wide ? " wide" : ""}"><div class="l">${label}</div><div class="v ${opts.vcls || ""}">${value}</div>` +
-    `<div class="s">${sub}</div>${sparkVals ? `<div style="color:var(--faint)">${spark(sparkVals)}</div>` : ""}${opts.extra || ""}</div>`;
+  const key = opts.key;
+  const line = key ? interpret(key, state.data.temperature) : "";
+  return `<div class="tile${opts.wide ? " wide" : ""}"><div class="l">${label} ${key ? infoBtn(key) : ""}</div><div class="v ${opts.vcls || ""}">${value}</div>` +
+    `<div class="s">${sub}</div>${sparkVals ? `<div style="color:var(--faint)">${spark(sparkVals)}</div>` : ""}${opts.extra || ""}` +
+    `${line ? `<div class="why">${esc(line)}</div>` : ""}${key ? infoBox(key) : ""}</div>`;
 }
 
 const pctText = (p) => (p == null ? "" : ` · 1년 중 ${p}% 위치`);
 
 function renderTemp() {
   const t = state.data.temperature;
-  $("#summary").innerHTML = (t.summary || []).map((s) =>
+  renderThermo();
+  $("#summary").innerHTML = (t.summary || []).filter((s) => !(t.thermo && s.key === "fear")).map((s) =>
     `<div class="sum ${s.tone}"><div class="row"><span class="t">${esc(s.title)}</span><span class="lv">${esc(s.level)}</span></div><p>${esc(s.text)}</p></div>`
   ).join("") || `<div class="empty">시장 온도 데이터를 받지 못했습니다</div>`;
 
@@ -79,22 +210,23 @@ function renderTemp() {
   const ix = t.index || {};
   for (const [k, name] of [["kospi", "코스피"], ["kosdaq", "코스닥"]]) {
     const x = ix[k];
-    if (x) tiles.push(tile(name, num(x.close, 2), `<span class="${cls(x.change)}">${signed(x.change, 2, "%")}</span> · 20일 ${signed(x.change_20d, 1, "%")}`, x.spark));
+    if (x) tiles.push(tile(name, num(x.close, 2), `<span class="${cls(x.change)}">${signed(x.change, 2, "%")}</span> · 20일 ${signed(x.change_20d, 1, "%")}`, x.spark, { key: k }));
   }
-  if (t.vix) tiles.push(tile("미국 VIX (공포지수)", num(t.vix.value, 1), `5일 ${signed(t.vix.change, 1)}${pctText(t.vix.pct_1y)}`, t.vix.spark));
-  if (t.korea_vol) tiles.push(tile("국내 변동성 <small>(VKOSPI 대체)</small>", num(t.korea_vol.value, 1) + "%", `코스피200 20일 실제 변동성${pctText(t.korea_vol.pct_1y)}`, t.korea_vol.spark));
+  if (t.vix) tiles.push(tile("미국 VIX (공포지수)", num(t.vix.value, 1), `5일 ${signed(t.vix.change, 1)}${pctText(t.vix.pct_1y)}`, t.vix.spark, { key: "vix" }));
+  if (t.korea_vol) tiles.push(tile("국내 변동성 <small>(VKOSPI 대체)</small>", num(t.korea_vol.value, 1) + "%", `코스피200 20일 실제 변동성${pctText(t.korea_vol.pct_1y)}`, t.korea_vol.spark, { key: "korea_vol" }));
   if (t.fear_greed) {
     const fg = t.fear_greed;
     const kr = { "extreme fear": "극단적 공포", fear: "공포", neutral: "중립", greed: "탐욕", "extreme greed": "극단적 탐욕" }[fg.rating] || fg.rating;
-    tiles.push(tile("CNN 공포·탐욕", `${num(fg.score)} <small style="font-size:13px;font-weight:500">${esc(kr)}</small>`, `1주 전 ${num(fg.week_ago)} · 1달 전 ${num(fg.month_ago)}`));
+    tiles.push(tile("CNN 공포·탐욕", `${num(fg.score)} <small style="font-size:13px;font-weight:500">${esc(kr)}</small>`,
+      `전일 ${num(fg.prev)} · 1주 전 ${num(fg.week_ago)} · 1달 전 ${num(fg.month_ago)}${fg.year_ago != null ? ` · 1년 전 ${num(fg.year_ago)}` : ""}`, fg.spark, { key: "cnn" }));
   }
-  if (t.hy_spread) tiles.push(tile("미국 하이일드 스프레드", num(t.hy_spread.value, 2) + "%p", `20일 ${signed(t.hy_spread.change, 2, "%p")}${pctText(t.hy_spread.pct_1y)}`, t.hy_spread.spark));
-  if (t.usdkrw) tiles.push(tile("원/달러 환율", num(t.usdkrw.value, 1) + "원", `5일 ${signed(t.usdkrw.change, 1)}${pctText(t.usdkrw.pct_1y)} · ${t.usdkrw.date.slice(5)} 기준`, t.usdkrw.spark));
-  if (t.us10y) tiles.push(tile("미국 10년 국채금리", num(t.us10y.value, 2) + "%", `5일 ${signed(t.us10y.change, 2, "%p")}${pctText(t.us10y.pct_1y)}`, t.us10y.spark));
+  if (t.hy_spread) tiles.push(tile("미국 하이일드 스프레드", num(t.hy_spread.value, 2) + "%p", `20일 ${signed(t.hy_spread.change, 2, "%p")}${pctText(t.hy_spread.pct_1y)}`, t.hy_spread.spark, { key: "credit" }));
+  if (t.usdkrw) tiles.push(tile("원/달러 환율", num(t.usdkrw.value, 1) + "원", `5일 ${signed(t.usdkrw.change, 1)}${pctText(t.usdkrw.pct_1y)} · ${t.usdkrw.date.slice(5)} 기준`, t.usdkrw.spark, { key: "usdkrw" }));
+  if (t.us10y) tiles.push(tile("미국 10년 국채금리", num(t.us10y.value, 2) + "%", `5일 ${signed(t.us10y.change, 2, "%p")}${pctText(t.us10y.pct_1y)}`, t.us10y.spark, { key: "us10y" }));
   if (t.breadth) {
     const b = t.breadth;
-    tiles.push(tile("오르고 내린 종목", `<span class="up">${num(b.up)}</span> / <span class="down">${num(b.down)}</span>`, "상승 / 하락 (보통주)"));
-    tiles.push(tile("60일 신저가 종목", num(b.new_lows.at(-1)), `신고가 ${num(b.new_highs.at(-1))} · 최근 20일 추이`, b.new_lows));
+    tiles.push(tile("오르고 내린 종목", `<span class="up">${num(b.up)}</span> / <span class="down">${num(b.down)}</span>`, "상승 / 하락 (보통주)", null, { key: "updown" }));
+    tiles.push(tile("60일 신저가 종목", num(b.new_lows.at(-1)), `신고가 ${num(b.new_highs.at(-1))} · 최근 20일 추이`, b.new_lows, { key: "breadth" }));
   }
   if (t.flows) {
     const rows = [];
@@ -106,9 +238,9 @@ function renderTemp() {
         if (x) rows.push(`<tr><td>${name} ${who}</td><td class="${cls(x.today)}">${signed(x.today, 0)}</td><td class="${cls(x.d5)}">${signed(x.d5, 0)}</td><td class="${cls(x.d20)}">${signed(x.d20, 0)}</td></tr>`);
       }
     }
-    tiles.push(`<div class="tile wide"><div class="l">시장 전체 순매수 (억 원)</div><table class="flowtbl"><thead><tr><th></th><th>오늘</th><th>5일</th><th>20일</th></tr></thead><tbody>${rows.join("")}</tbody></table></div>`);
+    tiles.push(`<div class="tile wide"><div class="l">시장 전체 순매수 (억 원) ${infoBtn("marketflows")}</div>${infoBox("marketflows")}<table class="flowtbl"><thead><tr><th></th><th>오늘</th><th>5일</th><th>20일</th></tr></thead><tbody>${rows.join("")}</tbody></table></div>`);
   }
-  tiles.push(tile("신용잔고·반대매매", `<span class="na">–</span>`, "아직 수집 경로를 찾지 못함"));
+  tiles.push(tile("신용잔고·반대매매", `<span class="na">–</span>`, "아직 수집 경로를 찾지 못함", null, { key: "creditbal" }));
   $("#tiles").innerHTML = tiles.join("");
 }
 

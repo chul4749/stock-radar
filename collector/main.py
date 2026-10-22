@@ -165,12 +165,13 @@ def main(argv):
     vix = safe("VIX", sources.vix, errors)
     if vix:
         # 기준일(한국) 이전 미국 장 마감값까지만
-        vix = [r for r in vix if r[0] <= f"{base[:4]}-{base[4:6]}-{base[6:]}"]
+        vix = [r for r in vix if r[0] < iso(base)]
         temp["vix"] = logic.series_stat(vix)
     hy = safe("하이일드", lambda: sources.fred("BAMLH0A0HYM2"), errors)
+    hy = [r for r in hy if r[0] < iso(base)] if hy else hy
     if hy:
         temp["hy_spread"] = logic.series_stat(hy, days_back=20)
-    temp["fear_greed"] = safe("CNN", sources.cnn_fear_greed, errors)
+    temp["fear_greed"] = safe("CNN", lambda: sources.cnn_fear_greed(iso(base)), errors)
     uni_closes = closes[[c for c in universe if c in closes.columns]]
     b = logic.breadth(uni_closes)
     temp["breadth"] = b
@@ -179,10 +180,25 @@ def main(argv):
         temp["flows"] = {m: logic.flows_summary(df) for m, df in flows.items()}
     for key, sid in (("usdkrw", "DEXKOUS"), ("us10y", "DGS10")):
         rows = safe(sid, lambda: sources.fred(sid), errors)
+        rows = [r for r in rows if r[0] < iso(base)] if rows else rows
         if rows:
             temp[key] = logic.series_stat(rows)
     temp["credit_balance"] = None  # 신용잔고·반대매매: 수집 경로 미확인
     temp["summary"] = logic.summarize_temperature(temp)
+    temp["thermo"] = logic.thermometer(temp)
+    # 전일·1주 전·1달 전 온도: 이전 기록 파일에서
+    prev_files = sorted(n[:8] for n in os.listdir(DATA) if n[:8].isdigit() and n.endswith(".json") and n[:8] < base)
+    hist = {}
+    for key, back in (("prev", 1), ("week", 5), ("month", 21)):
+        if len(prev_files) >= back:
+            d = prev_files[-back]
+            with open(os.path.join(DATA, f"{d}.json"), encoding="utf-8") as f:
+                old = json.load(f)["temperature"]
+            th = old.get("thermo") or logic.thermometer(old)
+            if th:
+                hist[key] = {"date": d, "score": th["score"], "label": th["label"]}
+    if temp["thermo"]:
+        temp["thermo"]["history"] = hist
 
     out = {
         "version": 1,

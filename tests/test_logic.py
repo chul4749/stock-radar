@@ -198,3 +198,16 @@ def test_realized_vol_flat_is_zero():
     s = pd.Series([100.0] * 30)
     assert logic.realized_vol(s).dropna().iloc[-1] == 0
     assert not math.isnan(logic.realized_vol(pd.Series([100.0 * (1.01 ** i) for i in range(30)])).iloc[-1])
+
+
+def test_thermometer_averages_parts_and_labels():
+    t = {"korea_vol": {"value": 30, "pct_1y": 90}, "vix": {"value": 25, "pct_1y": 80},
+         "fear_greed": {"score": 20}, "breadth": {"new_highs": [10], "new_lows": [90]},
+         "index": {"kospi": {"change_20d": -10.0}}, "flows": {"KOSPI": {"pos_days20": 5, "days20": 20}},
+         "hy_spread": {"value": 4, "pct_1y": 95}}
+    th = logic.thermometer(t)
+    scores = {p["key"]: p["score"] for p in th["parts"]}
+    assert scores == {"korea_vol": 10, "vix": 20, "cnn": 20, "breadth": 10, "momentum": 20, "flows": 25, "credit": 5}
+    assert th["score"] == 16 and th["label"] == "극단적 공포"
+    assert logic.thermometer({"vix": {"value": 1, "pct_1y": 1}}) is None
+    assert logic.thermo_label(50) == ("중립", "neutral") and logic.thermo_label(80)[0] == "극단적 탐욕"

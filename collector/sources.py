@@ -151,16 +151,30 @@ def fred(series_id):
     return rows
 
 
-def cnn_fear_greed():
+def cnn_fear_greed(base_iso):
+    """CNN 공포·탐욕지수. 1년치 일별 기록에서 기준일 전 미국 장 마감값을 고른다.
+
+    CNN 기록의 날짜(UTC 0시)는 전날 미국 장 마감값이다. 한국 기준일 저녁에 알 수 있는 건
+    그 날짜(UTC) ≤ 기준일인 값까지.
+    """
     r = retry(lambda: get("https://production.dataviz.cnn.io/index/fearandgreed/graphdata",
                           headers={"Referer": "https://edition.cnn.com/", "Accept": "application/json"}))
-    fg = r.json()["fear_and_greed"]
+    hist = r.json()["fear_and_greed_historical"]["data"]
+    rows = [(datetime.utcfromtimestamp(p["x"] / 1000).strftime("%Y-%m-%d"), p["y"], p.get("rating"))
+            for p in hist]
+    rows = [x for x in rows if x[0] <= base_iso]
+    if not rows:
+        raise RuntimeError("기준일 이전 CNN 기록 없음")
+    pick = lambda back: round(rows[-1 - back][1], 1) if len(rows) > back else None
     return {
-        "score": round(fg["score"], 1),
-        "rating": fg["rating"],
-        "week_ago": round(fg.get("previous_1_week") or math.nan, 1),
-        "month_ago": round(fg.get("previous_1_month") or math.nan, 1),
-        "timestamp": fg.get("timestamp"),
+        "date": rows[-1][0],
+        "score": pick(0),
+        "rating": rows[-1][2],
+        "prev": pick(1),
+        "week_ago": pick(5),
+        "month_ago": pick(21),
+        "year_ago": round(rows[0][1], 1) if len(rows) >= 240 else None,
+        "spark": [round(x[1], 1) for x in rows[-60:]],
     }
 
 
