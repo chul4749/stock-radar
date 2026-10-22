@@ -1,0 +1,23 @@
+# 데이터 출처 시험 결과 (2026-10-22, GitHub Actions)
+
+사무실 PC에서는 증권 사이트 대부분이 막혀 있어 수집은 GitHub Actions에서만 한다.
+시험 스크립트: `probe/probe.py`, 워크플로 `probe` (수동 실행).
+
+| 용도 | 출처 | 결과 | 비고 |
+|---|---|---|---|
+| 뉴스 | 구글 뉴스 RSS | ✅ | 키 없음, 검색어별 100건 |
+| 뉴스 | 네이버 주요뉴스 `m.stock.naver.com/api/news/list` | ✅ | 비공식 |
+| 뉴스 | 네이버 종목 뉴스 `m.stock.naver.com/api/news/stock/{code}` | ✅ | 비공식 |
+| 공시 | DART 웹 목록 | ✅ | 정식은 OpenDART 키(무료) 권장 |
+| 전종목 시세 | 네이버 `api/stocks/marketValue/{KOSPI,KOSDAQ}` | ✅ | 코스피 2,494·코스닥 1,823 (ETF 포함), 100건/쪽 |
+| 일봉 | 네이버 `api.finance.naver.com/siseJson.naver` | ✅ | |
+| 기관·외국인 | 네이버 `api/stock/{code}/trend` | ✅ | 종목별, 일자별 순매수 수량 |
+| PER·PBR·52주 | 네이버 `api/stock/{code}/integration` | ✅ | |
+| 미국 VIX | CBOE CSV | ✅ | FRED VIX는 시간초과 |
+| 하이일드 스프레드 | FRED csv (UA 없이, 60초) | ✅ | 브라우저 UA를 붙이면 시간초과 |
+| 공포·탐욕 | CNN graphdata | ✅ | 비공식 |
+| 코스피200 지수 | 네이버 `api/index/KPI200/basic` | ✅ | |
+| VKOSPI | 네이버·pykrx | ❌ | KRX 로그인 필요 |
+| KRX 전체 (pykrx) | data.krx.co.kr | ❌ | 2026년 현재 KRX 회원 로그인(KRX_ID/KRX_PW) 필요 |
+| 옛 네이버 금융 페이지 | finance.naver.com/item, sise, news | ❌ | Npay 증권 신형 화면으로 바뀌어 표를 못 읽음 |
+| 신용잔고·반대매매 | 금융투자협회 freesis | △ | 접속만 확인, 데이터 경로 미확인 |
