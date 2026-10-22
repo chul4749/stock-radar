@@ -39,8 +39,17 @@ def check(name, group):
     return deco
 
 
+DUMP = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dump")
+os.makedirs(DUMP, exist_ok=True)
+
+
 def get(url, **kw):
-    r = requests.get(url, headers={**UA, **kw.pop("headers", {})}, timeout=TIMEOUT, **kw)
+    ua = kw.pop("ua", True)
+    r = requests.get(url, headers={**(UA if ua else {}), **kw.pop("headers", {})},
+                     timeout=kw.pop("timeout", TIMEOUT), **kw)
+    name = re.sub(r"[^A-Za-z0-9]+", "_", url.split("//", 1)[-1])[:80]
+    with open(os.path.join(DUMP, name + ".txt"), "wb") as f:
+        f.write(r.content[:200000])
     r.raise_for_status()
     return r
 
@@ -143,7 +152,46 @@ def krx_direct():
     return len(rows), [rows[0].get("ISU_ABBRV")] if rows else [str(data)[:120]]
 
 
+@check("네이버 모바일 시가총액 목록", "시세·수급")
+def naver_mobile_market():
+    r = get("https://m.stock.naver.com/api/stocks/marketValue/KOSPI", params={"page": 1, "pageSize": 100})
+    d = r.json()
+    items = d.get("stocks", d if isinstance(d, list) else [])
+    return len(items), [str(items[0])[:150]] if items else [str(d)[:150]]
+
+
+@check("네이버 기관 순매수 상위", "시세·수급")
+def naver_deal_rank():
+    r = get("https://finance.naver.com/sise/sise_deal_rank_iframe.naver",
+            params={"sosok": "01", "investor_gubun": "1000", "type": "buy"})
+    r.encoding = "euc-kr"
+    names = re.findall(r'class="company"[^>]*>([^<]+)<', r.text) or re.findall(r'title="([^"]+)"', r.text)
+    return len(names), names[:3]
+
+
 # ---------- 시장 온도 ----------
+
+@check("CBOE VIX CSV", "시장 온도")
+def cboe_vix():
+    r = get("https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv")
+    lines = r.text.strip().splitlines()
+    return len(lines) - 1, lines[-2:]
+
+
+@check("FRED 하이일드 (UA 없이, 60초)", "시장 온도")
+def fred_hy2():
+    r = get("https://fred.stlouisfed.org/graph/fredgraph.csv", params={"id": "BAMLH0A0HYM2"},
+            ua=False, timeout=60)
+    lines = r.text.strip().splitlines()
+    return len(lines) - 1, lines[-2:]
+
+
+@check("네이버 지수 API (코스피200)", "시장 온도")
+def naver_kpi200():
+    r = get("https://m.stock.naver.com/api/index/KPI200/basic")
+    d = r.json()
+    return 1, [d.get("closePrice"), d.get("localTradedAt")]
+
 
 @check("FRED 미국 VIX", "시장 온도")
 def fred_vix():
