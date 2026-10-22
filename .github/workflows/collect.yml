@@ -24,7 +24,7 @@ concurrency:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -33,24 +33,29 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - run: python -m pytest -q tests
-      - run: |
-          for d in ${{ inputs.dates }}; do python -m collector.main "$d"; done
-          python -m collector.main ${{ inputs.base_date }}
-        env:
-          KRX_ID: ${{ secrets.KRX_ID }}
-          KRX_PW: ${{ secrets.KRX_PW }}
-      - name: 결과 저장
+      - name: 수집·저장
         run: |
           git config user.name "stock-radar-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # 대기열에서 기다린 실행은 예전 커밋으로 시작하므로, 최신 브랜치 위에 방금 만든 데이터를 통째로 얹는다
-          mv site/data "$RUNNER_TEMP/data"
-          git fetch -q origin "$GITHUB_REF_NAME"
-          git checkout -q -f -B "$GITHUB_REF_NAME" "origin/$GITHUB_REF_NAME"
-          rm -rf site/data && mv "$RUNNER_TEMP/data" site/data
-          git add -A site/data
-          git diff --cached --quiet || git commit -m "data: $(date -u +%F)"
-          git push origin "$GITHUB_REF_NAME"
+          save() {
+            mv site/data "$RUNNER_TEMP/data"
+            git fetch -q origin "$GITHUB_REF_NAME"
+            git checkout -q -f -B "$GITHUB_REF_NAME" "origin/$GITHUB_REF_NAME"
+            rm -rf site/data && mv "$RUNNER_TEMP/data" site/data
+            git add -A site/data
+            git diff --cached --quiet || git commit -q -m "data: $1"
+            git push -q origin "$GITHUB_REF_NAME"
+          }
+          # 과거 기준일은 하루씩 저장해서, 중간에 시간이 다 돼도 끝난 날짜는 남게 한다
+          for d in ${{ inputs.dates }}; do
+            python -m collector.main "$d" && save "$d 재계산" || echo "::warning::$d 재계산 실패"
+          done
+          python -m collector.main ${{ inputs.base_date }}
+          save "$(date -u +%F)"
+        env:
+          KRX_ID: ${{ secrets.KRX_ID }}
+          KRX_PW: ${{ secrets.KRX_PW }}
       - uses: actions/upload-artifact@v4
         with:
           name: site
