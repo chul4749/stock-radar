@@ -272,16 +272,17 @@ function renderSectors() {
     $("#sector-list").innerHTML = `<div class="empty">이 날짜는 업종 데이터가 없습니다.</div>`;
     return;
   }
-  const max = Math.max(1, ...s.inflow.map((r) => Math.abs(r.flow_eok)), ...s.outflow.map((r) => Math.abs(r.flow_eok)));
-  const row = (r) => {
+  // 들어온 쪽·빠져나간 쪽을 각자 가장 큰 값에 맞춘다
+  const scale = (list) => Math.max(1, ...list.map((r) => Math.abs(r.flow_eok)));
+  const row = (r, max) => {
     const w = Math.max(2, (Math.abs(r.flow_eok) / max) * 100);
     const names = r.flow_eok > 0 ? r.top : r.bottom;
     return `<div class="sec"><div class="sec-hd"><b>${esc(r.sector)}</b><span class="${cls(r.flow_eok)}">${signed(r.flow_eok, 0, "억")}</span></div>
       <div class="sec-bar"><i style="width:${w}%;background:var(--${r.flow_eok > 0 ? "up" : "down"})"></i></div>
       <small>${r.n}종목 · 5일 등락 중앙값 <span class="${cls(r.rise_5d)}">${signed(r.rise_5d, 1, "%")}</span>${names.length ? " · " + names.map(esc).join(", ") : ""}</small></div>`;
   };
-  $("#sector-list").innerHTML = `<div class="tile wide">${s.inflow.map(row).join("")}</div>` +
-    (s.outflow.length ? `<details class="rules"><summary>빠져나간 업종 보기</summary><div class="tile wide">${s.outflow.map(row).join("")}</div></details>` : "");
+  $("#sector-list").innerHTML = `<div class="tile wide">${s.inflow.map((r) => row(r, scale(s.inflow))).join("")}</div>` +
+    (s.outflow.length ? `<details class="rules"><summary>빠져나간 업종 보기</summary><div class="tile wide">${s.outflow.map((r) => row(r, scale(s.outflow))).join("")}</div></details>` : "");
 }
 
 function renderExcluded() {
