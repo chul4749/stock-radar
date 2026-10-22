@@ -262,6 +262,25 @@ def vkospi():
     raise RuntimeError("변동성 지수를 목록에서 찾지 못함")
 
 
+@check("VKOSPI (KRX 전체지수 시세)", "시장 온도")
+def vkospi_all():
+    from pykrx.website.krx.market.core import 전체지수시세
+    seen = []
+    for code in ("01", "02", "03", "04", "05", "06", "07", "08"):
+        try:
+            df = 전체지수시세().fetch(YMD, code)
+        except Exception as e:
+            seen.append(f"{code}:{type(e).__name__}")
+            continue
+        seen.append(f"{code}:{len(df)}")
+        if "IDX_NM" in df:
+            hit = df[df["IDX_NM"].str.contains("변동성|VKOSPI", regex=True)]
+            if len(hit):
+                row = hit.iloc[0]
+                return 1, [code, row["IDX_NM"], row.get("CLSPRC_IDX")]
+    raise RuntimeError("못 찾음 " + " ".join(seen))
+
+
 @check("네이버 VKOSPI 페이지", "시장 온도")
 def naver_vkospi():
     r = get("https://m.stock.naver.com/api/index/VKOSPI/basic")
