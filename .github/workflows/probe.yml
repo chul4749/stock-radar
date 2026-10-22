@@ -1,0 +1,20 @@
+name: probe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests pykrx
+      - run: python probe/probe.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: probe-result
+          path: probe/result.json
