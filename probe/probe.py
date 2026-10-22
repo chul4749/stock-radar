@@ -169,6 +169,37 @@ def naver_deal_rank():
     return len(names), names[:3]
 
 
+@check("네이버 코스닥 시가총액 목록", "시세·수급")
+def naver_mobile_kosdaq():
+    r = get("https://m.stock.naver.com/api/stocks/marketValue/KOSDAQ", params={"page": 1, "pageSize": 100})
+    d = r.json()
+    return len(d.get("stocks", [])), [d.get("totalCount")]
+
+
+@check("네이버 종목 종합(PER·PBR·52주)", "시세·수급")
+def naver_integration():
+    r = get("https://m.stock.naver.com/api/stock/005930/integration")
+    d = r.json()
+    infos = {i.get("code"): i.get("value") for i in d.get("totalInfos", [])}
+    return len(infos), [str(infos)[:300]]
+
+
+@check("네이버 종목 뉴스", "뉴스")
+def naver_stock_news():
+    r = get("https://m.stock.naver.com/api/news/stock/005930", params={"pageSize": 10, "page": 1})
+    d = r.json()
+    items = [i for g in d for i in g.get("items", [])] if isinstance(d, list) else []
+    return len(items), [items[0].get("title")] if items else [str(d)[:150]]
+
+
+@check("네이버 주요뉴스 목록", "뉴스")
+def naver_main_news():
+    r = get("https://m.stock.naver.com/api/news/list", params={"category": "mainnews", "pageSize": 20, "page": 1})
+    d = r.json()
+    items = d if isinstance(d, list) else d.get("list", d.get("items", []))
+    return len(items), [str(items[0])[:150]] if items else [str(d)[:150]]
+
+
 # ---------- 시장 온도 ----------
 
 @check("CBOE VIX CSV", "시장 온도")
