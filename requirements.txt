@@ -1,0 +1,4 @@
+requests
+pandas
+pykrx==1.2.9
+pytest
