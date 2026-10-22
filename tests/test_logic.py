@@ -24,6 +24,14 @@ def test_matcher_skips_stopwords():
     assert m.find("수혜 대상 확대에 삼성전자 강세") == ["005930"]
 
 
+def test_matcher_short_hangul_names_need_boundary():
+    m = logic.NameMatcher({"026960": "동서", "000000": "효성"})
+    assert m.find("동서대학교 앵커사업단") == []
+    assert m.find("동서, 3분기 실적 개선") == ["026960"]
+    assert m.find("동서는 배당 확대") == ["026960"]
+    assert m.find("나동서 씨") == []
+
+
 def test_common_stock_filter():
     assert logic.is_common_stock("005930", "삼성전자")
     assert not logic.is_common_stock("005935", "삼성전자우")

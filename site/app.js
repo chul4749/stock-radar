@@ -132,9 +132,15 @@ function renderFilter() {
 
 function bars(daily) {
   const max = Math.max(1, ...daily.map((d) => Math.abs(d.sum || 0)));
+  const hasNeg = daily.some((d) => (d.sum || 0) < 0);
+  // 음수가 있으면 가운데 기준선 위아래로, 없으면 전체 높이를 쓴다
   const cols = daily.map((d) => {
-    const v = d.sum || 0, h = Math.max(2, (Math.abs(v) / max) * 100);
-    return `<div title="${ymd(d.date)} ${signed(v, 0, "억")}"><i class="${v < 0 ? "neg" : ""}" style="height:${h / 2}%;background:var(--${v >= 0 ? "up" : "down"})"></i></div>`;
+    const v = d.sum || 0, h = Math.max(3, (Math.abs(v) / max) * 100);
+    const bar = `<i class="${v < 0 ? "neg" : ""}" style="height:${h}%;background:var(--${v >= 0 ? "up" : "down"})"></i>`;
+    const inner = hasNeg
+      ? `<div style="height:50%;display:flex;align-items:flex-end;width:100%">${v >= 0 ? bar : ""}</div><div style="height:50%;width:100%">${v < 0 ? bar : ""}</div>`
+      : bar;
+    return `<div title="${ymd(d.date)} ${signed(v, 0, "억")}">${inner}</div>`;
   }).join("");
   const labs = daily.map((d) => `<span>${d.date.slice(4, 6)}/${d.date.slice(6)}</span>`).join("");
   return `<div class="bars">${cols}</div><div class="barlab">${labs}</div>`;

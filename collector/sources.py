@@ -204,7 +204,7 @@ def naver_main_news(pages=5):
                 f"https://n.news.naver.com/mnews/article/{oid}/{aid}" if oid and aid else "")
             at = _parse_naver_time(row.get("datetime") or row.get("dt") or row.get("writeDateTime"))
             if title and url and at:
-                out.append({"title": title, "url": url, "source": row.get("officeName") or "네이버",
+                out.append({"title": title, "url": url, "source": row.get("ohnm") or row.get("officeName") or "네이버",
                             "at": at.isoformat(timespec="minutes"), "kind": "뉴스"})
         if not rows:
             break

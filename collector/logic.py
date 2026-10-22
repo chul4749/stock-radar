@@ -138,6 +138,10 @@ NAME_STOP = {"대상", "국보", "서울", "보성", "화성", "동방", "삼양
              "대원", "부국", "삼일", "일정", "세원", "한일", "대한", "우진", "경방", "방림", "백광", "유니"}
 
 
+HANGUL = re.compile(r"[가-힣]")
+PARTICLES = set("은는이가을를의와과도만에로")
+
+
 def is_common_stock(code, name, section=""):
     if code[-1] != "0":           # 우선주 코드는 끝자리가 0 이 아님
         return False
@@ -171,6 +175,11 @@ class NameMatcher:
                     if re.match(r"[A-Za-z]", n[-1]) and re.match(r"[A-Za-z]", nxt):
                         continue
                     if re.match(r"[A-Za-z]", n[0]) and re.match(r"[A-Za-z]", prv):
+                        continue
+                    # 두 글자 한글 이름은 뒤에 조사만 허용 (예: '동서' in '동서대학교' 제외)
+                    if len(n) == 2 and HANGUL.match(n) and HANGUL.match(nxt) and nxt not in PARTICLES:
+                        continue
+                    if HANGUL.match(n[0]) and HANGUL.match(prv) and len(n) <= 3:
                         continue
                     for k in range(i, i + len(n)):
                         used[k] = True
