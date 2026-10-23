@@ -235,7 +235,7 @@ def test_forced_selling_spike_raises_selling_pressure():
     b = {"new_lows": [100] * 6, "new_highs": [100] * 6, "up": 1, "down": 1}
     calm = {"breadth": b, "credit_balance": {"forced": {"value": 300, "avg20": 250, "pct_1y": 50}}}
     s = {x["key"]: x for x in logic.summarize_temperature(calm)}
-    assert s["selling"]["level"] == "비슷함" and "반대매매 300억" in s["selling"]["text"]
+    assert s["selling"]["level"] == "비슷함" and "(반대매매) 300억" in s["selling"]["text"]
     spike = {"breadth": b, "credit_balance": {"forced": {"value": 900, "avg20": 300, "pct_1y": 98}}}
     s = {x["key"]: x for x in logic.summarize_temperature(spike)}
     assert s["selling"]["level"] == "커지는 중" and "3.0배" in s["selling"]["text"]
@@ -287,7 +287,7 @@ def test_scorecard_splits_by_regime():
 def test_regime_explains_decision_and_chart():
     t = {"thermo": {"score": 35}}
     r = logic.market_regime(_kospi(-0.002, n=200), t, dates=[f"d{i}" for i in range(200)])
-    assert r["key"] == "down" and "추세로 판정" in r["reason"] and "20일선" in r["next"]
+    assert r["key"] == "down" and "하락장" in r["reason"] and "20일 평균 가격" in r["next"]
     assert [c["ok"] for c in r["trend_checks"]] == [False, False, False]
     assert len(r["chart"]["close"]) == 120 and r["chart"]["ma60"][-1] == r["trend"]["ma60"]
     assert r["fit"]["swing"]["evidence"] and r["fit"]["swing"]["source"]

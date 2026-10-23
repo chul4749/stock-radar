@@ -246,27 +246,27 @@ def summarize_temperature(t):
         tone = "fear" if s >= 70 else "neutral" if s >= 35 else "calm"
         out.append({"key": "fear", "title": "공포 크기", "level": level, "tone": tone,
                     "score": round(s),
-                    "text": f"변동성·심리 지표를 1년 기준으로 놓으면 공포 쪽 {round(s)}점 (100점 = 1년 중 가장 무서운 수준)."})
+                    "text": f"시장이 얼마나 겁먹었나를 지난 1년과 비교하면 {round(s)}점 (100점 = 1년 중 가장 무서웠던 때, 0점 = 가장 편했던 때)."})
 
     # 2. 매도 압력: 신저가 종목 수가 최근 5일 평균보다 늘었나
     b = t.get("breadth")
     if b and len(b["new_lows"]) >= 6:
         now, avg = b["new_lows"][-1], sum(b["new_lows"][-6:-1]) / 5
         if now > avg * 1.3 and now >= 30:
-            level, tone, text = "커지는 중", "fear", f"60일 신저가 종목 {now}개, 최근 5일 평균 {avg:.0f}개보다 많음."
+            level, tone, text = "커지는 중", "fear", f"석 달 만에 가장 싼 값까지 떨어진 종목(신저가) {now}개 — 최근 5일 평균 {avg:.0f}개보다 많음. 파는 힘이 세지는 중."
         elif now < avg * 0.7:
-            level, tone, text = "줄어드는 중", "calm", f"60일 신저가 종목 {now}개, 최근 5일 평균 {avg:.0f}개보다 적음."
+            level, tone, text = "줄어드는 중", "calm", f"석 달 만에 가장 싼 값까지 떨어진 종목(신저가) {now}개 — 최근 5일 평균 {avg:.0f}개보다 적음. 파는 힘이 약해지는 중."
         else:
-            level, tone, text = "비슷함", "neutral", f"60일 신저가 종목 {now}개, 최근 5일 평균 {avg:.0f}개와 비슷."
+            level, tone, text = "비슷함", "neutral", f"석 달 만에 가장 싼 값까지 떨어진 종목(신저가) {now}개 — 최근 5일 평균 {avg:.0f}개와 비슷."
         # 반대매매가 20일 평균의 2배 넘게 몰리면 신저가와 상관없이 매도 압력이 커지는 중으로 본다
         fo = (t.get("credit_balance") or {}).get("forced")
         if fo and fo.get("avg20"):
             mult = fo["value"] / fo["avg20"]
             if mult >= 2 and fo["value"] >= 300:
                 level, tone = "커지는 중", "fear"
-                text += f" 반대매매 {fo['value']:,.0f}억, 20일 평균의 {mult:.1f}배."
+                text += f" 빚 때문에 강제로 팔린 금액(반대매매) {fo['value']:,.0f}억 — 평소의 {mult:.1f}배."
             else:
-                text += f" 반대매매 {fo['value']:,.0f}억 (20일 평균 {fo['avg20']:,.0f}억)."
+                text += f" 빚 때문에 강제로 팔린 금액(반대매매) {fo['value']:,.0f}억 (평소 {fo['avg20']:,.0f}억)."
         out.append({"key": "selling", "title": "매도 압력", "level": level, "tone": tone, "text": text})
 
     # 3. 자금시장: 하이일드 스프레드
@@ -275,8 +275,8 @@ def summarize_temperature(t):
         wide = (hy["pct_1y"] or 0) >= 80 or (hy["change"] or 0) >= 0.5
         out.append({"key": "credit", "title": "자금시장", "level": "경색 신호" if wide else "안정",
                     "tone": "fear" if wide else "calm",
-                    "text": f"미국 하이일드 스프레드 {hy['value']}%p (1년 중 {hy['pct_1y']}% 위치). "
-                            + ("돈줄이 조여지는 쪽." if wide else "주가 공포가 자금 위기로 번진 신호는 아직 없음.")})
+                    "text": f"미국에서 신용 낮은 회사가 돈 빌릴 때 더 내는 이자(하이일드 스프레드) {hy['value']}%p — 1년 중 {hy['pct_1y']}% 위치. "
+                            + ("돈 빌리기가 어려워지는 쪽이라 조심." if wide else "주가가 무서워도 돈줄이 막히는 위기로 번지진 않음.")})
     return out
 
 
@@ -480,11 +480,11 @@ def screen(universe, closes, values, flows_daily, flows_5d, pension_5d, news_tod
             checks = [
                 {"label": f"5일 중 {rules['swing_min_days']}일 이상 기관+외국인 순매수", "ok": days_pos >= rules["swing_min_days"],
                  "value": f"{days_pos}일"},
-                {"label": f"5일 순매수가 시총의 {rules['swing_min_ratio']}% 이상", "ok": ratio >= rules["swing_min_ratio"],
+                {"label": f"5일 순매수가 회사 덩치(시총)의 {rules['swing_min_ratio']}% 이상", "ok": ratio >= rules["swing_min_ratio"],
                  "value": f"{ratio:.2f}%"},
-                {"label": "주가 > 20일선 > 60일선", "ok": close > m20 > m60,
+                {"label": "주가 > 20일 평균 > 60일 평균 (오르는 흐름)", "ok": close > m20 > m60,
                  "value": f"{close:,.0f} / {m20:,.0f} / {m60:,.0f}"},
-                {"label": "20일선 상승 중", "ok": m20 > m20_prev, "value": f"{(m20 / m20_prev - 1) * 100:+.1f}%"},
+                {"label": "20일 평균 가격이 오르는 중", "ok": m20 > m20_prev, "value": f"{(m20 / m20_prev - 1) * 100:+.1f}%"},
                 {"label": f"5일 상승률 {rules['swing_max_5d_rise']:.0f}% 이하 (과열 아님)",
                  "ok": rise5 <= rules["swing_max_5d_rise"], "value": f"{rise5:+.1f}%"},
             ]
@@ -817,58 +817,58 @@ REGIMES = {
 
 # 시나리오 적합도의 근거. 화면의 '왜?'에 그대로 나간다
 EVIDENCE = {
-    "mom": ("오르는 장에서는 최근 잘 오르고 돈이 들어오는 종목이 한동안 더 오르는 경향(모멘텀)이 가장 잘 나타납니다.",
-            "Jegadeesh·Titman (1993) 등 모멘텀 연구"),
-    "mom_crash": ("급락 뒤 변동성이 큰 구간에서는, 반등이 올 때 그동안 많이 빠진 종목이 덜 빠진 종목보다 훨씬 크게 오릅니다. "
-                  "그래서 오르던·돈 들어오던 종목을 따라가는 전략이 이 구간에서 가장 크게 손실을 냈고, 반대로 낙폭 큰 종목은 크게 튀었습니다.",
-                  "Daniel·Moskowitz (2016) 'Momentum Crashes', 미국·해외 주식"),
-    "trend": ("지수가 이동평균 아래에 있을 때는 하락이 이어지는 경향이 있어, 추세를 따르면 큰 하락을 상당 부분 피했습니다. "
-              "대신 방향 없는 장에서는 신호가 자주 틀립니다.",
-              "Faber 등 이동평균 추세 추종 연구"),
-    "value_trap": ("오르는 장에서 혼자 크게 빠진 종목은 실적 악화 같은 이유가 있는 경우가 많아, 싸 보이는 함정(가치 함정)에 빠지기 쉽습니다.",
-                   "가치 함정에 관한 일반적 관찰"),
-    "reversal": ("방향 없는 장에서는 단기간 많이 빠진 종목이 제자리로 돌아오는 단기 반전이 상대적으로 잘 나타납니다.",
-                 "Jegadeesh (1990), Lehmann (1990) 단기 반전 연구"),
-    "falling_knife": ("하락 추세가 이어지는 동안에는 싸 보이는 종목도 시장과 같이 더 빠지기 쉬워, 한 번에 사기보다 나눠서 지켜보는 편이 낫습니다.",
-                      "추세 추종 연구의 반대 측면"),
-    "short_term": ("거래가 몰린 종목의 하루 이틀 움직임은 장세보다 개별 재료의 영향이 커서, 어느 장에서든 짧게 끊는 게 핵심입니다. "
-                   "다만 장이 흔들릴수록 손실 폭도 커집니다.",
+    "mom": ("오르는 장에서는 이미 오르고 있고 큰손이 사는 종목이 한동안 더 오르는 경향이 있습니다. '달리는 말에 올라타라'는 말과 같은 이야기입니다.",
+            "모멘텀 연구 (Jegadeesh·Titman 1993 등)"),
+    "mom_crash": ("크게 떨어진 뒤 출렁임이 큰 장에서는, 반등이 오면 그동안 많이 빠졌던 종목이 훨씬 크게 튑니다. "
+                  "반대로 '그나마 버티던 종목'을 따라 산 전략은 이때 가장 크게 손해를 봤습니다. "
+                  "그래서 이 장에서는 스윙(따라가기)은 피하고, 많이 빠진 저평가 종목이 상대적으로 낫습니다.",
+                  "Daniel·Moskowitz (2016) '모멘텀 붕괴' 연구"),
+    "trend": ("지수가 20일·60일 평균 가격보다 아래에 있을 때는 더 내려가는 경우가 많아서, 그때 따라 사면 같이 밀리기 쉽습니다. "
+              "다만 방향 없이 오르내리는 장에서는 이런 신호가 자주 틀립니다.",
+              "이동평균 추세 연구 (Faber 등)"),
+    "value_trap": ("다들 오르는데 혼자 크게 떨어진 종목은 실적이 나빠지는 등 이유가 있는 경우가 많습니다. 싸 보여도 '싼 데는 이유가 있는' 함정일 수 있습니다.",
+                   "가치 함정에 관한 일반적인 관찰"),
+    "reversal": ("방향 없이 오르내리는 장에서는 며칠 사이 많이 빠진 종목이 제자리로 돌아오는 경우가 상대적으로 많습니다.",
+                 "단기 반전 연구 (Jegadeesh 1990 등)"),
+    "falling_knife": ("내리는 장에서는 싸 보이는 종목도 시장을 따라 더 빠지기 쉽습니다(떨어지는 칼날). 한 번에 사지 말고 나눠서 지켜보는 게 낫습니다.",
+                      "추세 연구의 반대쪽 이야기"),
+    "short_term": ("하루 이틀 움직임은 장 전체보다 그 종목의 뉴스 영향이 큽니다. 어느 장에서든 짧게 끊는 게 핵심이고, 장이 불안할수록 손실도 커집니다.",
                    "경험칙 (뚜렷한 연구 근거는 약함)"),
-    "inv_trend": ("하락 추세가 확인된 구간에서는 지수 하락이 이어지는 경향이 있어, 짧게 들고 가는 1배 인버스가 상대적으로 덜 불리합니다.",
-                  "이동평균 추세 추종 연구"),
-    "inv_decay": ("인버스·곱버스는 매일 수익률을 다시 맞추기 때문에, 방향 없이 출렁이면 지수가 제자리여도 손실이 쌓입니다(음의 복리). "
-                  "개인 투자자는 바닥을 예측하고 거꾸로 들어갔다가 손실을 본 경우가 많았습니다.",
-                  "자본시장연구원 레버리지·인버스 ETF 성과 분석, 운용사 안내"),
-    "inv_panic": ("공포가 극에 달한 뒤에는 하루 3~5%씩 급반등하는 날이 잦습니다. 이때 곱버스는 반등 하루에 크게 잃고, "
-                  "출렁임이 커서 음의 복리도 커집니다. 급락 뒤 추격 진입이 가장 손실이 큰 패턴입니다.",
-                  "Daniel·Moskowitz (2016) 패닉 구간 급반등, 레버리지·인버스 ETF 분석"),
+    "inv_trend": ("확실히 내리는 장에서는 하락이 며칠 이어지는 경향이 있어, 짧게 들고 가는 1배 인버스가 상대적으로 덜 불리합니다.",
+                  "이동평균 추세 연구"),
+    "inv_decay": ("인버스는 매일 다시 계산되는 구조라, 지수가 오르락내리락하며 제자리여도 손해가 쌓입니다. "
+                  "개인 투자자는 '이제 떨어지겠지' 하고 거꾸로 들어갔다가 손해 본 경우가 많았습니다.",
+                  "자본시장연구원 레버리지·인버스 ETF 분석"),
+    "inv_panic": ("크게 떨어지고 다들 겁먹은 뒤에는 하루에 3~5%씩 확 튀는 날이 자주 옵니다. "
+                  "이때 인버스(특히 2배)를 들고 있으면 반등 하루에 크게 잃습니다. 급락 뒤 따라 들어가는 게 가장 손해가 큰 패턴입니다.",
+                  "급락 뒤 급반등 연구, 레버리지·인버스 ETF 분석"),
 }
 
 # 장세별 시나리오 적합도: (등급, 한 줄 이유, 근거 키)
 FIT = {
     "up": {
-        "swing": ("good", "추세가 살아 있어 돈이 들어오는 종목이 더 가는 경향", "mom"),
-        "scalp": ("ok", "거래 몰린 종목이 하루 이틀 더 가는 경우가 많음", "short_term"),
-        "value": ("bad", "오르는 장에서 혼자 떨어진 종목은 이유가 있는 경우가 많음", "value_trap"),
-        "inverse": ("bad", "추세를 거스르는 베팅", "inv_decay"),
+        "swing": ("good", "오르는 흐름이 살아 있어, 큰손이 사는 종목이 더 갈 가능성이 큼", "mom"),
+        "scalp": ("ok", "거래가 몰린 종목이 하루 이틀 더 가는 경우가 많음", "short_term"),
+        "value": ("bad", "다 오르는데 혼자 빠진 종목은 이유가 있는 경우가 많음", "value_trap"),
+        "inverse": ("bad", "오르는 장에서 내리는 쪽에 거는 것", "inv_decay"),
     },
     "range": {
-        "swing": ("ok", "가짜 돌파가 잦아 손절 기준을 짧게", "trend"),
-        "scalp": ("ok", "짧게 치고 빠지는 쪽이 상대적으로 유리", "short_term"),
-        "value": ("ok", "많이 빠진 종목이 제자리로 돌아오는 경향", "reversal"),
-        "inverse": ("bad", "방향이 없어 매일 재조정 손실만 쌓이기 쉬움", "inv_decay"),
+        "swing": ("ok", "올랐다 내렸다 해서 속기 쉬움, 손절을 짧게", "trend"),
+        "scalp": ("ok", "짧게 사고파는 쪽이 상대적으로 유리", "short_term"),
+        "value": ("ok", "많이 빠진 종목이 제자리로 돌아오는 경우가 있음", "reversal"),
+        "inverse": ("bad", "방향이 없어서 시간이 갈수록 손해가 쌓이기 쉬움", "inv_decay"),
     },
     "down": {
-        "swing": ("bad", "꺾인 장에서 수급만 보고 따라가면 같이 밀리기 쉬움", "trend"),
-        "scalp": ("ok", "하루 이틀만, 손절 짧게", "short_term"),
-        "value": ("ok", "싸 보여도 더 빠질 수 있어 나눠서 관찰", "falling_knife"),
-        "inverse": ("good", "추세가 확인된 구간이라 1배 인버스를 짧게 고려할 만함", "inv_trend"),
+        "swing": ("bad", "내리는 장에서 따라 사면 같이 밀리기 쉬움", "trend"),
+        "scalp": ("ok", "하루 이틀만, 손절은 짧게", "short_term"),
+        "value": ("ok", "싸 보여도 더 빠질 수 있으니 나눠서 지켜보기", "falling_knife"),
+        "inverse": ("good", "확실히 내리는 장이라 1배 인버스를 짧게 고려해 볼 만함", "inv_trend"),
     },
     "panic": {
-        "swing": ("bad", "급반등 때 가장 크게 깨지는 구간 (추세 추종 붕괴)", "mom_crash"),
-        "scalp": ("ok", "변동성이 커서 기회도 손실도 큼, 아주 짧게", "short_term"),
-        "value": ("good", "공포가 극에 달하면 많이 빠진 종목이 크게 튀는 경향, 나눠서", "mom_crash"),
-        "inverse": ("bad", "급반등이 잦고 변동성이 커 곱버스 손실이 커지는 구간, 추격 금지", "inv_panic"),
+        "swing": ("bad", "급반등이 오면 가장 크게 깨지는 전략", "mom_crash"),
+        "scalp": ("ok", "출렁임이 커서 벌 기회도 잃을 위험도 큼, 아주 짧게", "short_term"),
+        "value": ("good", "다들 겁먹었을 때 많이 빠진 종목이 크게 튀는 경향, 나눠서", "mom_crash"),
+        "inverse": ("bad", "급반등이 잦아 인버스가 크게 당하는 구간, 따라 들어가지 않기", "inv_panic"),
     },
 }
 
@@ -906,10 +906,10 @@ def market_regime(kospi, t, dates=None):
     panic_checks = [
         {"label": "시장 온도 25점 미만 (극단적 공포)", "value": "–" if th is None else f"{th}점",
          "ok": th is not None and th < 25},
-        {"label": "코스피 20일 등락 −15% 이하", "value": f"{chg20:+.1f}%", "ok": chg20 <= -15},
-        {"label": "국내 변동성 1년 중 90% 이상", "value": "–" if kv is None else f"{kv}% 위치",
+        {"label": "코스피가 20일 새 15% 넘게 떨어짐", "value": f"{chg20:+.1f}%", "ok": chg20 <= -15},
+        {"label": "출렁임(변동성)이 1년 중 최상위 10%", "value": "–" if kv is None else f"{kv}% 위치",
          "ok": kv is not None and kv >= 90},
-        {"label": "반대매매 20일 평균의 2배 이상 (300억 이상)",
+        {"label": "강제 매도(반대매매)가 평소의 2배 이상 (300억 이상)",
          "value": "–" if fo_mult is None else f"{fo['value']:,.0f}억, 평균의 {fo_mult:.1f}배",
          "ok": fo_mult is not None and fo["value"] >= 300 and fo_mult >= 2},
     ]
@@ -919,39 +919,39 @@ def market_regime(kospi, t, dates=None):
     # 2단계: 추세 조건
     slope = (ma20 / ma20_prev - 1) * 100
     trend_checks = [
-        {"label": "코스피가 20일선 위", "value": f"{close:,.0f} / {ma20:,.0f} ({(close / ma20 - 1) * 100:+.1f}%)", "ok": close > ma20},
-        {"label": "20일선이 60일선 위", "value": f"{ma20:,.0f} / {ma60:,.0f}", "ok": ma20 > ma60},
-        {"label": "20일선이 오르는 중 (5일 전보다 높음)", "value": f"{slope:+.2f}%", "ok": rising},
+        {"label": "코스피가 20일 평균 가격 위", "value": f"{close:,.0f} / {ma20:,.0f} ({(close / ma20 - 1) * 100:+.1f}%)", "ok": close > ma20},
+        {"label": "20일 평균이 60일 평균보다 높음", "value": f"{ma20:,.0f} / {ma60:,.0f}", "ok": ma20 > ma60},
+        {"label": "20일 평균 가격이 오르는 중 (5일 전보다 높음)", "value": f"{slope:+.2f}%", "ok": rising},
     ]
     tkey = _trend_key(close, ma20, ma60, rising)
     key = "panic" if panic else tkey
 
-    trend_txt = {"up": "코스피가 20일선·60일선 위이고 20일선이 오르는 중",
-                 "down": "코스피가 20일선·60일선 아래이고 20일선이 내려가는 중",
-                 "range": "추세 조건이 엇갈림 (위·아래가 섞여 있음)"}[tkey]
+    trend_txt = {"up": "코스피가 20일·60일 평균 가격보다 위에 있고 계속 오르는 중",
+                 "down": "코스피가 20일·60일 평균 가격보다 아래에 있고 계속 내리는 중",
+                 "range": "오르는 신호와 내리는 신호가 섞여 있음"}[tkey]
     if key == "panic":
-        reason = f"패닉 조건 {len(panic)}개 해당 → 추세와 상관없이 패닉으로 판정. 추세만 보면 {REGIMES[tkey]} ({trend_txt})."
+        reason = f"급락·공포 신호가 {len(panic)}개나 겹쳐서 '패닉'입니다. 흐름만 보면 {REGIMES[tkey]}입니다 ({trend_txt})."
     else:
-        pre = f"패닉 조건 {len(met_panic)}개뿐 (2개 이상이어야 패닉)" if met_panic else "패닉 조건 없음"
-        reason = f"{pre} → 추세로 판정: {trend_txt} → {REGIMES[key]}."
+        pre = f"급락·공포 신호가 {len(met_panic)}개 있지만 패닉(2개 이상)까지는 아님" if met_panic else "급락·공포 신호는 없음"
+        reason = f"{pre}. {trend_txt} → {REGIMES[key]}입니다."
     if key == "panic":
-        nxt = f"패닉 조건이 모두 풀리면 추세로 다시 판정합니다. 지금 추세 그대로면 {REGIMES[tkey]}입니다."
+        nxt = f"급락·공포 신호가 잦아들면 흐름대로 다시 판정합니다. 지금 흐름이면 {REGIMES[tkey]}이 됩니다."
     elif key == "down":
-        nxt = f"코스피가 20일선({ma20:,.0f}) 위로 올라서면 횡보·전환으로 바뀝니다. 지금보다 {(ma20 / close - 1) * 100:.1f}% 위입니다."
+        nxt = f"코스피가 20일 평균 가격({ma20:,.0f})을 넘어서면 '횡보·전환'으로 바뀝니다. 지금보다 {(ma20 / close - 1) * 100:.1f}% 더 올라야 합니다."
     elif key == "up":
-        nxt = f"코스피가 20일선({ma20:,.0f}) 아래로 내려가면 횡보·전환으로 바뀝니다. 지금보다 {(1 - ma20 / close) * 100:.1f}% 아래입니다."
+        nxt = f"코스피가 20일 평균 가격({ma20:,.0f}) 아래로 내려가면 '횡보·전환'으로 바뀝니다. 지금보다 {(1 - ma20 / close) * 100:.1f}% 빠지면 그렇게 됩니다."
     else:
-        nxt = (f"코스피·20일선이 60일선({ma60:,.0f}) 위에서 20일선이 오르면 상승장, "
-               f"모두 아래에서 20일선이 내려가면 하락장이 됩니다.")
+        nxt = (f"코스피가 평균 가격선들 위로 확실히 올라서면 상승장, "
+               f"60일 평균 가격({ma60:,.0f}) 아래로 확실히 내려가면 하락장이 됩니다.")
     if key != "panic" and len(met_panic) == 1:
-        nxt += " 패닉 조건이 하나 더 맞으면 패닉으로 바뀝니다."
+        nxt += " 급락·공포 신호가 하나 더 켜지면 '패닉'이 됩니다."
 
     fl = (t.get("flows") or {}).get("KOSPI") or {}
     b = t.get("breadth") or {}
     hy = (t.get("hy_spread") or {}).get("pct_1y")
     inv_checks = [
-        {"label": "코스피가 20일선·60일선 아래", "value": f"{close:,.0f} / {ma20:,.0f} / {ma60:,.0f}", "ok": close < ma20 < ma60},
-        {"label": "20일선이 내려가는 중", "value": f"{slope:+.2f}%", "ok": not rising},
+        {"label": "코스피가 20일·60일 평균 가격 아래", "value": f"{close:,.0f} / {ma20:,.0f} / {ma60:,.0f}", "ok": close < ma20 < ma60},
+        {"label": "20일 평균 가격이 내려가는 중", "value": f"{slope:+.2f}%", "ok": not rising},
         {"label": "큰손(외국인+기관) 20일 중 순매수일 8일 이하",
          "value": "–" if fl.get("pos_days20") is None else f"{fl['pos_days20']}일",
          "ok": fl.get("pos_days20") is not None and fl["pos_days20"] <= 8},
@@ -969,17 +969,17 @@ def market_regime(kospi, t, dates=None):
     # 패닉까지는 아니어도 패닉 조건이 하나라도 켜져 있으면(예: 20일 −15% 급락) 추격은 위험하다
     blockers = met_panic
     if met >= need and not blockers:
-        verdict = ("consider", "인버스 고려 구간", "하락 추세가 확인됨. 1배 인버스를 짧게, 코스피가 20일선을 되찾으면 정리.",
-                   f"코스피가 20일선({ma20:,.0f}) 위로 올라서면 정리 신호입니다.")
+        verdict = ("consider", "인버스 고려 구간", "내리는 흐름이 확인됐습니다. 한다면 1배 상품으로 짧게, 코스피가 20일 평균 가격을 되찾으면 정리.",
+                   f"코스피가 20일 평균 가격({ma20:,.0f}) 위로 올라서면 정리할 때입니다.")
     elif met >= need:
         verdict = ("caution", "하락 추세지만 추격 주의",
-                   "이미 급락했거나 공포가 커서 급반등이 잦은 구간. 지금 따라 들어가기보다 반등이 20일선 아래서 꺾일 때가 상대적으로 나은 자리.",
-                   f"패닉 조건(급락·극단적 공포 등)이 모두 풀린 뒤에도 하락 신호가 {need}개 이상 남아 있으면 '고려 구간'이 됩니다.")
+                   "이미 많이 떨어져서 갑자기 튀어 오르는 날이 잦은 때입니다. 지금 따라 들어가기보다, 한 번 반등했다가 다시 꺾일 때가 그나마 나은 자리입니다.",
+                   f"급락·공포 신호가 잦아든 뒤에도 내리는 신호가 {need}개 이상 남아 있으면 '고려 구간'이 됩니다.")
     elif met == need - 1:
-        verdict = ("watch", "하락 신호 일부", "아직 추세가 확인되지 않음. 지켜보기.",
+        verdict = ("watch", "하락 신호 일부", "내리는 흐름이 아직 확실하지 않습니다. 지켜보기.",
                    f"하락 신호가 {need}개 이상이 되면 다시 판단합니다.")
     else:
-        verdict = ("no", "인버스 불리", "하락 추세 신호가 부족함.", f"하락 신호가 {need}개 이상이 되면 다시 판단합니다.")
+        verdict = ("no", "인버스 불리", "내리는 흐름이라고 보기 어렵습니다.", f"하락 신호가 {need}개 이상이 되면 다시 판단합니다.")
 
     out = {
         "key": key, "label": REGIMES[key], "trend_key": tkey,
@@ -1018,17 +1018,17 @@ def regime_transition(rg):
     if key in ("down", "range"):
         target = "횡보·전환" if key == "down" else "상승장"
         items = [
-            {"label": "코스피가 20일선 위로", "ok": close > ma20,
+            {"label": "코스피가 20일 평균 가격 위로 올라섬", "ok": close > ma20,
              "value": "회복" if close > ma20 else f"{gap20:.1f}% 남음"},
-            {"label": "20일선이 다시 오름 (5일 전보다 높음)", "ok": slope > 0, "value": f"{slope:+.2f}%"},
-            {"label": "20일선이 60일선 위로", "ok": ma20 > ma60, "value": f"{(ma60 / ma20 - 1) * 100:.1f}% 남음" if ma20 <= ma60 else "회복"},
+            {"label": "20일 평균 가격이 다시 오르기 시작 (5일 전보다 높음)", "ok": slope > 0, "value": f"{slope:+.2f}%"},
+            {"label": "20일 평균이 60일 평균보다 높아짐 (짧은 흐름이 긴 흐름을 이김)", "ok": ma20 > ma60, "value": f"{(ma60 / ma20 - 1) * 100:.1f}% 남음" if ma20 <= ma60 else "회복"},
         ]
     else:
         target = "횡보·전환 (상승 추세 꺾임)"
         items = [
-            {"label": "코스피가 20일선 아래로", "ok": close < ma20,
+            {"label": "코스피가 20일 평균 가격 아래로 떨어짐", "ok": close < ma20,
              "value": "이탈" if close < ma20 else f"{-gap20:.1f}% 여유"},
-            {"label": "20일선이 내려가기 시작", "ok": slope < 0, "value": f"{slope:+.2f}%"},
+            {"label": "20일 평균 가격이 내려가기 시작", "ok": slope < 0, "value": f"{slope:+.2f}%"},
         ]
     met = sum(1 for i in items if i["ok"])
     # 전환 임박: 20일선까지 2% 안쪽이거나, 20일선 기울기가 거의 평평해짐
@@ -1061,26 +1061,26 @@ def entry_signals(t):
     big5 = ((fl.get("foreign") or {}).get("d5") or 0) + ((fl.get("inst") or {}).get("d5") or 0) if fl else None
     stages = [
         {"name": "투매 진정", "need": 2, "guide": "1/3만 나눠서", "checks": [
-            chk("신저가 종목이 최근 5일 평균보다 적음", lows_avg is not None and lows[-1] < lows_avg,
+            chk("바닥을 새로 뚫는 종목(신저가)이 최근 5일 평균보다 적음", lows_avg is not None and lows[-1] < lows_avg,
                 f"{lows[-1]} / 평균 {lows_avg:.0f}" if lows_avg is not None else "–"),
-            chk("반대매매가 20일 평균 이하", fo.get("avg20") and fo["value"] <= fo["avg20"],
+            chk("빚 때문에 강제로 팔리는 물량(반대매매)이 평소(20일 평균) 이하", fo.get("avg20") and fo["value"] <= fo["avg20"],
                 f"{fo['value']:,.0f}억 / 평균 {fo['avg20']:,.0f}억" if fo.get("avg20") else "–"),
-            chk("국내 변동성이 최근 10일 최고보다 10% 이상 내려옴", kv_recent and kv["value"] <= max(kv_recent) * 0.9,
+            chk("출렁임(변동성)이 최근 10일 최고보다 10% 이상 줄어듦", kv_recent and kv["value"] <= max(kv_recent) * 0.9,
                 f"{kv['value']}% / 최고 {max(kv_recent)}%" if kv_recent else "–"),
         ]},
         {"name": "수급 전환", "need": 2, "guide": "2/3까지", "checks": [
-            chk("외국인 선물 3일 이상 연속 순매수 또는 5일 합 순매수",
+            chk("외국인이 선물을 사는 쪽으로 돌아섬 (3일 연속 또는 5일 합계 순매수)",
                 fu and ((fu.get("streak") or 0) >= 3 or (fu.get("d5") or 0) > 0),
                 (f"{fu['streak']:+d}일째 · 5일 {fu.get('d5_eok') if fu.get('d5_eok') is not None else fu.get('d5'):+,}" +
                  ("억" if fu.get("d5_eok") is not None else "계약")) if fu else "–"),
-            chk("코스피 외국인+기관 현물 5일 순매수", big5 is not None and big5 > 0,
+            chk("외국인+기관이 최근 5일 동안 주식을 판 것보다 더 삼", big5 is not None and big5 > 0,
                 f"{big5:+,.0f}억" if big5 is not None else "–"),
-            chk("시장 온도가 1주 전보다 오름", week and th.get("score") is not None and th["score"] > week["score"],
+            chk("시장 온도가 1주 전보다 올라감", week and th.get("score") is not None and th["score"] > week["score"],
                 f"{th.get('score')}점 / 1주 전 {week['score']}점" if week else "–"),
         ]},
         {"name": "추세 확인", "need": 2, "guide": "상승장 루틴으로 (스윙 위주)", "checks": [
-            chk("코스피가 20일선 위", tr["close"] > tr["ma20"], f"{tr['close']:,.0f} / {tr['ma20']:,.0f}"),
-            chk("20일선이 다시 오름", tr["ma20_rising"], f"{tr['ma20_slope']:+.2f}%"),
+            chk("코스피가 20일 평균 가격 위", tr["close"] > tr["ma20"], f"{tr['close']:,.0f} / {tr['ma20']:,.0f}"),
+            chk("20일 평균 가격이 다시 오르는 중", tr["ma20_rising"], f"{tr['ma20_slope']:+.2f}%"),
         ]},
     ]
     level = 0
@@ -1091,8 +1091,8 @@ def entry_signals(t):
         if not st["pass"]:
             break
         level += 1
-    guides = ["기다림 — 투매가 아직 진정되지 않음", "1/3만 나눠서 (투매가 진정되는 중)",
-              "2/3까지 (돈이 다시 들어오기 시작)", "상승장 루틴으로 — 스윙 위주, 저평가는 줄이기"]
+    guides = ["아직 기다리기 — 겁먹고 파는 물량(투매)이 안 멈춤", "쓸 돈의 1/3만 나눠서 — 투매가 잦아드는 중",
+              "쓸 돈의 2/3까지 — 큰손 돈이 다시 들어오기 시작", "평소처럼 — 오르는 장 방식(스윙 위주), 저평가는 줄이기"]
     nxt = stages[level] if level < len(stages) else None
     return {"level": level, "guide": guides[level], "stages": stages,
             "next": (f"다음 단계 '{nxt['name']}'까지 {max(0, nxt['need'] - nxt['met'])}개 더" if nxt else "세 단계 모두 통과"),

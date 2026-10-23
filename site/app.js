@@ -70,31 +70,31 @@ function render() {
 /* ---------------- 지표 설명(ⓘ)과 한 줄 해석 ---------------- */
 
 const INFO = {
-  thermo: "여러 지표를 0(극단적 공포)~100(극단적 탐욕) 점수로 바꿔 같은 무게로 평균한 국내 시장 온도계입니다. CNN 공포·탐욕지수와 같은 방식이지만 한국 시장 지표를 섞었습니다. 공포가 크다고 바닥이라는 뜻은 아니고, 지금 시장 분위기가 어느 쪽에 쏠려 있는지 보는 용도입니다.",
-  korea_vol: "코스피200이 최근 20일 동안 실제로 얼마나 출렁였는지를 연율(%)로 나타낸 값입니다. VKOSPI(앞으로의 예상 흔들림)를 구하지 못해 대신 쓰는 지표입니다. 높을수록 시장이 불안하다는 뜻입니다.",
-  vix: "미국 S&P500 옵션 가격으로 계산한 '앞으로 30일 예상 흔들림'입니다. 보통 20 아래면 평온, 30 위면 불안한 편으로 봅니다. 미국 장이 흔들리면 다음 날 한국 장에도 영향을 줍니다.",
-  cnn: "CNN이 미국 시장의 주가 추세·신고가 종목 수·옵션·정크본드 수요 등 7가지를 합쳐 만든 투자심리 점수입니다. 0에 가까울수록 공포, 100에 가까울수록 탐욕입니다.",
-  breadth: "최근 60일 중 가장 높은 가격(신고가) 또는 가장 낮은 가격(신저가)을 찍은 종목 수입니다. 지수는 대형주 몇 개 때문에 버텨도, 신저가 종목이 늘면 시장 속은 약해지고 있다는 뜻입니다.",
-  updown: "기준일에 오른 종목 수와 내린 종목 수입니다(보통주, 코스피·코스닥 따로와 합계). 지수와 반대로 움직이면 소수 대형주가 지수를 끌고 있다는 신호입니다.",
-  momentum: "코스피가 최근 20영업일 동안 몇 % 움직였는지입니다. 크게 빠졌으면 공포 쪽, 크게 올랐으면 탐욕 쪽으로 계산합니다.",
-  flows: "최근 20영업일 중 외국인과 기관이 합쳐서 코스피 주식을 순매수한 날이 며칠인지입니다. 큰손이 꾸준히 사면 탐욕 쪽, 꾸준히 팔면 공포 쪽입니다.",
-  credit: "재무가 약한 미국 기업이 돈을 빌릴 때 국채보다 얼마나 더 높은 이자를 내야 하는지입니다. 이 차이가 벌어지면 주가 공포가 기업 자금줄 문제로 번지고 있다는 신호입니다.",
-  kospi: "코스피 지수와 기준일 등락률, 최근 20영업일 등락률입니다.",
-  kosdaq: "코스닥 지수와 기준일 등락률, 최근 20영업일 등락률입니다. 중소형·성장주 분위기를 봅니다.",
-  usdkrw: "1달러를 사는 데 드는 원화입니다. 환율이 빠르게 오르면(원화 약세) 외국인이 한국 주식을 팔 유인이 커지는 경우가 많습니다. FRED 자료라 며칠 늦게 반영됩니다.",
-  us10y: "미국 10년 만기 국채 금리입니다. 금리가 오르면 성장주·기술주 가치가 낮게 평가되기 쉽고, 위험자산에서 돈이 빠지는 경우가 많습니다.",
-  marketflows: "시장 전체에서 외국인·기관이 순매수(산 금액 − 판 금액)한 규모입니다. 단위는 억 원입니다.",
-  selling: "60일 중 가장 낮은 가격(신저가)까지 떨어진 종목 수를 최근 5일 평균과 비교합니다. 신저가 종목이 늘면 버티던 종목까지 팔리고 있다는 뜻이고, 줄면 투매가 잦아들고 있다는 뜻입니다.",
-  regime: "코스피가 20일·60일 이동평균 위인지 아래인지(추세)와 급락·극단적 공포·높은 변동성·반대매매 급증(패닉 조건, 두 개 이상 겹치면 패닉)으로 지금 장을 상승장·횡보·하락장·패닉 넷 중 하나로 나눕니다. 시나리오별 적합도는 '급락 뒤 변동성이 큰 패닉 구간에선 추세 추종이 가장 크게 깨지고 낙폭 큰 종목이 크게 튄다', '하락 추세에선 추세를 따르는 쪽이 낙폭을 줄인다' 같은 연구 결과를 바탕으로 한 경향입니다.",
-  inverse: "지수가 떨어지면 오르는 ETF입니다. 하루 수익률을 매일 다시 맞추기 때문에, 지수가 오르내리며 제자리여도 손실이 쌓입니다(2배 상품은 더 심함). 그래서 방향이 뚜렷한 짧은 구간에만 맞고, 공포가 극에 달한 뒤 따라 들어가면 급반등에 크게 당하기 쉽습니다.",
-  score_swing: "강도는 0~100점으로, 지금까지 이 탭에 걸린 후보들(날짜마다 상위 10개)의 계산값 중 몇 % 위치인지입니다. 100점에 가까울수록 역대 후보 중에서도 강한 편이고, 세 탭 모두 같은 눈금이라 비교할 수 있습니다. 계산값은 통과한 종목끼리 순서를 매기는 식입니다. 시가총액에 비해 최근 5일 기관·외국인이 얼마나 많이 샀는지(%)에, 며칠 연속 샀는지를 더 얹었습니다. 덩치에 비해 큰손이 꾸준히 사는 종목이 위로 옵니다. 계산값은 탭마다 공식이 달라 그 자체로는 다른 탭과 비교할 수 없습니다.",
-  score_scalp: "강도는 0~100점으로, 지금까지 이 탭에 걸린 후보들의 계산값 중 몇 % 위치인지입니다. 세 탭 모두 같은 눈금이라 비교할 수 있습니다. 계산값은 세 가지를 0~100점으로 맞춰 가중평균합니다: 큰손 확인(오늘 거래대금 중 기관·외국인 순매수 비중 0%→0, 20%→100) 50%, 거래 증가(평소의 3배→0, 8배→100, 15배를 넘으면 오히려 깎여 30배에 0) 25%, 상승폭(5~15%가 100, 필터 하한 2%나 상한가 근처 29%로 갈수록 0) 25%. 거래가 폭발하고 크게 튄 '주목받는 종목'은 이후 성적이 나쁜 경향이 있어(Barber·Odean 2008, 이 사이트 기록에서도 확인), 큰손이 확인해 준 적당한 급등을 위로 올립니다.",
-  score_value: "강도는 0~100점으로, 지금까지 이 탭에 걸린 후보들의 계산값 중 몇 % 위치인지입니다. 세 탭 모두 같은 눈금이라 비교할 수 있습니다. 계산값은 네 가지를 0~100점으로 맞춰 가중평균합니다: 낙폭(60일 고점 대비 20%→0점, 50%→100점) 25%, 싸짐(1년 중앙 PBR 대비 할인 20%→0, 70%→100) 15%, PER(15→0, 5→100) 35%, 이익(EPS 1년 전의 0.8배→0, 1.5배→100, 올해 추정 EPS가 있으면 '지금 대비 추정'도 같은 눈금으로 반반 섞음) 25%. 싸면서 이익이 버티는 종목이 위로 오도록 했습니다.",
-  futures: "외국인이 코스피200 선물을 산 금액에서 판 금액을 뺀 값입니다. 금액은 계약 수 × 그날 선물 가격 × 25만 원으로 계산했고, 계약 수는 작게 같이 적었습니다. 외국인은 선물로 지수 방향에 베팅하거나 현물을 헤지하는 경우가 많아, 며칠씩 한 방향으로 쌓이면 지수가 그쪽으로 움직이는 경향이 있습니다. 한국 장세를 먼저 보여 주는 지표로 많이 봅니다.",
-  signals: "급락 뒤 '사도 되는 시점'을 세 단계로 확인합니다. 1단계 투매 진정(신저가·반대매매가 줄고 변동성이 꺾임) → 2단계 수급 전환(외국인 선물·현물 큰손이 다시 사고 시장 온도가 오름) → 3단계 추세 확인(코스피가 20일선을 되찾고 20일선이 오름). 앞 단계를 통과해야 다음 단계로 올라갑니다. 바닥은 아무도 못 맞히므로 단계마다 나눠서 들어가는 방식(1/3 → 2/3 → 상승장 루틴)을 가이드로 붙였습니다.",
-  transition: "지금 장세에서 다음 장세로 바뀌려면 코스피와 20일·60일 이동평균이 어떻게 돼야 하는지와, 지금 얼마나 남았는지입니다. 20일선까지 2% 안쪽이거나 20일선 기울기가 거의 평평해지면 '전환 임박'으로 표시합니다.",
-  loan: "개인이 증권사에서 돈을 빌려 산 주식 금액(신용거래융자 잔고)입니다. 많이 쌓일수록 주가가 빠질 때 담보 부족으로 강제로 팔리는 물량(반대매매)이 커질 수 있습니다. 금융투자협회 자료라 하루 늦게 나옵니다.",
-  forced: "외상으로 산 주식 대금(미수금)을 기한 안에 못 갚아 증권사가 강제로 판 금액입니다. 급락장에서 반대매매가 몰리면 좋은 종목도 같이 떨어집니다. 금융투자협회 자료라 하루 늦게 나옵니다.",
+  thermo: "지금 시장 분위기가 '겁먹은 쪽'인지 '들뜬 쪽'인지 0~100점으로 보여 줍니다.\n· 25점 아래: 다들 겁먹음 (극단적 공포)\n· 50점 근처: 보통\n· 75점 위: 다들 들뜸 (극단적 탐욕)\n아래 '무엇으로 계산했나'의 여러 지표를 점수로 바꿔 평균했습니다. 공포가 크다고 바로 바닥이라는 뜻은 아닙니다.",
+  korea_vol: "코스피200이 최근 20일 동안 하루하루 얼마나 크게 오르내렸는지입니다.\n· 높을수록: 장이 크게 출렁임 = 불안\n· 낮을수록: 잔잔함\n원래는 'VKOSPI(한국 공포지수)'를 보는데, 구할 수 없어 대신 씁니다.",
+  vix: "미국 증시의 '공포지수'입니다. 앞으로 한 달 동안 미국 주가가 얼마나 출렁일지 시장이 예상하는 값입니다.\n· 20 아래: 평온\n· 20~30: 경계\n· 30 위: 불안\n미국 장이 흔들리면 다음 날 한국 장도 영향을 받습니다.",
+  cnn: "미국 CNN이 매일 발표하는 '투자 심리 점수'입니다.\n· 0에 가까울수록: 겁먹음 (공포)\n· 100에 가까울수록: 들뜸 (탐욕)\n미국 주가 흐름, 오르는 종목 수 등 7가지를 합쳐 만듭니다.",
+  breadth: "최근 60일 중 가장 비싼 값(신고가) 또는 가장 싼 값(신저가)을 찍은 종목 수입니다.\n· 신저가가 많을수록: 시장 안쪽이 약함\n지수는 삼성전자 같은 큰 종목 몇 개 때문에 버틸 수 있어서, 종목 전체가 어떤지 따로 봅니다.",
+  updown: "그날 오른 종목 수와 내린 종목 수입니다.\n지수는 올랐는데 내린 종목이 더 많으면, 큰 종목 몇 개만 지수를 끌어올렸다는 뜻입니다.",
+  momentum: "코스피가 최근 20거래일(약 한 달) 동안 몇 % 오르거나 내렸는지입니다.\n· 많이 내렸으면: 공포 쪽\n· 많이 올랐으면: 들뜬 쪽",
+  flows: "최근 20거래일 중 외국인과 기관(큰손)이 코스피 주식을 산 날이 며칠인지입니다.\n· 많을수록: 큰손이 꾸준히 사는 중 (좋은 신호)\n· 적을수록: 큰손이 계속 파는 중",
+  credit: "형편이 어려운 미국 회사들이 돈을 빌릴 때 이자를 얼마나 더 내야 하는지입니다.\n· 높아질수록: 돈 빌리기가 어려워짐 = 금융시장이 긴장\n주가 하락이 '돈줄 문제'로 번지는지 보는 지표입니다.",
+  kospi: "코스피 지수, 그날 몇 % 움직였는지, 최근 20거래일(약 한 달) 동안 몇 % 움직였는지입니다.",
+  kosdaq: "코스닥 지수(작은 회사·성장주 위주), 그날 등락, 최근 20거래일 등락입니다.",
+  usdkrw: "1달러를 사려면 원화가 얼마 필요한지입니다.\n· 환율이 빠르게 오르면(원화 가치 하락): 외국인이 한국 주식을 팔고 나가는 경우가 많음\n미국 자료라 며칠 늦게 반영됩니다.",
+  us10y: "미국 정부가 10년 동안 돈을 빌릴 때 내는 이자율입니다. 전 세계 금리의 기준입니다.\n· 오르면: 주식, 특히 성장주에 불리 (돈이 안전한 채권으로 감)",
+  marketflows: "시장 전체에서 외국인과 기관이 산 금액에서 판 금액을 뺀 값(순매수)입니다. 단위는 억 원입니다.\n· +면 더 많이 삼, −면 더 많이 팖",
+  selling: "주가가 60일 중 최저가까지 떨어진 종목 수를 최근 5일 평균과 비교합니다.\n· 늘어나면: 버티던 종목까지 팔리는 중 (파는 힘이 셈)\n· 줄어들면: 마구 팔던 게(투매) 잦아드는 중",
+  regime: "지금 장이 어떤 상태인지 넷 중 하나로 나눕니다.\n· 상승장: 코스피가 20일·60일 평균 가격 위에서 오르는 중\n· 하락장: 둘 다 아래에서 내리는 중\n· 횡보·전환: 방향이 섞임\n· 패닉: 급락, 극단적 공포, 큰 출렁임, 강제 매도 급증 중 두 가지 이상이 겹침\n장마다 잘 통하는 전략이 다르다는 연구 결과를 바탕으로 '어떤 탭이 맞는지'를 함께 보여 줍니다.",
+  inverse: "지수가 떨어지면 돈을 버는 상품(ETF)입니다. 예: 코스피가 1% 내리면 약 1% 오름.\n주의: 매일 다시 계산되는 구조라, 지수가 오르락내리락하며 제자리여도 손해가 쌓입니다. 2배 상품은 더 심합니다. 그래서 '확실히 내리는 짧은 구간'에만 맞고, 이미 많이 떨어진 뒤 따라 들어가면 반등에 크게 당하기 쉽습니다.",
+  score_swing: "강도: 이 종목이 조건에 얼마나 강하게 걸렸는지 0~100점입니다. 지금까지 같은 탭에 걸린 종목들 중 어디쯤인지로 매겨서, 세 탭을 같은 눈금으로 비교할 수 있습니다.\n스윙 계산: 회사 크기에 비해 최근 5일 큰손이 얼마나 많이 샀는지 + 며칠 연속 샀는지.\n강도가 높다고 오른다는 보장은 없습니다. '어떤 종목부터 볼지' 순서로만 쓰세요.",
+  score_scalp: "강도: 이 종목이 조건에 얼마나 강하게 걸렸는지 0~100점입니다. 지금까지 같은 탭에 걸린 종목들 중 어디쯤인지로 매깁니다.\n단타 계산 (100점 만점을 나눠 가짐):\n· 큰손 확인 50%: 오늘 거래 중 큰손이 산 비중 (20% 이상이면 만점)\n· 거래 증가 25%: 평소보다 거래가 몇 배 늘었나 (8배면 만점, 15배 넘게 과열되면 오히려 감점)\n· 상승폭 25%: 5~15% 오르면 만점, 상한가 근처까지 튀면 감점\n너무 과열된 종목은 다음 날 꺾이는 경우가 많아서 이렇게 만들었습니다.",
+  score_value: "강도: 이 종목이 조건에 얼마나 강하게 걸렸는지 0~100점입니다. 지금까지 같은 탭에 걸린 종목들 중 어디쯤인지로 매깁니다.\n저평가 계산 (100점 만점을 나눠 가짐):\n· 낙폭 25%: 최근 고점보다 많이 빠졌나 (50% 빠지면 만점)\n· 싸짐 15%: 평소(1년)보다 얼마나 싸게 거래되나\n· PER 35%: 버는 돈에 비해 싼가 (PER 5 이하면 만점)\n· 이익 25%: 이익이 줄지 않고 버티거나 늘었나\n'싸면서 돈은 잘 버는 회사'가 위로 오게 했습니다.",
+  futures: "외국인이 '코스피 선물'을 산 금액에서 판 금액을 뺀 값입니다.\n선물은 '앞으로 지수가 오를지 내릴지'에 거는 상품이라, 외국인의 방향 생각이 잘 드러납니다.\n· 며칠 연속 사면(+): 지수가 오를 쪽으로 보는 중\n· 며칠 연속 팔면(−): 내릴 쪽으로 보는 중\n한국 장의 방향을 먼저 알려 주는 지표로 많이 봅니다.",
+  signals: "많이 떨어진 뒤 '이제 사도 될까?'를 세 단계로 확인합니다.\n1단계 투매 진정: 마구 팔던 게 잦아드는지 (신저가 종목·강제 매도 감소, 출렁임 감소)\n2단계 수급 전환: 큰손이 다시 사기 시작하는지 (외국인 선물·주식 순매수, 분위기 회복)\n3단계 추세 확인: 지수가 다시 오르는 흐름인지 (20일 평균 가격 회복)\n바닥은 아무도 정확히 못 맞힙니다. 그래서 한 번에 다 사지 말고 단계마다 나눠서(1/3 → 2/3 → 나머지) 들어가는 방법을 안내합니다.",
+  transition: "지금 장(예: 하락장)이 다음 장(예: 횡보·전환)으로 바뀌려면 무엇이 필요한지, 지금 얼마나 남았는지입니다.\n핵심은 코스피가 20일 평균선(최근 20일 종가 평균) 위로 올라서느냐입니다. 평균선까지 2% 안쪽으로 가까워지면 '전환 임박'이 뜹니다.",
+  loan: "개인이 증권사에서 돈을 빌려 산 주식 금액(빚투)입니다.\n· 많이 쌓여 있을수록: 주가가 빠질 때 강제로 팔리는 물량이 커질 수 있음\n하루 늦게 발표되는 자료입니다.",
+  forced: "빌려서 산 주식 대금을 제때 못 갚아 증권사가 강제로 판 금액(반대매매)입니다.\n· 갑자기 늘면: 좋은 종목까지 같이 떨어지는 투매가 나오는 중\n· 줄어들면: 투매가 잦아드는 중\n하루 늦게 발표되는 자료입니다.",
 };
 
 // 1년 중 위치(백분위)로 쓰는 한 줄 해석. high = 값이 높을 때의 의미
@@ -441,9 +441,9 @@ function renderTemp() {
 /* ---------------- 종목 필터 ---------------- */
 
 const TAB_HINT = {
-  swing: "최근 3일 안에 기사·공시가 있고, 기관·외국인 돈이 며칠째 들어오며, 차트가 올라가는 흐름인 종목.",
-  scalp: "오늘 기사·공시가 나왔고, 거래대금이 평소의 몇 배로 터지며, 오늘 기관·외국인도 산 종목.",
-  value: "최근 많이 떨어져 장부가치 대비 1년 중 싼 편인데, 이익은 크게 줄지 않은 종목. 시장 공포로 싸진 건지 볼 후보.",
+  swing: "며칠~몇 주 들고 가는 후보. 최근 3일 안에 소식(기사·공시)이 있고, 큰손(기관·외국인)이 며칠째 사고 있으며, 주가가 오르는 흐름인 종목.",
+  scalp: "하루~이틀 짧게 보는 후보. 오늘 소식이 나왔고, 평소보다 몇 배 많이 거래됐으며, 오늘 큰손(기관·외국인)도 산 종목.",
+  value: "많이 떨어져서 1년 중 싼 편인데, 회사가 버는 돈(이익)은 크게 줄지 않은 종목. 회사 문제가 아니라 시장이 겁먹어서 싸진 건지 살펴볼 후보.",
 };
 const TAB_NAME = { swing: "스윙", scalp: "단타", value: "저평가" };
 
@@ -501,7 +501,7 @@ function renderToday() {
     rows.push(["인버스", esc(rg.inverse.label)]);
     const sg = d.temperature.signals, tn = d.temperature.transition;
     if (sg) rows.push(["사도 되는 신호", `<b style="color:${SIG_COLOR[sg.level]}">${sg.level}단계</b> <small>${esc(sg.guide)}</small>`]);
-    if (tn) rows.push(["장의 전환", `20일선까지 ${tn.gap20 > 0 ? `${num(tn.gap20, 1)}% 남음` : "회복"}${tn.near ? ` <span class="tag new">전환 임박</span>` : ""}`]);
+    if (tn) rows.push(["장의 전환", `20일 평균선까지 ${tn.gap20 > 0 ? `${num(tn.gap20, 1)}% 남음` : "회복"}${tn.near ? ` <span class="tag new">전환 임박</span>` : ""}`]);
   }
   const tops = ["swing", "scalp", "value"].filter((g) => (f[g] || []).length).map((g) => {
     const x = f[g][0];
@@ -538,9 +538,9 @@ function renderTurn() {
       ${strip}${infoBox("signals")}</div>`;
   // 장의 전환: 다음 장세까지 남은 조건
   const gap = Math.max(-10, Math.min(10, tr.gap20));
-  const gauge = `<div class="gapbar"><span class="mid"></span><i style="left:${50 - gap * 5}%"></i></div><div class="barlab"><span style="text-align:left">20일선 아래</span><span>20일선</span><span style="text-align:right">위</span></div>`;
+  const gauge = `<div class="gapbar"><span class="mid"></span><i style="left:${50 - gap * 5}%"></i></div><div class="barlab"><span style="text-align:left">평균선 아래</span><span>20일 평균선</span><span style="text-align:right">위</span></div>`;
   const turnBox = `<div class="sum neutral turnbox"><div class="row"><span class="t">장의 전환 ${infoBtn("transition")}</span><span class="lv">${esc(tr.from)} → ${esc(tr.to)}</span>${tr.near ? `<span class="tag new">전환 임박</span>` : ""}</div>
-      <p>코스피가 20일선보다 ${tr.gap20 > 0 ? `${num(tr.gap20, 1)}% 아래` : `${num(-tr.gap20, 1)}% 위`}, 60일선보다 ${tr.gap60 > 0 ? `${num(tr.gap60, 1)}% 아래` : `${num(-tr.gap60, 1)}% 위`}</p>
+      <p>코스피가 20일 평균선보다 ${tr.gap20 > 0 ? `${num(tr.gap20, 1)}% 아래` : `${num(-tr.gap20, 1)}% 위`}, 60일 평균선보다 ${tr.gap60 > 0 ? `${num(tr.gap60, 1)}% 아래` : `${num(-tr.gap60, 1)}% 위`}</p>
       ${gauge}${checkList(tr.items)}<p><small>전환 조건 ${tr.met}/${tr.items.length}</small></p>${infoBox("transition")}</div>`;
   box.innerHTML = sigBox + `<ul class="fit sigstages">${stageCards}</ul>` + turnBox +
     `<p class="hint">급락 뒤 바닥은 보통 '투매 진정 → 수급 전환 → 추세 확인' 순서로 확인됩니다. 단계마다 나눠서 들어가는 가이드이고, 매수 추천이 아닙니다.</p>`;
@@ -599,7 +599,7 @@ function regimeTable(cur) {
   };
   const rows = keys.map((k) => `<tr class="${k === cur ? "cur" : ""}"><th>${REGIME_NAME[k]} <small>${br[k].days}일</small></th>${["swing", "scalp", "value"].map((g) => cell(k, g)).join("")}</tr>`).join("");
   return `<details class="rules"><summary>장세별 성적 전체 보기</summary><table class="score rgtbl"><thead><tr><th></th><th>스윙</th><th>단타</th><th>저평가</th></tr></thead><tbody>${rows}</tbody></table>` +
-    `<p class="hint">필터에 걸린 날의 장세별로, 5일 뒤 코스피보다 얼마나 더 올랐는지(초과 수익률) 평균입니다. 날짜가 적으면 우연이 크게 섞입니다.</p></details>`;
+    `<p class="hint">필터에 걸린 날의 장세별로, 5일 뒤 코스피보다 얼마나 더 올랐는지(코스피보다 더 번 정도) 평균입니다. 날짜가 적으면 우연이 크게 섞입니다.</p></details>`;
 }
 
 function renderRegime() {
@@ -609,13 +609,13 @@ function renderRegime() {
   if (!rg) { box.innerHTML = `<div class="empty">이 날짜는 장세 판정이 생기기 전 기록입니다.</div>`; return; }
   const tr = rg.trend;
   const head = `<div class="sum ${REGIME_TONE[rg.key]}"><div class="row"><span class="t">지금 장세 ${infoBtn("regime")}</span><span class="lv">${esc(rg.label)}</span></div>` +
-    `<p>${esc(rg.reason || `코스피 ${num(tr.close, 2)} · 20일선 ${num(tr.ma20, 0)} · 60일선 ${num(tr.ma60, 0)}`)}</p>${infoBox("regime")}${regimeStrip(rg.key)}</div>`;
+    `<p>${esc(rg.reason || `코스피 ${num(tr.close, 2)} · 20일 평균 ${num(tr.ma20, 0)} · 60일 평균 ${num(tr.ma60, 0)}`)}</p>${infoBox("regime")}${regimeStrip(rg.key)}</div>`;
 
   // 왜 이렇게 판단했나: 1단계 패닉 조건 → 2단계 추세 조건 → 바뀌려면
   const why = rg.panic_checks ? `<details class="rules why-box" open><summary>왜 이렇게 판단했나</summary>
       ${rg.chart ? lineChart(rg.chart) : ""}
-      <h3>1단계 · 패닉 조건 <small>두 개 이상 맞으면 패닉 (하나만 맞으면 인버스 추격 주의)</small></h3>${checkList(rg.panic_checks)}
-      <h3>2단계 · 추세 조건 <small>셋 다 ✓면 상승장, 셋 다 ✗면 하락장, 섞이면 횡보·전환</small></h3>${checkList(rg.trend_checks)}
+      <h3>① 급락·공포 신호 <small>두 개 이상 켜지면 패닉. 하나만 켜져도 인버스를 뒤쫓아 사는 건 조심</small></h3>${checkList(rg.panic_checks)}
+      <h3>② 오르는 흐름인가 <small>셋 다 ✓면 상승장, 셋 다 ✗면 하락장, 섞여 있으면 횡보·전환</small></h3>${checkList(rg.trend_checks)}
       <h3>판정이 바뀌려면</h3><p class="next">${esc(rg.next)}</p></details>` : "";
 
   const rows = ["swing", "scalp", "value"].map((g) => {
@@ -802,7 +802,7 @@ function scoreCheckTable(chk) {
     };
     const hi = (chk[g].hi || {})["5"], lo = (chk[g].lo || {})["5"];
     const gap = hi && lo && hi.excess != null && lo.excess != null ? hi.excess - lo.excess : null;
-    const verdict = gap == null ? "–" : Math.min(hi.n, lo.n) < 30 ? "표본 적음" : gap > 1 ? "점수 높을수록 나음" : gap < -1 ? "오히려 반대" : "차이 없음";
+    const verdict = gap == null ? "–" : Math.min(hi.n, lo.n) < 30 ? "기록 부족" : gap > 1 ? "점수 높을수록 나음" : gap < -1 ? "오히려 반대" : "차이 없음";
     return `<tr><th>${TAB_NAME[g]}</th>${c("hi")}${c("lo")}<td><small>${verdict}</small></td></tr>`;
   }).join("");
   return `<h3 class="fit-h">점수가 쓸모 있나</h3><div class="tile wide"><table class="score">
@@ -827,12 +827,12 @@ function renderScore() {
     return `<tr><th>${TAB_NAME[g]}</th>${cells}</tr>`;
   }).join("");
   const minN = Math.min(...["swing", "scalp", "value"].map((g) => ((sc.stats[g] || {})["5"] || { n: 0 }).n));
-  const warn = minN < 30 ? `<p class="hint">기록이 ${sc.days}일치뿐이라 표본이 적습니다 (5일 기준 30건 미만인 구분이 있음). 지금 숫자는 우연일 수 있습니다.</p>` : "";
+  const warn = minN < 30 ? `<p class="hint">기록이 ${sc.days}일치뿐이라 아직 기록이 적습니다 (30건이 안 되는 칸이 있음). 지금 숫자는 우연일 수 있으니 참고만 하세요.</p>` : "";
   const recent = (sc.recent || []).filter((e) => e.r1 != null).slice(0, 15).map((e) =>
     `<tr><td>${e.date.slice(4, 6)}/${e.date.slice(6)}</td><td>${TAB_NAME[e.group]}</td><td style="text-align:left">${esc(e.name)}</td>` +
     hs.map((h) => `<td class="${cls(e["r" + h])}">${e["r" + h] == null ? "–" : signed(e["r" + h], 1, "%")}</td>`).join("") + "</tr>").join("");
   const m = sc.method;
-  const how = m ? `<p class="hint">다음 날 시가에 사서 N영업일째 종가에 판 성적입니다(거래 비용 ${m.cost}% 뺌). '초과'는 같은 기간 종목이 속한 시장 지수(코스피·코스닥)보다 얼마나 더 올랐는지이고, 같은 종목이 며칠 연속 걸리면 겹치는 구간은 한 번만 셉니다.</p>`
+  const how = m ? `<p class="hint">걸린 다음 날 아침 첫 가격(시가)에 사서 N일 뒤 마감 가격(종가)에 팔았다면 어땠는지입니다. 수수료·세금 ${m.cost}%는 뺐습니다. '초과'는 같은 기간 그냥 지수(코스피·코스닥)를 샀을 때보다 얼마나 더 벌었나입니다. 같은 종목이 며칠 연속 걸리면 한 번만 셉니다.</p>`
     : `<p class="hint">기준일 종가 기준, 코스피 대비 성적입니다 (예전 계산 방식).</p>`;
   const bf = (sc.backfill_dates || []).length
     ? `<p class="hint">${sc.backfill_dates.length}일(${ymd(sc.backfill_dates[0])}~${ymd(sc.backfill_dates.at(-1))})은 나중에 다시 계산한 기록이라, 그날 실제로 보이던 뉴스와 달라 스윙·단타 성적은 조금 할인해서 보세요.</p>` : "";
@@ -869,7 +869,7 @@ function renderSectors() {
     const names = r.flow_eok > 0 ? r.top : r.bottom;
     return `<div class="sec"><div class="sec-hd"><b>${esc(r.sector)}</b><span class="${cls(r.flow_eok)}">${signed(r.flow_eok, 0, "억")}</span></div>
       <div class="sec-bar"><i style="width:${w}%;background:var(--${r.flow_eok > 0 ? "up" : "down"})"></i></div>
-      <small>${r.n}종목 · 5일 등락 중앙값 <span class="${cls(r.rise_5d)}">${signed(r.rise_5d, 1, "%")}</span>${names.length ? " · " + names.map(esc).join(", ") : ""}</small></div>`;
+      <small>${r.n}종목 · 5일 등락(가운데 값) <span class="${cls(r.rise_5d)}">${signed(r.rise_5d, 1, "%")}</span>${names.length ? " · " + names.map(esc).join(", ") : ""}</small></div>`;
   };
   $("#sector-list").innerHTML = `<div class="tile wide">${s.inflow.map((r) => row(r, scale(s.inflow))).join("")}</div>` +
     (s.outflow.length ? `<details class="rules"><summary>빠져나간 업종 보기</summary><div class="tile wide">${s.outflow.map((r) => row(r, scale(s.outflow))).join("")}</div></details>` : "");
@@ -903,7 +903,7 @@ function lineChart(ch) {
     return `<polyline points="${pts}" fill="none" stroke="${c}" stroke-width="${sw}" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>`;
   }).join("");
   return `<svg class="chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="60일 주가와 이동평균">${lines}</svg>
-    <div class="legend"><span><i style="background:var(--text)"></i>종가</span><span><i style="background:var(--up)"></i>20일선</span><span><i style="background:var(--down)"></i>60일선</span>
+    <div class="legend"><span><i style="background:var(--text)"></i>종가</span><span><i style="background:var(--up)"></i>20일 평균선</span><span><i style="background:var(--down)"></i>60일 평균선</span>
     <span class="rng">${num(min)} ~ ${num(max)}</span></div>
     <div class="barlab"><span style="text-align:left">${ymd(ch.dates[0])}</span><span style="text-align:right">${ymd(ch.dates[n - 1])}</span></div>`;
 }
@@ -1072,7 +1072,7 @@ function renderRules() {
     <li>${r.scalp_min_change}% 이상 상승</li><li>기준일 기관+외국인 순매수가 그날 거래대금의 ${r.scalp_min_net_ratio ?? 0}% 이상</li></ul>
     <h3>스윙</h3>
     <ul><li>최근 3영업일 안에 기사·공시</li><li>최근 5일 중 ${r.swing_min_days}일 이상 기관+외국인 순매수</li>
-    <li>5일 순매수 합이 시가총액의 ${r.swing_min_ratio}% 이상</li><li>주가 &gt; 20일 이동평균 &gt; 60일 이동평균, 20일선 상승 중</li>
+    <li>5일 순매수 합이 시가총액의 ${r.swing_min_ratio}% 이상</li><li>주가 &gt; 20일 이동평균 &gt; 60일 이동평균, 20일 이동평균 상승 중</li>
     <li>5일 상승률 ${r.swing_max_5d_rise}% 이하 (이미 급등한 종목 제외)</li></ul>
     ${state.data.filter.value_rules ? valueRules(state.data.filter.value_rules, eok) : ""}
     <h3>점수 (정렬용)</h3>
