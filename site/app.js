@@ -84,7 +84,7 @@ const INFO = {
   us10y: "미국 10년 만기 국채 금리입니다. 금리가 오르면 성장주·기술주 가치가 낮게 평가되기 쉽고, 위험자산에서 돈이 빠지는 경우가 많습니다.",
   marketflows: "시장 전체에서 외국인·기관이 순매수(산 금액 − 판 금액)한 규모입니다. 단위는 억 원입니다.",
   selling: "60일 중 가장 낮은 가격(신저가)까지 떨어진 종목 수를 최근 5일 평균과 비교합니다. 신저가 종목이 늘면 버티던 종목까지 팔리고 있다는 뜻이고, 줄면 투매가 잦아들고 있다는 뜻입니다.",
-  regime: "코스피가 20일·60일 이동평균 위인지 아래인지(추세)와 시장 온도·변동성·반대매매(패닉 여부)로 지금 장을 상승장·횡보·하락장·패닉 넷 중 하나로 나눕니다. 시나리오별 적합도는 '급락 뒤 변동성이 큰 패닉 구간에선 추세 추종이 가장 크게 깨지고 낙폭 큰 종목이 크게 튄다', '하락 추세에선 추세를 따르는 쪽이 낙폭을 줄인다' 같은 연구 결과를 바탕으로 한 경향입니다.",
+  regime: "코스피가 20일·60일 이동평균 위인지 아래인지(추세)와 급락·극단적 공포·높은 변동성·반대매매 급증(패닉 조건, 두 개 이상 겹치면 패닉)으로 지금 장을 상승장·횡보·하락장·패닉 넷 중 하나로 나눕니다. 시나리오별 적합도는 '급락 뒤 변동성이 큰 패닉 구간에선 추세 추종이 가장 크게 깨지고 낙폭 큰 종목이 크게 튄다', '하락 추세에선 추세를 따르는 쪽이 낙폭을 줄인다' 같은 연구 결과를 바탕으로 한 경향입니다.",
   inverse: "지수가 떨어지면 오르는 ETF입니다. 하루 수익률을 매일 다시 맞추기 때문에, 지수가 오르내리며 제자리여도 손실이 쌓입니다(2배 상품은 더 심함). 그래서 방향이 뚜렷한 짧은 구간에만 맞고, 공포가 극에 달한 뒤 따라 들어가면 급반등에 크게 당하기 쉽습니다.",
   score_swing: "강도는 0~100점으로, 지금까지 이 탭에 걸린 후보들(날짜마다 상위 10개)의 계산값 중 몇 % 위치인지입니다. 100점에 가까울수록 역대 후보 중에서도 강한 편이고, 세 탭 모두 같은 눈금이라 비교할 수 있습니다. 계산값은 통과한 종목끼리 순서를 매기는 식입니다. 시가총액에 비해 최근 5일 기관·외국인이 얼마나 많이 샀는지(%)에, 며칠 연속 샀는지를 더 얹었습니다. 덩치에 비해 큰손이 꾸준히 사는 종목이 위로 옵니다. 계산값은 탭마다 공식이 달라 그 자체로는 다른 탭과 비교할 수 없습니다.",
   score_scalp: "강도는 0~100점으로, 지금까지 이 탭에 걸린 후보들의 계산값 중 몇 % 위치인지입니다. 세 탭 모두 같은 눈금이라 비교할 수 있습니다. 계산값은 세 가지를 0~100점으로 맞춰 가중평균합니다: 큰손 확인(오늘 거래대금 중 기관·외국인 순매수 비중 0%→0, 20%→100) 50%, 거래 증가(평소의 3배→0, 8배→100, 15배를 넘으면 오히려 깎여 30배에 0) 25%, 상승폭(5~15%가 100, 필터 하한 2%나 상한가 근처 29%로 갈수록 0) 25%. 거래가 폭발하고 크게 튄 '주목받는 종목'은 이후 성적이 나쁜 경향이 있어(Barber·Odean 2008, 이 사이트 기록에서도 확인), 큰손이 확인해 준 적당한 급등을 위로 올립니다.",
@@ -211,7 +211,7 @@ function renderThermo() {
     return `<li><div><small>${name}</small><b style="color:${x ? THERMO_COLOR(x.score) : "var(--faint)"}">${x ? esc(x.label) : "기록 없음"}</b></div>${x ? badge(x.score) : ""}</li>`;
   }).join("");
   const parts = th.parts.map((p) => `<div class="part">
-      <div class="part-hd"><span>${esc(p.name)} ${infoBtn(p.key)}</span><b style="color:${THERMO_COLOR(p.score)}">${p.score}점 <small>${THERMO_KR(p.score)}</small></b></div>
+      <div class="part-hd"><span>${esc(p.name)} ${infoBtn(p.key)}${p.weight && p.weight < 1 ? ` <small class="half">반 무게</small>` : ""}</span><b style="color:${THERMO_COLOR(p.score)}">${p.score}점 <small>${THERMO_KR(p.score)}</small></b></div>
       <div class="part-bar"><i style="left:${p.score}%"></i></div>
       <small>${esc(p.raw)}</small>${infoBox(p.key)}
     </div>`).join("");
@@ -222,7 +222,7 @@ function renderThermo() {
       <ul class="th-cmp">${cmp}</ul>
     </div>
     ${infoBox("thermo")}
-    <details class="rules"${state.expAll ? " open" : ""}><summary>무엇으로 계산했나 (${th.parts.length}개 지표)</summary><p class="hint">오른쪽은 각 지표를 0(공포)~100(탐욕) 점수로 바꾼 값이고, 막대 아래 작은 글씨가 지표의 원래 숫자입니다.${vixEx(th)}</p>${parts}</details>
+    <details class="rules"${state.expAll ? " open" : ""}><summary>무엇으로 계산했나 (${th.parts.length}개 지표)</summary><p class="hint">오른쪽은 각 지표를 0(공포)~100(탐욕) 점수로 바꾼 값이고, 막대 아래 작은 글씨가 지표의 원래 숫자입니다. 온도는 이 점수들의 평균인데, '코스피 20일 추세'와 '신고가 vs 신저가'는 둘 다 주가 하락을 보는 지표라 반 무게로 넣었습니다(급락장에서 공포 쪽으로 겹쳐 쏠리지 않게).${vixEx(th)}</p>${parts}</details>
   </div>`;
 }
 
@@ -576,7 +576,7 @@ function renderRegime() {
   // 왜 이렇게 판단했나: 1단계 패닉 조건 → 2단계 추세 조건 → 바뀌려면
   const why = rg.panic_checks ? `<details class="rules why-box" open><summary>왜 이렇게 판단했나</summary>
       ${rg.chart ? lineChart(rg.chart) : ""}
-      <h3>1단계 · 패닉 조건 <small>하나라도 맞으면 패닉</small></h3>${checkList(rg.panic_checks)}
+      <h3>1단계 · 패닉 조건 <small>두 개 이상 맞으면 패닉 (하나만 맞으면 인버스 추격 주의)</small></h3>${checkList(rg.panic_checks)}
       <h3>2단계 · 추세 조건 <small>셋 다 ✓면 상승장, 셋 다 ✗면 하락장, 섞이면 횡보·전환</small></h3>${checkList(rg.trend_checks)}
       <h3>판정이 바뀌려면</h3><p class="next">${esc(rg.next)}</p></details>` : "";
 
@@ -1023,7 +1023,7 @@ function renderRules() {
     <li>공시는 계약·수주·자사주 취득·실적 발표·특허·합병 등 재료가 되는 제목만 (제목만으로는 좋고 나쁨을 알 수 없는 실적·합병 공시도 포함)</li></ul>
     <h3>단타</h3>
     <ul><li>전 영업일 장 마감 뒤 ~ 기준일 사이 기사·공시</li><li>거래대금이 20일 평균의 ${r.scalp_value_mult}배 이상</li>
-    <li>${r.scalp_min_change}% 이상 상승</li><li>기준일 기관+외국인 순매수 &gt; 0</li></ul>
+    <li>${r.scalp_min_change}% 이상 상승</li><li>기준일 기관+외국인 순매수가 그날 거래대금의 ${r.scalp_min_net_ratio ?? 0}% 이상</li></ul>
     <h3>스윙</h3>
     <ul><li>최근 3영업일 안에 기사·공시</li><li>최근 5일 중 ${r.swing_min_days}일 이상 기관+외국인 순매수</li>
     <li>5일 순매수 합이 시가총액의 ${r.swing_min_ratio}% 이상</li><li>주가 &gt; 20일 이동평균 &gt; 60일 이동평균, 20일선 상승 중</li>

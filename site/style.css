@@ -317,3 +317,4 @@ table.fin .est { color: var(--faint); }
 .tile.fut .nums div > small:last-child { font-size: 10px; color: var(--faint); }
 .tile.fut svg.futchart { height: 90px; margin-top: 8px; }
 .futwho td small { display: block; font-size: 10px; color: var(--faint); }
+.part-hd small.half { font-size: 10px; color: var(--faint); border: 1px solid var(--line); border-radius: 4px; padding: 0 3px; }

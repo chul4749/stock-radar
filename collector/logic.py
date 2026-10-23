@@ -187,10 +187,10 @@ def thermometer(t):
     """
     parts = []
 
-    def add(key, name, score, raw):
+    def add(key, name, score, raw, weight=1.0):
         if score is None:
             return
-        parts.append({"key": key, "name": name, "score": round(max(0, min(100, score))), "raw": raw})
+        parts.append({"key": key, "name": name, "score": round(max(0, min(100, score))), "raw": raw, "weight": weight})
 
     kv = t.get("korea_vol")
     if kv and kv.get("pct_1y") is not None:
@@ -204,10 +204,11 @@ def thermometer(t):
     b = t.get("breadth")
     if b and b.get("new_lows"):
         hi, lo = b["new_highs"][-1], b["new_lows"][-1]
-        add("breadth", "신고가 vs 신저가", 50 if hi + lo == 0 else 100 * hi / (hi + lo), f"신고가 {hi} · 신저가 {lo}")
+        # 코스피 20일 추세와 같은 '주가 하락'을 보는 지표라 둘 다 반 무게 (급락장에서 공포 쪽으로 겹쳐 쏠리지 않게)
+        add("breadth", "신고가 vs 신저가", 50 if hi + lo == 0 else 100 * hi / (hi + lo), f"신고가 {hi} · 신저가 {lo}", 0.5)
     k = (t.get("index") or {}).get("kospi")
     if k and k.get("change_20d") is not None:
-        add("momentum", "코스피 20일 추세", 50 + k["change_20d"] * 3, f"20일 {k['change_20d']:+.1f}%")
+        add("momentum", "코스피 20일 추세", 50 + k["change_20d"] * 3, f"20일 {k['change_20d']:+.1f}%", 0.5)
     fl = (t.get("flows") or {}).get("KOSPI")
     if fl and fl.get("days20"):
         add("flows", "큰손 수급 (코스피)", 100 * fl["pos_days20"] / fl["days20"],
@@ -222,7 +223,7 @@ def thermometer(t):
     # 빚투(신용융자)는 많으면 탐욕이지만 급감도 위험 신호라 방향이 모호해 온도계에서는 뺀다 (칸으로만 보여 줌)
     if len(parts) < 3:
         return None
-    score = round(sum(p["score"] for p in parts) / len(parts))
+    score = round(sum(p["score"] * p["weight"] for p in parts) / sum(p["weight"] for p in parts))
     label, tone = thermo_label(score)
     return {"score": score, "label": label, "tone": tone, "parts": parts}
 
@@ -364,6 +365,7 @@ RULES = {
     "min_value": 10 * EOK,
     "scalp_value_mult": 3.0,
     "scalp_min_change": 2.0,
+    "scalp_min_net_ratio": 2.0,   # 오늘 기관+외국인 순매수 / 거래대금 (%) — 1원만 사도 통과하지 않게
     "swing_min_days": 3,
     "swing_min_ratio": 0.05,      # 5일 기관+외국인 순매수 / 시총 (%)
     "swing_max_5d_rise": 20.0,
@@ -433,8 +435,9 @@ def screen(universe, closes, values, flows_daily, flows_5d, pension_5d, news_tod
                  "value": f"{mult:.1f}배"},
                 {"label": f"오늘 {rules['scalp_min_change']:.0f}% 이상 상승", "ok": info["change"] >= rules["scalp_min_change"],
                  "value": f"{info['change']:+.1f}%"},
-                {"label": "오늘 기관+외국인 순매수", "ok": f_today + i_today > 0,
-                 "value": f"{(f_today + i_today) / EOK:+,.0f}억"},
+                {"label": f"오늘 기관+외국인 순매수가 거래대금의 {rules['scalp_min_net_ratio']:.0f}% 이상",
+                 "ok": (f_today + i_today) / info["value"] * 100 >= rules["scalp_min_net_ratio"] if info["value"] else False,
+                 "value": f"{(f_today + i_today) / EOK:+,.0f}억 ({(f_today + i_today) / info['value'] * 100 if info['value'] else 0:.1f}%)"},
             ]
             if all(c["ok"] for c in checks):
                 score, parts = scalp_score(mult, info["change"], max(0, f_today + i_today) / info["value"])
@@ -866,7 +869,9 @@ def market_regime(kospi, t, dates=None):
          "value": "–" if fo_mult is None else f"{fo['value']:,.0f}억, 평균의 {fo_mult:.1f}배",
          "ok": fo_mult is not None and fo["value"] >= 300 and fo_mult >= 2},
     ]
-    panic = [f"{c['label'].split(' (')[0]}: {c['value']}" for c in panic_checks if c["ok"]]
+    met_panic = [f"{c['label'].split(' (')[0]}: {c['value']}" for c in panic_checks if c["ok"]]
+    # 급락 하나만으로는 패닉이 아니다: 하락과 높은 변동성·공포가 겹친 상태 (Daniel·Moskowitz의 '패닉 구간')
+    panic = met_panic if len(met_panic) >= 2 else []
     # 2단계: 추세 조건
     slope = (ma20 / ma20_prev - 1) * 100
     trend_checks = [
@@ -883,7 +888,8 @@ def market_regime(kospi, t, dates=None):
     if key == "panic":
         reason = f"패닉 조건 {len(panic)}개 해당 → 추세와 상관없이 패닉으로 판정. 추세만 보면 {REGIMES[tkey]} ({trend_txt})."
     else:
-        reason = f"패닉 조건 없음 → 추세로 판정: {trend_txt} → {REGIMES[key]}."
+        pre = f"패닉 조건 {len(met_panic)}개뿐 (2개 이상이어야 패닉)" if met_panic else "패닉 조건 없음"
+        reason = f"{pre} → 추세로 판정: {trend_txt} → {REGIMES[key]}."
     if key == "panic":
         nxt = f"패닉 조건이 모두 풀리면 추세로 다시 판정합니다. 지금 추세 그대로면 {REGIMES[tkey]}입니다."
     elif key == "down":
@@ -893,6 +899,8 @@ def market_regime(kospi, t, dates=None):
     else:
         nxt = (f"코스피·20일선이 60일선({ma60:,.0f}) 위에서 20일선이 오르면 상승장, "
                f"모두 아래에서 20일선이 내려가면 하락장이 됩니다.")
+    if key != "panic" and len(met_panic) == 1:
+        nxt += " 패닉 조건이 하나 더 맞으면 패닉으로 바뀝니다."
 
     fl = (t.get("flows") or {}).get("KOSPI") or {}
     b = t.get("breadth") or {}
@@ -914,13 +922,15 @@ def market_regime(kospi, t, dates=None):
         inv_checks.append({"label": "외국인 선물 20일 누적 순매도", "value": f"{fu['d20']:+,}계약", "ok": fu["d20"] < 0})
     met = sum(1 for c in inv_checks if c["ok"])
     need = 4 if len(inv_checks) <= 5 else 5  # 외국인 선물까지 6개면 5개 이상
-    if met >= need and not panic:
+    # 패닉까지는 아니어도 패닉 조건이 하나라도 켜져 있으면(예: 20일 −15% 급락) 추격은 위험하다
+    blockers = met_panic
+    if met >= need and not blockers:
         verdict = ("consider", "인버스 고려 구간", "하락 추세가 확인됨. 1배 인버스를 짧게, 코스피가 20일선을 되찾으면 정리.",
                    f"코스피가 20일선({ma20:,.0f}) 위로 올라서면 정리 신호입니다.")
     elif met >= need:
         verdict = ("caution", "하락 추세지만 추격 주의",
-                   "이미 공포가 극에 달해 급반등이 잦은 구간. 지금 따라 들어가기보다 반등이 20일선 아래서 꺾일 때가 상대적으로 나은 자리.",
-                   f"패닉 조건이 풀린 뒤에도 하락 신호가 {need}개 이상 남아 있으면 '고려 구간'이 됩니다.")
+                   "이미 급락했거나 공포가 커서 급반등이 잦은 구간. 지금 따라 들어가기보다 반등이 20일선 아래서 꺾일 때가 상대적으로 나은 자리.",
+                   f"패닉 조건(급락·극단적 공포 등)이 모두 풀린 뒤에도 하락 신호가 {need}개 이상 남아 있으면 '고려 구간'이 됩니다.")
     elif met == need - 1:
         verdict = ("watch", "하락 신호 일부", "아직 추세가 확인되지 않음. 지켜보기.",
                    f"하락 신호가 {need}개 이상이 되면 다시 판단합니다.")
@@ -931,12 +941,12 @@ def market_regime(kospi, t, dates=None):
         "key": key, "label": REGIMES[key], "trend_key": tkey,
         "trend": {"close": r1(close), "ma20": r1(ma20), "ma60": r1(ma60), "ma20_rising": rising,
                   "ma20_slope": round(slope, 2), "chg20": r1(chg20)},
-        "panic": panic, "reason": reason, "next": nxt,
+        "panic": panic, "panic_met": met_panic, "reason": reason, "next": nxt,
         "panic_checks": panic_checks, "trend_checks": trend_checks,
         "fit": {g: {"grade": v[0], "why": v[1], "evidence": EVIDENCE[v[2]][0], "source": EVIDENCE[v[2]][1]}
                 for g, v in FIT[key].items()},
         "inverse": {"verdict": verdict[0], "label": verdict[1], "text": verdict[2], "next": verdict[3],
-                    "checks": inv_checks, "met": met, "need": need, "blockers": panic},
+                    "checks": inv_checks, "met": met, "need": need, "blockers": blockers},
     }
     if dates is not None and len(kospi) >= 180:
         n = 120

@@ -293,6 +293,10 @@ def test_regime_explains_decision_and_chart():
     assert r["fit"]["swing"]["evidence"] and r["fit"]["swing"]["source"]
     t["thermo"]["score"] = 20
     r = logic.market_regime(_kospi(-0.002, n=200), t)
+    # 극단적 공포 하나만으로는 패닉이 아님 (두 개 이상)
+    assert r["key"] == "down" and r["panic_met"] and "하나 더" in r["next"] and r["inverse"]["blockers"]
+    t["korea_vol"] = {"pct_1y": 95}
+    r = logic.market_regime(_kospi(-0.002, n=200), t)
     assert r["key"] == "panic" and r["trend_key"] == "down" and "하락장" in r["next"] and "chart" not in r
 
 
@@ -395,3 +399,15 @@ def test_scalp_score_prefers_confirmed_over_overheated():
     assert solid > hot and parts["flow"] == 100 and parts["move"] == 100
     x = {"value_mult": 6, "change": 9, "value_eok": 100, "flow": {"foreign_today": 15, "inst_today": 10}}
     assert logic.rescore("scalp", x) == solid
+
+
+def test_thermometer_halves_overlapping_price_signals():
+    t = {"vix": {"value": 20, "pct_1y": 50}, "korea_vol": {"value": 20, "pct_1y": 50}, "fear_greed": {"score": 50},
+         "index": {"kospi": {"change_20d": -20}}, "breadth": {"new_lows": [100], "new_highs": [0]}}
+    th = logic.thermometer(t)
+    # 50·50·50 (무게 1) + 0·0 (무게 0.5씩) → (150 + 0) / 4 = 37.5 → 38 (같은 무게였다면 30)
+    assert th["score"] == 38
+
+
+def test_scalp_needs_meaningful_big_hand_buying():
+    assert logic.RULES["scalp_min_net_ratio"] == 2.0
