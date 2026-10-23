@@ -62,6 +62,21 @@ def series_stat(rows, days_back=5, year=252):
     }
 
 
+def futures_summary(rows):
+    """[(날짜, 외국인, 기관, 개인, 가격)] → 외국인 코스피200 선물 순매수 요약 (계약)."""
+    if not rows or len(rows) < 2:
+        return None
+    fx = [r[1] for r in rows]
+    cum, acc = [], 0
+    for v in fx[-20:]:
+        acc += v
+        cum.append(acc)
+    return {"date": f"{rows[-1][0][:4]}-{rows[-1][0][4:6]}-{rows[-1][0][6:]}",
+            "today": fx[-1], "d5": sum(fx[-5:]), "d20": sum(fx[-20:]),
+            "inst_today": rows[-1][2], "retail_today": rows[-1][3],
+            "price": rows[-1][4], "cum20": cum}
+
+
 def credit_summary(loans, funds):
     """FreeSIS 신용공여 잔고(STATSCU0100000070BO) + 증시자금(STATSCU0100000060BO) → 억 원 단위 요약.
 
@@ -448,14 +463,17 @@ VALUE_RULES = {
 VALUE_WEIGHTS = {"drop": 0.25, "cheap": 0.15, "per": 0.35, "eps": 0.25}
 
 
-def value_score(drop, pbr_ratio, per, eps_ratio):
-    """→ (0~100 점수, 항목별 0~100)."""
+def value_score(drop, pbr_ratio, per, eps_ratio, fwd_ratio=None):
+    """→ (0~100 점수, 항목별 0~100). fwd_ratio = 올해 추정 EPS / 지금 EPS (있으면 이익 항목에 반반 섞음)."""
     clip = lambda v: max(0.0, min(1.0, v))
+    eps_part = clip((eps_ratio - 0.8) / 0.7)         # EPS 1년 전의 0.8배 → 0, 1.5배 이상 → 100
+    if fwd_ratio is not None:
+        eps_part = (eps_part + clip((fwd_ratio - 0.8) / 0.7)) / 2  # 추정치도 같은 눈금 (결산 EPS는 늦게 바뀌므로)
     parts = {
         "drop": clip((drop - 20) / 30),              # 낙폭 20% → 0, 50% 이상 → 100
         "cheap": clip((1 - pbr_ratio - 0.2) / 0.5),  # 1년 중앙 PBR 대비 할인 20% → 0, 70% 이상 → 100
         "per": clip((15 - per) / 10),                # PER 15 → 0, 5 이하 → 100
-        "eps": clip((eps_ratio - 0.8) / 0.7),        # EPS 1년 전의 0.8배 → 0, 1.5배 이상 → 100
+        "eps": eps_part,
     }
     score = sum(VALUE_WEIGHTS[k] * v for k, v in parts.items()) * 100
     return round(score, 1), {k: round(v * 100) for k, v in parts.items()}
@@ -464,8 +482,21 @@ def value_score(drop, pbr_ratio, per, eps_ratio):
 def rescore(group, x):
     """기록 파일의 후보 점수. 저평가는 저장된 항목으로 지금 공식에 맞춰 다시 계산한다."""
     if group == "value" and all(x.get(k) is not None for k in ("drop_60d", "pbr", "pbr_med", "per", "eps_ratio")) and x["pbr_med"]:
-        return value_score(x["drop_60d"], x["pbr"] / x["pbr_med"], x["per"], x["eps_ratio"])[0]
+        return value_score(x["drop_60d"], x["pbr"] / x["pbr_med"], x["per"], x["eps_ratio"], x.get("eps_fwd_ratio"))[0]
     return x.get("score")
+
+
+def apply_forward_eps(value, profiles):
+    """저평가 후보에 네이버 추정 EPS를 반영해 점수를 다시 매기고 다시 정렬한다."""
+    for x in value:
+        p = profiles.get(x["code"]) or {}
+        eps, cns = p.get("eps"), p.get("cns_eps")
+        if eps and eps > 0 and cns is not None:
+            x["eps_fwd_ratio"] = round(cns / eps, 2)
+            x["score"], x["score_parts"] = value_score(x["drop_60d"], x["pbr"] / x["pbr_med"], x["per"],
+                                                       x["eps_ratio"], x["eps_fwd_ratio"])
+    value.sort(key=lambda x: -x["score"])
+    return value
 
 
 def value_screen(universe, closes, fund_now, fund_hist, flows_5d, news_3d, rules=VALUE_RULES):
@@ -591,7 +622,7 @@ def parse_profile(integ, fin):
     info = {i.get("code"): i.get("value") for i in (integ or {}).get("totalInfos") or []}
     out = {
         "cap_eok": _eok(info.get("marketValue")),
-        "per": _num(info.get("per")), "cns_per": _num(info.get("cnsPer")),
+        "per": _num(info.get("per")), "cns_per": _num(info.get("cnsPer")), "cns_eps": _num(info.get("cnsEps")),
         "pbr": _num(info.get("pbr")), "eps": _num(info.get("eps")), "bps": _num(info.get("bps")),
         "div_yield": _num(info.get("dividendYieldRatio")),
         "high52": _num(info.get("highPriceOf52Weeks")), "low52": _num(info.get("lowPriceOf52Weeks")),
@@ -828,19 +859,23 @@ def market_regime(kospi, t, dates=None):
         {"label": "미국 하이일드 1년 중 70% 이상 (자금시장 긴장)", "value": "–" if hy is None else f"{hy}% 위치",
          "ok": hy is not None and hy >= 70},
     ]
+    fu = t.get("futures")
+    if fu:
+        inv_checks.append({"label": "외국인 선물 20일 누적 순매도", "value": f"{fu['d20']:+,}계약", "ok": fu["d20"] < 0})
     met = sum(1 for c in inv_checks if c["ok"])
-    if met >= 4 and not panic:
+    need = 4 if len(inv_checks) <= 5 else 5  # 외국인 선물까지 6개면 5개 이상
+    if met >= need and not panic:
         verdict = ("consider", "인버스 고려 구간", "하락 추세가 확인됨. 1배 인버스를 짧게, 코스피가 20일선을 되찾으면 정리.",
                    f"코스피가 20일선({ma20:,.0f}) 위로 올라서면 정리 신호입니다.")
-    elif met >= 4:
+    elif met >= need:
         verdict = ("caution", "하락 추세지만 추격 주의",
                    "이미 공포가 극에 달해 급반등이 잦은 구간. 지금 따라 들어가기보다 반등이 20일선 아래서 꺾일 때가 상대적으로 나은 자리.",
-                   "패닉 조건이 풀린 뒤에도 하락 신호가 4개 이상 남아 있으면 '고려 구간'이 됩니다.")
-    elif met == 3:
+                   f"패닉 조건이 풀린 뒤에도 하락 신호가 {need}개 이상 남아 있으면 '고려 구간'이 됩니다.")
+    elif met == need - 1:
         verdict = ("watch", "하락 신호 일부", "아직 추세가 확인되지 않음. 지켜보기.",
-                   "하락 신호가 4개 이상이 되면 다시 판단합니다.")
+                   f"하락 신호가 {need}개 이상이 되면 다시 판단합니다.")
     else:
-        verdict = ("no", "인버스 불리", "하락 추세 신호가 부족함.", "하락 신호가 4개 이상이 되면 다시 판단합니다.")
+        verdict = ("no", "인버스 불리", "하락 추세 신호가 부족함.", f"하락 신호가 {need}개 이상이 되면 다시 판단합니다.")
 
     out = {
         "key": key, "label": REGIMES[key], "trend_key": tkey,
@@ -851,7 +886,7 @@ def market_regime(kospi, t, dates=None):
         "fit": {g: {"grade": v[0], "why": v[1], "evidence": EVIDENCE[v[2]][0], "source": EVIDENCE[v[2]][1]}
                 for g, v in FIT[key].items()},
         "inverse": {"verdict": verdict[0], "label": verdict[1], "text": verdict[2], "next": verdict[3],
-                    "checks": inv_checks, "met": met, "blockers": panic},
+                    "checks": inv_checks, "met": met, "need": need, "blockers": panic},
     }
     if dates is not None and len(kospi) >= 180:
         n = 120

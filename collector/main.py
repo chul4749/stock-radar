@@ -145,17 +145,11 @@ def main(argv):
     log(f"  저평가 {len(value)} (과거 스냅샷 {len(fund_hist)}개)")
     for x in value[:5]:
         log(f"   저평가 {x['name']} -{x['drop_60d']}% PBR {x['pbr']}/{x['pbr_med']}")
-    overlap = logic.mark_overlap(scalp, swing, value)
-    past = past_scores(base)
-    for g, items in (("scalp", scalp), ("swing", swing), ("value", value)):
-        logic.score_percentiles(items, past.get(g, []))
-    log(f"  겹침 {len(overlap)}")
-    for group in (scalp[:10], swing[:10], value[:10]):
-        logic.enrich(group, closes, sectors, quality)
-    # 종목 상세(눌렀을 때)용 기업 정보: 화면에 나가는 후보만, 네이버 지금 시점 값
+    # 기업 정보(네이버): 저평가 후보 전체 + 화면에 나갈 후보. 저평가는 추정 EPS를 점수에 반영
     profiles, failed = {}, 0
-    for x in scalp[:10] + swing[:10] + value[:10]:
-        code = x["code"]
+
+    def profile(code):
+        nonlocal failed
         if code not in profiles:
             try:
                 profiles[code] = logic.parse_profile(*sources.naver_profile(code))
@@ -164,8 +158,22 @@ def main(argv):
                 profiles[code], failed = None, failed + 1
                 log(f"  상세 {code} 실패: {type(e).__name__}")
             time.sleep(0.2)
-        if profiles[code]:
-            x["profile"] = profiles[code]
+        return profiles[code]
+
+    for x in value:
+        profile(x["code"])
+    logic.apply_forward_eps(value, profiles)
+    overlap = logic.mark_overlap(scalp, swing, value)
+    past = past_scores(base)
+    for g, items in (("scalp", scalp), ("swing", swing), ("value", value)):
+        logic.score_percentiles(items, past.get(g, []))
+    log(f"  겹침 {len(overlap)}")
+    for group in (scalp[:10], swing[:10], value[:10]):
+        logic.enrich(group, closes, sectors, quality)
+    # 종목 상세(눌렀을 때)용 기업 정보: 화면에 나가는 후보만, 네이버 지금 시점 값
+    for x in scalp[:10] + swing[:10] + value[:10]:
+        if profile(x["code"]):
+            x["profile"] = profiles[x["code"]]
     log(f"  기업 정보 {len(profiles) - failed}/{len(profiles)}")
     if profiles and failed == len(profiles):
         errors.append("기업 정보: 전부 실패")
@@ -212,6 +220,8 @@ def main(argv):
     loans = safe("신용잔고", lambda: sources.kofia("STATSCU0100000070BO", kofia_from, base), errors)
     funds = safe("반대매매", lambda: sources.kofia("STATSCU0100000060BO", kofia_from, base), errors)
     temp["credit_balance"] = logic.credit_summary(loans, funds)
+    fut = safe("외국인 선물", lambda: sources.daum_futures(base), errors)
+    temp["futures"] = logic.futures_summary(fut) if fut else None
     temp["summary"] = logic.summarize_temperature(temp)
     temp["thermo"] = logic.thermometer(temp)
     kospi_long = safe("코스피 1년", lambda: sources.index_history("1001", year_ago, base), errors)

@@ -356,3 +356,32 @@ def test_scorecard_next_open_market_bench_dedup_cost():
     # 하루 뒤 다시 걸린 같은 종목은 5일 성적에 중복으로 세지 않음 (1일 성적은 따로 셈)
     assert stats["scalp"]["1"]["n"] == 2
     assert next(e for e in recent if e["date"] == "d1")["dup"] == [5]
+
+
+def test_forward_eps_reorders_value():
+    base = {"drop_60d": 30, "pbr": 1.0, "pbr_med": 1.6, "per": 8, "eps_ratio": 1.2}
+    a = {**base, "code": "A"}
+    b = {**base, "code": "B"}
+    a["score"], a["score_parts"] = logic.value_score(30, 1 / 1.6, 8, 1.2)
+    b["score"], b["score_parts"] = logic.value_score(30, 1 / 1.6, 8, 1.2)
+    # A는 올해 이익이 반토막 날 전망, B는 늘어날 전망
+    out = logic.apply_forward_eps([a, b], {"A": {"eps": 1000, "cns_eps": 500}, "B": {"eps": 1000, "cns_eps": 1600}})
+    assert [x["code"] for x in out] == ["B", "A"]
+    assert a["eps_fwd_ratio"] == 0.5 and a["score_parts"]["eps"] == 29
+    assert logic.rescore("value", a) == a["score"]
+
+
+def test_futures_summary_and_inverse_check():
+    rows = [(f"202610{d:02d}", -1000 if d % 2 else 400, 0, 0, 900.0) for d in range(1, 23)]
+    f = logic.futures_summary(rows)
+    assert f["today"] == 400 and f["d5"] == -1000 * 2 + 400 * 3 and len(f["cum20"]) == 20
+    t = {"thermo": {"score": 35}, "futures": f, "flows": {"KOSPI": {"pos_days20": 5, "days20": 20}},
+         "breadth": {"new_lows": [300], "new_highs": [50]}, "hy_spread": {"pct_1y": 95}}
+    r = logic.market_regime(_kospi(-0.002), t)
+    assert r["inverse"]["met"] == 6 and r["inverse"]["need"] == 5 and r["inverse"]["verdict"] == "consider"
+
+
+def test_futures_isin_candidates():
+    from collector import sources
+    assert sources._isin_check("KR700593000") == "3"
+    assert sources._isin_check("KR4A017C000") == "3"

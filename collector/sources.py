@@ -156,6 +156,42 @@ def naver_profile(code):
     return integ, fin
 
 
+def _isin_check(body):
+    """ISIN 검증 숫자 (문자 → 10~35, 룬 알고리즘)."""
+    digits = "".join(str(int(c, 36)) for c in body)
+    total = 0
+    for i, ch in enumerate(reversed(digits)):
+        d = int(ch) * (2 if i % 2 == 0 else 1)
+        total += d - 9 if d > 9 else d
+    return str((10 - total % 10) % 10)
+
+
+def daum_futures(base_ymd, days=60):
+    """다음 금융: 코스피200 선물 투자자별 순매수(계약, 전 월물 합계) → 날짜 오름차순 [(YYYYMMDD, 외국인, 기관, 개인, 선물가격)].
+
+    선물 종목(ISIN)이 필요해 기준일 뒤 첫 분기 만기물부터 차례로 시도한다 (2026-10 시험, probe/futures.py).
+    """
+    y, m = int(base_ymd[:4]), int(base_ymd[4:6])
+    tries = []
+    for k in range(5):
+        q = ((m - 1) // 3 + k) % 4
+        yy = y + ((m - 1) // 3 + k) // 4
+        code = "369C"[q]
+        body = f"KR4A01{yy % 10}{code}000" if yy >= 2026 else f"KR4101{'VWX'[yy - 2024]}{code}000"
+        tries.append(body + _isin_check(body))
+    headers = {**UA, "Referer": "https://finance.daum.net/domestic/futures"}
+    for isin in tries:
+        r = get(f"https://finance.daum.net/api/future/{isin}/days", headers=headers, timeout=20,
+                params={"page": 1, "perPage": days})
+        rows = r.json().get("data") or []
+        out = [(x["date"][:10].replace("-", ""), x.get("foreignSettlement"), x.get("institutionSettlement"),
+                x.get("privateSettlement"), x.get("tradePrice")) for x in rows]
+        out = sorted(o for o in out if o[0] <= base_ymd and o[1] is not None)
+        if out and out[-1][0] == base_ymd:
+            return out
+    return []
+
+
 def kofia(obj, start_ymd, end_ymd):
     """금융투자협회 FreeSIS 일별 통계 → 날짜 오름차순 [{TMPV1: 날짜, TMPV2...}]. 금액 단위 백만 원, T+1 영업일 공표.
 

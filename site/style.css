@@ -288,3 +288,14 @@ table.fin { font-size: 12px; margin-top: 6px; }
 table.fin th, table.fin td { padding: 4px 2px; }
 table.fin th:first-child { text-align: left; color: var(--sub); font-weight: 400; }
 table.fin .est { color: var(--faint); }
+.today { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 6px 14px; }
+.today .tr { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14px; align-items: baseline; }
+.today .tr:last-child { border-bottom: 0; }
+.today .k { flex: 0 0 96px; color: var(--sub); font-size: 13px; }
+.today .v { flex: 1; min-width: 0; }
+.today .v small { color: var(--sub); font-size: 12px; }
+.today b.good { color: var(--calm); }
+.today b.bad { color: var(--fear); }
+.today .picks { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.today .picks small { margin-left: 3px; }
+.today button.pick { width: auto; margin: 0; padding: 0; border: 0; background: none; font: inherit; font-weight: 700; color: var(--text); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
