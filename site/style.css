@@ -273,3 +273,10 @@ table.rgtbl tr.cur th, table.rgtbl tr.cur td { background: var(--neutral-bg); }
 .tabs button[data-fit]::after { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-left: 4px; vertical-align: 2px; background: var(--neutral); }
 .tabs button[data-fit="good"]::after { background: var(--calm); }
 .tabs button[data-fit="bad"]::after { background: var(--fear); }
+.scorerow { margin: 8px 0 2px; font-size: 13px; color: var(--sub); }
+.scorerow .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.scorerow b { color: var(--text); font-size: 15px; }
+.scorerow small { font-size: 11px; color: var(--faint); }
+.scorerow .sbar { height: 5px; border-radius: 3px; background: var(--neutral-bg); margin-top: 4px; overflow: hidden; }
+.scorerow .sbar i { display: block; height: 100%; border-radius: 3px; background: var(--text); opacity: 0.55; }
+.scorerow small.f { display: block; margin-top: 3px; }
