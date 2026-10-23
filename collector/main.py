@@ -195,7 +195,8 @@ def main(argv):
     temp["thermo"] = logic.thermometer(temp)
     kospi_long = safe("코스피 1년", lambda: sources.index_history("1001", year_ago, base), errors)
     if kospi_long is not None:
-        temp["regime"] = logic.market_regime([float(v) for v in kospi_long.values], temp)
+        temp["regime"] = logic.market_regime([float(v) for v in kospi_long.values], temp,
+                                             dates=[d.strftime("%Y%m%d") for d in kospi_long.index])
     # 전일·1주 전·1달 전 온도: 이전 기록 파일에서
     prev_files = sorted(n[:8] for n in os.listdir(DATA) if n[:8].isdigit() and n.endswith(".json") and n[:8] < base)
     hist = {}

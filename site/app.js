@@ -431,13 +431,57 @@ function bars(daily) {
 /* ---------------- 지금 장세와 시나리오 ---------------- */
 
 const FIT_TXT = { good: ["◎", "잘 맞음"], ok: ["△", "조심해서"], bad: ["✕", "안 맞음"] };
+const REGIME_TONE = { up: "calm", range: "neutral", down: "fear", panic: "fear" };
+const REGIME_NAME = { up: "상승장", range: "횡보·전환", down: "하락장", panic: "패닉" };
 const INV_PRODUCTS = "예: KODEX 인버스(114800, 코스피200 1배) · KODEX 200선물인버스2X(252670, 2배, 하루~며칠만) · KODEX 코스닥150선물인버스(251340)";
 
-function regimeRecord(key, g) {
+// 성적표의 장세별 기록 (5일 뒤)
+function regimeStat(key, g) {
   const r = ((state.score || {}).by_regime || {})[key];
   const x = r && r.groups[g] && r.groups[g]["5"];
+  return x ? { ...x, days: r.days } : null;
+}
+
+function regimeRecord(key, g) {
+  const x = regimeStat(key, g);
   if (!x) return "이 장세 기록 아직 없음";
-  return `이 장세 기록: 5일 뒤 코스피 대비 ${signed(x.excess, 1, "%")} · 오른 비율 ${x.win}% (${x.n}건, ${r.days}일)${r.days < 10 ? " — 아직 참고만" : ""}`;
+  return `이 장세 기록: 5일 뒤 코스피 대비 ${signed(x.excess, 1, "%")} · 오른 비율 ${x.win}% (${x.n}건, ${x.days}일)${x.days < 10 ? " — 아직 참고만" : ""}`;
+}
+
+// 규칙과 실제 기록이 반대로 나오면 알려 준다 (표본 10건 이상일 때만)
+function mismatch(grade, x) {
+  if (!x || x.n < 10 || x.excess == null) return "";
+  if (grade === "good" && x.excess < 0) return "기록은 규칙과 반대: 이 장세에서 코스피보다 못했습니다.";
+  if (grade === "bad" && x.excess > 2) return "기록은 규칙과 반대: 이 장세에서 코스피보다 나았습니다.";
+  return "";
+}
+
+const checkList = (items) => `<ul class="chk">${items.map((c) =>
+  `<li class="${c.ok ? "ok" : "no"}"><span>${c.ok ? "✓" : "✗"} ${esc(c.label)}</span><b>${esc(c.value)}</b></li>`).join("")}</ul>`;
+
+// 최근 장세 흐름 띠와 '몇 일째'
+function regimeStrip(key) {
+  const rs = (state.score || {}).regimes || {};
+  const ds = Object.keys(rs).sort().filter((d) => d <= state.data.base_date).slice(-20);
+  if (!ds.length) return "";
+  let run = 0;
+  for (let i = ds.length - 1; i >= 0 && rs[ds[i]] === key; i--) run++;
+  const cells = ds.map((d) => `<i class="rg-${rs[d]}" title="${ymd(d)} ${REGIME_NAME[rs[d]]}"></i>`).join("");
+  return `<div class="rgstrip"><div class="cells">${cells}</div><small>최근 ${ds.length}일 장세 흐름${run ? ` · ${REGIME_NAME[key]} ${run}일째` : ""}</small>` +
+    `<div class="legend">${Object.entries(REGIME_NAME).map(([k, n]) => `<span><i class="rg-${k}"></i>${n}</span>`).join("")}</div></div>`;
+}
+
+function regimeTable(cur) {
+  const br = (state.score || {}).by_regime || {};
+  const keys = ["up", "range", "down", "panic"].filter((k) => br[k]);
+  if (!keys.length) return "";
+  const cell = (k, g) => {
+    const x = regimeStat(k, g);
+    return x ? `<td class="${cls(x.excess)}">${signed(x.excess, 1, "%")}<small>${x.n}건</small></td>` : `<td class="na">–</td>`;
+  };
+  const rows = keys.map((k) => `<tr class="${k === cur ? "cur" : ""}"><th>${REGIME_NAME[k]} <small>${br[k].days}일</small></th>${["swing", "scalp", "value"].map((g) => cell(k, g)).join("")}</tr>`).join("");
+  return `<details class="rules"><summary>장세별 성적 전체 보기</summary><table class="score rgtbl"><thead><tr><th></th><th>스윙</th><th>단타</th><th>저평가</th></tr></thead><tbody>${rows}</tbody></table>` +
+    `<p class="hint">필터에 걸린 날의 장세별로, 5일 뒤 코스피보다 얼마나 더 올랐는지(초과 수익률) 평균입니다. 날짜가 적으면 우연이 크게 섞입니다.</p></details>`;
 }
 
 function renderRegime() {
@@ -446,21 +490,34 @@ function renderRegime() {
   document.querySelectorAll(".tabs button").forEach((b) => { if (rg) b.dataset.fit = rg.fit[b.dataset.tab].grade; else delete b.dataset.fit; });
   if (!rg) { box.innerHTML = `<div class="empty">이 날짜는 장세 판정이 생기기 전 기록입니다.</div>`; return; }
   const tr = rg.trend;
-  const tone = { up: "calm", range: "neutral", down: "fear", panic: "fear" }[rg.key];
-  const head = `<div class="sum ${tone}"><div class="row"><span class="t">지금 장세 ${infoBtn("regime")}</span><span class="lv">${esc(rg.label)}</span></div>` +
-    `<p>코스피 ${num(tr.close, 2)} · 20일선 ${num(tr.ma20, 0)} ${tr.ma20_rising ? "↗" : "↘"} · 60일선 ${num(tr.ma60, 0)} · 20일 ${signed(tr.chg20, 1, "%")}</p>` +
-    (rg.panic.length ? `<p>패닉 판정: ${rg.panic.map(esc).join(", ")}</p>` : "") + `${infoBox("regime")}</div>`;
+  const head = `<div class="sum ${REGIME_TONE[rg.key]}"><div class="row"><span class="t">지금 장세 ${infoBtn("regime")}</span><span class="lv">${esc(rg.label)}</span></div>` +
+    `<p>${esc(rg.reason || `코스피 ${num(tr.close, 2)} · 20일선 ${num(tr.ma20, 0)} · 60일선 ${num(tr.ma60, 0)}`)}</p>${infoBox("regime")}${regimeStrip(rg.key)}</div>`;
+
+  // 왜 이렇게 판단했나: 1단계 패닉 조건 → 2단계 추세 조건 → 바뀌려면
+  const why = rg.panic_checks ? `<details class="rules why-box" open><summary>왜 이렇게 판단했나</summary>
+      ${rg.chart ? lineChart(rg.chart) : ""}
+      <h3>1단계 · 패닉 조건 <small>하나라도 맞으면 패닉</small></h3>${checkList(rg.panic_checks)}
+      <h3>2단계 · 추세 조건 <small>셋 다 ✓면 상승장, 셋 다 ✗면 하락장, 섞이면 횡보·전환</small></h3>${checkList(rg.trend_checks)}
+      <h3>판정이 바뀌려면</h3><p class="next">${esc(rg.next)}</p></details>` : "";
+
   const rows = ["swing", "scalp", "value"].map((g) => {
-    const f = rg.fit[g], [ic, lab] = FIT_TXT[f.grade];
-    return `<li class="fit-${f.grade}"><div class="row"><b>${ic} ${TAB_NAME[g]}</b><span>${lab}</span></div><p>${esc(f.why)}</p><small>${regimeRecord(rg.key, g)}</small></li>`;
+    const f = rg.fit[g], [ic, lab] = FIT_TXT[f.grade], mm = mismatch(f.grade, regimeStat(rg.key, g));
+    return `<li class="fit-${f.grade}"><div class="row"><b>${ic} ${TAB_NAME[g]}</b><span>${lab}</span></div><p>${esc(f.why)}</p>` +
+      `<small>${regimeRecord(rg.key, g)}</small>${mm ? `<p class="mm">⚠ ${mm}</p>` : ""}` +
+      (f.evidence ? `<details class="ev"><summary>왜?</summary><p>${esc(f.evidence)}</p><small>근거: ${esc(f.source)}</small></details>` : "") + `</li>`;
   }).join("");
+
   const iv = rg.inverse, fi = rg.fit.inverse;
   const ivTone = { consider: "fit-good", caution: "fit-bad", watch: "fit-ok", no: "fit-bad" }[iv.verdict];
+  const ivChecks = iv.checks.map((c) => ({ value: "", ...c }));
   const inv = `<li class="${ivTone} inv"><div class="row"><b>${FIT_TXT[fi.grade][0]} 인버스 ${infoBtn("inverse")}</b><span>${esc(iv.label)}</span></div>` +
-    `<p>${esc(iv.text)}</p><ul class="chk">${iv.checks.map((c) => `<li class="${c.ok ? "ok" : "no"}">${c.ok ? "✓" : "✗"} ${esc(c.label)}</li>`).join("")}</ul>` +
+    `<p>${esc(iv.text)}</p>${checkList(ivChecks)}` +
     `<small>하락 신호 ${iv.met}/5${iv.blockers.length ? ` · 추격 주의: ${iv.blockers.map(esc).join(", ")}` : ""}</small>` +
+    (iv.next ? `<p class="next">${esc(iv.next)}</p>` : "") +
+    (fi.evidence ? `<details class="ev"><summary>왜?</summary><p>${esc(fi.evidence)}</p><small>근거: ${esc(fi.source)}</small></details>` : "") +
     `<p class="prod">${INV_PRODUCTS}. 2배 상품은 출렁이는 장에서 지수가 제자리여도 손실이 쌓입니다.</p>${infoBox("inverse")}</li>`;
-  box.innerHTML = head + `<ul class="fit">${rows}${inv}</ul>` +
+
+  box.innerHTML = head + why + `<h3 class="fit-h">이 장세에서 시나리오별 적합도</h3><ul class="fit">${rows}${inv}</ul>` + regimeTable(rg.key) +
     `<p class="hint">연구 결과를 바탕으로 한 경향이고 매수·매도 추천이 아닙니다. '이 장세 기록'이 쌓이면 실제로 맞는지 확인할 수 있습니다.</p>`;
 }
 

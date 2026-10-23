@@ -242,9 +242,33 @@ button.star.on { color: #e0a100; }
 .fit-bad .row span { color: var(--fear); }
 .fit p { margin: 3px 0 0; font-size: 13px; color: var(--text); }
 .fit small { display: block; margin-top: 4px; font-size: 12px; color: var(--sub); }
-.fit .chk { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12px; }
-.fit .chk li.ok { color: var(--text); }
-.fit .chk li.no { color: var(--faint); }
+.chk { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12px; }
+.chk li { display: flex; justify-content: space-between; gap: 8px; padding: 2px 0; }
+.chk li b { font-weight: 500; white-space: nowrap; }
+.chk li.ok { color: var(--text); }
+.chk li.no { color: var(--faint); }
+.why-box { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 4px 12px 10px; margin-top: 8px; }
+.why-box h3 small { font-weight: 400; color: var(--faint); font-size: 11px; margin-left: 4px; }
+.next { margin: 4px 0 0; font-size: 13px; color: var(--text); }
+.fit-h { font-size: 14px; margin: 14px 0 0; }
+.fit .mm { color: var(--fear); font-size: 12px; }
+.fit details.ev { margin-top: 4px; font-size: 12px; }
+.fit details.ev summary { cursor: pointer; color: var(--sub); }
+.fit details.ev p { font-size: 12px; color: var(--sub); }
+.fit details.ev small { margin-top: 2px; color: var(--faint); }
+.rgstrip { margin-top: 8px; }
+.rgstrip .cells { display: flex; gap: 2px; }
+.rgstrip .cells i { flex: 1; height: 10px; border-radius: 2px; }
+.rgstrip small { display: block; font-size: 11px; color: var(--sub); margin-top: 3px; }
+.rgstrip .legend { margin-top: 2px; flex-wrap: wrap; }
+.rgstrip .legend i { width: 8px; height: 8px; border-radius: 2px; }
+i.rg-up { background: var(--calm); }
+i.rg-range { background: var(--faint); }
+i.rg-down { background: var(--g1); }
+i.rg-panic { background: var(--g0); }
+table.rgtbl td small { display: block; font-size: 10px; color: var(--faint); }
+table.rgtbl th small { font-weight: 400; color: var(--faint); font-size: 10px; }
+table.rgtbl tr.cur th, table.rgtbl tr.cur td { background: var(--neutral-bg); }
 .fit p.prod { font-size: 12px; color: var(--sub); }
 .tabs button[data-fit]::after { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-left: 4px; vertical-align: 2px; background: var(--neutral); }
 .tabs button[data-fit="good"]::after { background: var(--calm); }

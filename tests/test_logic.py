@@ -282,3 +282,15 @@ def test_scorecard_splits_by_regime():
     _, _, _, by = logic.scorecard(hist, closes, kospi, {days[0]: "up", days[1]: "panic"})
     assert by["up"]["days"] == 1 and by["up"]["groups"]["swing"]["5"]["n"] == 1
     assert by["panic"]["groups"]["value"]["1"]["avg"] == 1.0
+
+
+def test_regime_explains_decision_and_chart():
+    t = {"thermo": {"score": 35}}
+    r = logic.market_regime(_kospi(-0.002, n=200), t, dates=[f"d{i}" for i in range(200)])
+    assert r["key"] == "down" and "추세로 판정" in r["reason"] and "20일선" in r["next"]
+    assert [c["ok"] for c in r["trend_checks"]] == [False, False, False]
+    assert len(r["chart"]["close"]) == 120 and r["chart"]["ma60"][-1] == r["trend"]["ma60"]
+    assert r["fit"]["swing"]["evidence"] and r["fit"]["swing"]["source"]
+    t["thermo"]["score"] = 20
+    r = logic.market_regime(_kospi(-0.002, n=200), t)
+    assert r["key"] == "panic" and r["trend_key"] == "down" and "하락장" in r["next"] and "chart" not in r
