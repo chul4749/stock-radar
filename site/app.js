@@ -591,7 +591,7 @@ function valueCard(x) {
 
 function cardHead(x) {
   return `<div class="hd">
-      <a class="nm" href="https://m.stock.naver.com/domestic/stock/${x.code}" target="_blank" rel="noopener">${esc(x.name)}<span class="mk">${esc(x.market)} ${x.code}${x.sector ? " · " + esc(x.sector) : ""}</span></a>
+      <a class="nm" data-code="${x.code}" href="https://m.stock.naver.com/domestic/stock/${x.code}" target="_blank" rel="noopener">${esc(x.name)}<span class="mk">${esc(x.market)} ${x.code}${x.sector ? " · " + esc(x.sector) : ""}</span></a>
       <div class="px">${starBtn(x)}<b>${num(x.close)}</b><span class="${cls(x.change)}">${signed(x.change, 1, "%")}</span></div>
     </div>${x.overlap ? `<span class="tag both">두 관점 겹침</span>` : ""}`;
 }
@@ -772,6 +772,29 @@ function lineChart(ch) {
     <div class="barlab"><span style="text-align:left">${ymd(ch.dates[0])}</span><span style="text-align:right">${ymd(ch.dates[n - 1])}</span></div>`;
 }
 
+// 종목 상세의 기업 정보 (네이버 증권, 수집 시점 값)
+function companyBlock(x) {
+  const p = x.profile;
+  if (!p) return "";
+  const pos52 = p.high52 && p.low52 && p.high52 > p.low52 ? Math.max(0, Math.min(100, Math.round(((x.close - p.low52) / (p.high52 - p.low52)) * 100))) : null;
+  const m = (label, v) => `<div><small>${label}</small><b>${v}</b></div>`;
+  const metrics = [
+    m("시가총액", eokText(p.cap_eok ?? x.cap_eok)),
+    m("PER", p.per == null ? "–" : `${num(p.per, 1)}배${p.cns_per != null ? ` <small style="display:inline;font-size:11px">추정 ${num(p.cns_per, 1)}</small>` : ""}`),
+    m("PBR", p.pbr == null ? "–" : `${num(p.pbr, 2)}배`),
+    m("배당수익률", p.div_yield == null ? "–" : `${num(p.div_yield, 2)}%`),
+    m("52주 범위", p.low52 && p.high52 ? `<span style="font-size:12px">${num(p.low52)}~${num(p.high52)}</span>` : "–"),
+    m("52주 중 위치", pos52 == null ? "–" : `${pos52}%`),
+  ].join("");
+  const a = p.annual;
+  const fmt = (t, v) => (v == null ? "–" : /률|ROE|비율/.test(t) ? `${num(v, 1)}%` : eokText(v));
+  const table = a ? `<table class="score fin"><thead><tr><th></th>${a.years.map((y) => `<th class="${y.est ? "est" : ""}">${esc(y.label.replace(" (추정)", ""))}${y.est ? "<br><small>추정</small>" : ""}</th>`).join("")}</tr></thead>` +
+    `<tbody>${a.rows.map((r) => `<tr><th>${esc(r.title)}</th>${r.values.map((v, i) => `<td class="${a.years[i].est ? "est" : ""}">${fmt(r.title, v)}</td>`).join("")}</tr>`).join("")}</tbody></table>` : "";
+  return `<div class="company"><h3>기업 정보 <small>네이버 증권 · ${esc((p.as_of || "").slice(5))} 수집</small></h3>` +
+    (p.summary ? `<p class="summary">${esc(p.summary)}</p>` : "") +
+    `<div class="nums">${metrics}</div>${table}</div>`;
+}
+
 function openDetail(code) {
   const f = state.data.filter;
   const x = [...(f.swing || []), ...(f.scalp || []), ...(f.value || [])].find((y) => y.code === code);
@@ -781,6 +804,7 @@ function openDetail(code) {
   const fl = x.flow;
   $("#detail-body").innerHTML = `${cardHead(x)}
     <p class="hint">${groups.join(" · ")} 후보${x.sector ? " · " + esc(x.sector) : ""} · 시가총액 ${num(x.cap_eok)}억 · 거래대금 ${num(x.value_eok)}억</p>
+    ${companyBlock(x)}
     ${x.chart ? lineChart(x.chart) : ""}
     <div class="nums">
       <div><small>외국인 지분율</small><b>${q.fratio == null ? "–" : num(q.fratio, 1) + "%"}</b></div>
@@ -799,6 +823,9 @@ function openDetail(code) {
 }
 
 document.addEventListener("click", (e) => {
+  // 카드의 종목명을 누르면 네이버 대신 상세(기업 정보 포함)를 연다. 상세 안의 종목명은 그대로 네이버로
+  const nm = e.target.closest(".card a.nm");
+  if (nm && nm.dataset.code) { e.preventDefault(); openDetail(nm.dataset.code); return; }
   const b = e.target.closest("button.more");
   if (b) openDetail(b.dataset.code);
   if (e.target.closest("#detail .close") || e.target.id === "detail") $("#detail").close();

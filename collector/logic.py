@@ -564,6 +564,59 @@ def risk_codes(dart_items, matcher, sections=None):
 
 # ---------------------------------------------------------------- 종목 정보 보강
 
+def _num(v):
+    """'1,234.5배' '22,292원' '0.78%' → 숫자. 없거나 '-' 면 None."""
+    if v is None:
+        return None
+    t = re.sub(r"[^0-9.\-]", "", str(v).replace(",", ""))
+    try:
+        return float(t) if t not in ("", "-", ".") else None
+    except ValueError:
+        return None
+
+
+def _eok(v):
+    """'1,248조 1,805억' → 억 원."""
+    if not v:
+        return None
+    jo = re.search(r"([\d,]+)조", v)
+    eok = re.search(r"([\d,]+)억", v)
+    if not jo and not eok:
+        return _num(v)
+    return (float(jo.group(1).replace(",", "")) * 10000 if jo else 0) + (float(eok.group(1).replace(",", "")) if eok else 0)
+
+
+PROFILE_ROWS = ("매출액", "영업이익", "당기순이익", "영업이익률", "ROE", "부채비율")
+
+
+def parse_profile(integ, fin):
+    """네이버 integration + finance/annual 응답 → 화면용 기업 정보."""
+    info = {i.get("code"): i.get("value") for i in (integ or {}).get("totalInfos") or []}
+    out = {
+        "cap_eok": _eok(info.get("marketValue")),
+        "per": _num(info.get("per")), "cns_per": _num(info.get("cnsPer")),
+        "pbr": _num(info.get("pbr")), "eps": _num(info.get("eps")), "bps": _num(info.get("bps")),
+        "div_yield": _num(info.get("dividendYieldRatio")),
+        "high52": _num(info.get("highPriceOf52Weeks")), "low52": _num(info.get("lowPriceOf52Weeks")),
+        "foreign_rate": _num(info.get("foreignRate")),
+        "industry": ((integ or {}).get("industryCompareInfo") or [{}])[0].get("industryName") if isinstance((integ or {}).get("industryCompareInfo"), list) else None,
+    }
+    summ = (fin or {}).get("corporationSummary")
+    if isinstance(summ, dict):
+        summ = " ".join(str(v) for v in summ.values() if isinstance(v, str) and len(v) > 10)
+    out["summary"] = re.sub(r"\s+", " ", summ).strip()[:600] if isinstance(summ, str) and summ.strip() else None
+    fi = (fin or {}).get("financeInfo") or {}
+    years = [(t["key"], t["title"].rstrip("."), t.get("isConsensus") == "Y") for t in fi.get("trTitleList") or []]
+    rows = {r["title"]: r.get("columns") or {} for r in fi.get("rowList") or [] if r.get("title") in PROFILE_ROWS}
+    if years and rows:
+        out["annual"] = {
+            "years": [{"label": lab + (" (추정)" if est else ""), "est": est} for _, lab, est in years],
+            "rows": [{"title": t, "values": [_num((rows[t].get(k) or {}).get("value")) for k, _, _ in years]}
+                     for t in PROFILE_ROWS if t in rows],
+        }
+    return out
+
+
 def enrich(items, closes, sectors, quality):
     """후보 종목에 업종, 60일 차트, 수급의 질(연기금·투신·사모·외국인 지분율)을 붙인다.
 

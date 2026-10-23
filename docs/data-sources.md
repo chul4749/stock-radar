@@ -21,3 +21,4 @@
 | KRX 전체 (pykrx) | data.krx.co.kr | ✅ | 회원 로그인 필요 → Secrets `KRX_ID`/`KRX_PW` 등록 후 성공 (전종목 2,867·투자자별 순매수 2,598·PER/PBR 2,714) |
 | 옛 네이버 금융 페이지 | finance.naver.com/item, sise, news | ❌ | Npay 증권 신형 화면으로 바뀌어 표를 못 읽음 |
 | 신용잔고·반대매매 | 금융투자협회 FreeSIS `meta/getMetaDataList.do` | ✅ | 화면 GET으로 세션 쿠키 받은 뒤 JSON POST. `STATSCU0100000070BO` 신용공여 잔고(TMPV2 융자 전체·3 코스피·4 코스닥), `STATSCU0100000060BO` 증시자금(TMPV5 미수금·6 반대매매·7 비중%). 백만 원, T+1 공표 (2026-10-23 시험, `probe/credit.py`) |
+| 종목 기업 정보 | 네이버 `api/stock/{code}/integration`, `finance/annual` | ✅ | 시총·PER(추정)·PBR·배당·52주, 연간 실적 3년+추정, 회사 설명(`corporationSummary`). 비공식 (2026-10-23 시험, `probe/company.py`). FnGuide 스냅샷은 빈 응답 |

@@ -280,3 +280,11 @@ table.rgtbl tr.cur th, table.rgtbl tr.cur td { background: var(--neutral-bg); }
 .scorerow .sbar { height: 5px; border-radius: 3px; background: var(--neutral-bg); margin-top: 4px; overflow: hidden; }
 .scorerow .sbar i { display: block; height: 100%; border-radius: 3px; background: var(--text); opacity: 0.55; }
 .scorerow small.f { display: block; margin-top: 3px; }
+.company { margin: 10px 0 12px; }
+.company h3 { font-size: 14px; margin: 0 0 4px; }
+.company h3 small { font-weight: 400; font-size: 11px; color: var(--faint); margin-left: 4px; }
+.company .summary { font-size: 13px; color: var(--sub); margin: 0 0 6px; line-height: 1.55; }
+table.fin { font-size: 12px; margin-top: 6px; }
+table.fin th, table.fin td { padding: 4px 2px; }
+table.fin th:first-child { text-align: left; color: var(--sub); font-weight: 400; }
+table.fin .est { color: var(--faint); }

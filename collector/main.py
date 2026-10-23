@@ -151,6 +151,23 @@ def main(argv):
     log(f"  겹침 {len(overlap)}")
     for group in (scalp[:10], swing[:10], value[:10]):
         logic.enrich(group, closes, sectors, quality)
+    # 종목 상세(눌렀을 때)용 기업 정보: 화면에 나가는 후보만, 네이버 지금 시점 값
+    profiles, failed = {}, 0
+    for x in scalp[:10] + swing[:10] + value[:10]:
+        code = x["code"]
+        if code not in profiles:
+            try:
+                profiles[code] = logic.parse_profile(*sources.naver_profile(code))
+                profiles[code]["as_of"] = datetime.now(KST).strftime("%Y-%m-%d")
+            except Exception as e:
+                profiles[code], failed = None, failed + 1
+                log(f"  상세 {code} 실패: {type(e).__name__}")
+            time.sleep(0.2)
+        if profiles[code]:
+            x["profile"] = profiles[code]
+    log(f"  기업 정보 {len(profiles) - failed}/{len(profiles)}")
+    if profiles and failed == len(profiles):
+        errors.append("기업 정보: 전부 실패")
     sector_flow = logic.sector_flows(universe, sectors, flows_5d, closes)
     log(f"  업종 유입 상위 {[r['sector'] for r in sector_flow['inflow'][:5]]}")
 

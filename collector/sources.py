@@ -137,6 +137,17 @@ def vix():
     return rows
 
 
+def naver_profile(code):
+    """네이버 모바일 증권: 종목 요약 지표(integration) + 연간 실적·회사 설명(finance/annual). 지금 시점 값."""
+    base = f"https://m.stock.naver.com/api/stock/{code}"
+    integ = retry(lambda: get(f"{base}/integration", timeout=15).json(), tries=2)
+    try:
+        fin = get(f"{base}/finance/annual", timeout=15).json()
+    except Exception:
+        fin = {}
+    return integ, fin
+
+
 def kofia(obj, start_ymd, end_ymd):
     """금융투자협회 FreeSIS 일별 통계 → 날짜 오름차순 [{TMPV1: 날짜, TMPV2...}]. 금액 단위 백만 원, T+1 영업일 공표.
 

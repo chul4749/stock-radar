@@ -321,3 +321,18 @@ def test_scorecard_score_halves():
                                  {"code": "B", "name": "b", "close": 100.0, "score": 1.0}]})]
     *_, check = logic.scorecard(hist, closes, kospi)
     assert check["swing"]["hi"]["5"]["avg"] == 10.0 and check["swing"]["lo"]["5"]["avg"] == -5.0
+
+
+def test_parse_profile_naver_shapes():
+    integ = {"totalInfos": [{"code": "marketValue", "value": "21조 3,172억"}, {"code": "per", "value": "15.19배"},
+                            {"code": "dividendYieldRatio", "value": "3.10%"}, {"code": "lowPriceOf52Weeks", "value": "17,910"}]}
+    fin = {"corporationSummary": "HMM은 컨테이너선과 벌크선을 운영하는 해운사.",
+           "financeInfo": {"trTitleList": [{"isConsensus": "N", "title": "2025.12.", "key": "202512"},
+                                           {"isConsensus": "Y", "title": "2026.12.", "key": "202612"}],
+                           "rowList": [{"title": "영업이익", "columns": {"202512": {"value": "14,612"}, "202612": {"value": "-"}}}]}}
+    p = logic.parse_profile(integ, fin)
+    assert p["cap_eok"] == 213172 and p["per"] == 15.19 and p["div_yield"] == 3.1 and p["low52"] == 17910
+    assert p["summary"].startswith("HMM은")
+    assert p["annual"]["years"][1] == {"label": "2026.12 (추정)", "est": True}
+    assert p["annual"]["rows"] == [{"title": "영업이익", "values": [14612.0, None]}]
+    assert logic.parse_profile({}, {})["summary"] is None
