@@ -229,6 +229,9 @@ def main(argv):
             "value_rules": logic.VALUE_RULES,
             "value": value[:10], "value_total": len(value),
             "overlap": overlap,
+            # 강도(역대 후보 중 위치) 계산용: 통과한 후보 전체의 점수. score_ver 2 = 저평가 새 공식
+            "all_scores": {g: [x["score"] for x in items] for g, items in (("scalp", scalp), ("swing", swing), ("value", value))},
+            "score_ver": 2,
             "excluded": excluded,
         },
         "sectors": sector_flow,
@@ -259,10 +262,10 @@ def main(argv):
                 rg = logic.market_regime(upto, rec.get("temperature") or {})
                 if rg:
                     regimes[d] = rg["key"]
-        stats, recent, features, by_regime = logic.scorecard(history, closes, kospi, regimes)
+        stats, recent, features, by_regime, score_check = logic.scorecard(history, closes, kospi, regimes)
         card = {"generated_at": out["generated_at"], "base_date": base, "days": len(history),
                 "horizons": list(logic.HORIZONS), "stats": stats, "recent": recent, "features": features,
-                "by_regime": by_regime, "regimes": regimes}
+                "by_regime": by_regime, "regimes": regimes, "score_check": score_check}
         with open(os.path.join(DATA, "scorecard.json"), "w", encoding="utf-8") as f:
             json.dump(card, f, ensure_ascii=False, separators=(",", ":"), default=_json_default)
         log(f"  기록 {len(history)}일, 통계 {json.dumps(stats, ensure_ascii=False)}")
@@ -278,7 +281,11 @@ def past_scores(base):
         with open(os.path.join(DATA, n), encoding="utf-8") as f:
             flt = json.load(f).get("filter", {})
         for g in ("scalp", "swing", "value"):
-            out.setdefault(g, []).extend(x["score"] for x in flt.get(g) or [] if x.get("score") is not None)
+            full = (flt.get("all_scores") or {}).get(g)
+            if full is not None and (g != "value" or flt.get("score_ver", 1) >= 2):
+                out.setdefault(g, []).extend(full)
+            else:  # 예전 파일: 상위 10개만, 저평가는 지금 공식으로 다시 계산
+                out.setdefault(g, []).extend(v for v in (logic.rescore(g, x) for x in flt.get(g) or []) if v is not None)
     return out
 
 

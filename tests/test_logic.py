@@ -163,7 +163,7 @@ def test_scorecard_returns_and_excess():
     kospi = pd.Series([1000, 1000, 1000, 1000, 1000, 1050, 1050.0], index=days)
     hist = [("d0", {"swing": [{"code": "A", "name": "가", "close": 100.0}], "scalp": [], "value": []}),
             ("d6", {"swing": [{"code": "A", "name": "가", "close": 120.0}], "scalp": [], "value": []})]
-    stats, recent, feats, _ = logic.scorecard(hist, closes, kospi)
+    stats, recent, feats, _, _ = logic.scorecard(hist, closes, kospi)
     assert stats["swing"]["1"] == {"n": 1, "avg": 10.0, "win": 100, "excess": 10.0}
     assert stats["swing"]["5"]["avg"] == 20.0 and stats["swing"]["5"]["excess"] == 15.0
     assert "20" not in stats["swing"]
@@ -279,7 +279,7 @@ def test_scorecard_splits_by_regime():
     kospi = pd.Series([1000.0] * 7, index=days)
     hist = [(days[0], {"swing": [{"code": "A", "name": "a", "close": 100.0}]}),
             (days[1], {"value": [{"code": "A", "name": "a", "close": 101.0}]})]
-    _, _, _, by = logic.scorecard(hist, closes, kospi, {days[0]: "up", days[1]: "panic"})
+    _, _, _, by, _ = logic.scorecard(hist, closes, kospi, {days[0]: "up", days[1]: "panic"})
     assert by["up"]["days"] == 1 and by["up"]["groups"]["swing"]["5"]["n"] == 1
     assert by["panic"]["groups"]["value"]["1"]["avg"] == 1.0
 
@@ -301,3 +301,23 @@ def test_score_percentiles_common_scale():
     logic.score_percentiles(items, [0.1, 0.3, 0.5, 0.9])
     assert items[0]["score_pct"] == 92 and items[0]["score_pool"] == 6
     assert items[1]["score_pct"] == 25
+
+
+def test_value_score_weights_fundamentals_not_just_drop():
+    # 많이 빠지고 거품 꺼진 종목 vs 덜 빠졌지만 PER 낮고 이익 늘어난 종목
+    crash, _ = logic.value_score(45, 0.3, 14, 0.85)
+    solid, parts = logic.value_score(25, 0.75, 5, 1.6)
+    assert solid > crash
+    assert parts == {"drop": 17, "cheap": 10, "per": 100, "eps": 100}
+    assert logic.value_score(50, 0.2, 5, 1.5)[0] == 100.0
+
+
+def test_scorecard_score_halves():
+    days = [f"2026100{i}" for i in range(1, 8)]
+    closes = pd.DataFrame({"A": [100, 100, 100, 100, 100, 110, 110], "B": [100, 100, 100, 100, 100, 95, 95]},
+                          index=days, dtype=float)
+    kospi = pd.Series([1000.0] * 7, index=days)
+    hist = [(days[0], {"swing": [{"code": "A", "name": "a", "close": 100.0, "score": 2.0},
+                                 {"code": "B", "name": "b", "close": 100.0, "score": 1.0}]})]
+    *_, check = logic.scorecard(hist, closes, kospi)
+    assert check["swing"]["hi"]["5"]["avg"] == 10.0 and check["swing"]["lo"]["5"]["avg"] == -5.0

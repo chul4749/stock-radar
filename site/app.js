@@ -87,7 +87,7 @@ const INFO = {
   inverse: "지수가 떨어지면 오르는 ETF입니다. 하루 수익률을 매일 다시 맞추기 때문에, 지수가 오르내리며 제자리여도 손실이 쌓입니다(2배 상품은 더 심함). 그래서 방향이 뚜렷한 짧은 구간에만 맞고, 공포가 극에 달한 뒤 따라 들어가면 급반등에 크게 당하기 쉽습니다.",
   score_swing: "강도는 0~100점으로, 지금까지 이 탭에 걸린 후보들(날짜마다 상위 10개)의 계산값 중 몇 % 위치인지입니다. 100점에 가까울수록 역대 후보 중에서도 강한 편이고, 세 탭 모두 같은 눈금이라 비교할 수 있습니다. 계산값은 통과한 종목끼리 순서를 매기는 식입니다. 시가총액에 비해 최근 5일 기관·외국인이 얼마나 많이 샀는지(%)에, 며칠 연속 샀는지를 더 얹었습니다. 덩치에 비해 큰손이 꾸준히 사는 종목이 위로 옵니다. 계산값은 탭마다 공식이 달라 그 자체로는 다른 탭과 비교할 수 없습니다.",
   score_scalp: "강도는 0~100점으로, 지금까지 이 탭에 걸린 후보들(날짜마다 상위 10개)의 계산값 중 몇 % 위치인지입니다. 100점에 가까울수록 역대 후보 중에서도 강한 편이고, 세 탭 모두 같은 눈금이라 비교할 수 있습니다. 계산값은 통과한 종목끼리 순서를 매기는 식입니다. 오늘 거래대금이 평소(20일 평균)의 몇 배인지에, 그 거래 중 기관·외국인 순매수 비중만큼 더 얹었습니다. 평소보다 돈이 확 몰리고 큰손도 산 종목이 위로 옵니다. 계산값은 탭마다 공식이 달라 그 자체로는 다른 탭과 비교할 수 없습니다.",
-  score_value: "강도는 0~100점으로, 지금까지 이 탭에 걸린 후보들(날짜마다 상위 10개)의 계산값 중 몇 % 위치인지입니다. 100점에 가까울수록 역대 후보 중에서도 강한 편이고, 세 탭 모두 같은 눈금이라 비교할 수 있습니다. 계산값은 통과한 종목끼리 순서를 매기는 식입니다. 60일 고점에서 많이 빠졌을수록, 그리고 지금 PBR이 1년 중앙값보다 쌀수록 높습니다. 많이 빠졌고 평소보다 싸게 거래되는 종목이 위로 옵니다. 계산값은 탭마다 공식이 달라 그 자체로는 다른 탭과 비교할 수 없습니다.",
+  score_value: "강도는 0~100점으로, 지금까지 이 탭에 걸린 후보들의 계산값 중 몇 % 위치인지입니다. 세 탭 모두 같은 눈금이라 비교할 수 있습니다. 계산값은 네 가지를 0~100점으로 맞춰 가중평균합니다: 낙폭(60일 고점 대비 20%→0점, 50%→100점) 25%, 싸짐(1년 중앙 PBR 대비 할인 20%→0, 70%→100) 15%, PER(15→0, 5→100) 35%, 이익(EPS 1년 전의 0.8배→0, 1.5배→100) 25%. 싸면서 이익이 버티는 종목이 위로 오도록 했습니다.",
   loan: "개인이 증권사에서 돈을 빌려 산 주식 금액(신용거래융자 잔고)입니다. 많이 쌓일수록 주가가 빠질 때 담보 부족으로 강제로 팔리는 물량(반대매매)이 커질 수 있습니다. 금융투자협회 자료라 하루 늦게 나옵니다.",
   forced: "외상으로 산 주식 대금(미수금)을 기한 안에 못 갚아 증권사가 강제로 판 금액입니다. 급락장에서 반대매매가 몰리면 좋은 종목도 같이 떨어집니다. 금융투자협회 자료라 하루 늦게 나옵니다.",
 };
@@ -614,7 +614,9 @@ function scoreFormula(x) {
     const extra = x.value_mult ? Math.max(0, (x.score / x.value_mult - 1) * 100) : 0;
     return `거래대금 평소의 ${num(x.value_mult, 1)}배 × (1 + 오늘 순매수/거래대금 ${num(extra, 1)}%)`;
   }
-  return `60일 고점 대비 ${num(x.drop_60d, 1)}% 하락 × (1년 중앙 PBR ${num(x.pbr_med, 2)} ÷ 지금 ${num(x.pbr, 2)})`;
+  const p = x.score_parts;
+  if (p) return `낙폭 ${p.drop} · 싸짐 ${p.cheap} · PER ${p.per} · 이익 ${p.eps}점의 가중평균 (25·15·35·25%)`;
+  return `60일 고점 대비 ${num(x.drop_60d, 1)}% 하락 × (1년 중앙 PBR ${num(x.pbr_med, 2)} ÷ 지금 ${num(x.pbr, 2)}) (예전 공식)`;
 }
 
 function scoreRow(x) {
@@ -661,6 +663,24 @@ function card(x) {
   </article>`;
 }
 
+// 점수가 쓸모 있는지: 같은 날·같은 탭 후보를 점수순으로 반 나눠, 위 절반과 아래 절반의 5일 뒤 성적 비교
+function scoreCheckTable(chk) {
+  if (!chk) return "";
+  const rows = ["swing", "scalp", "value"].filter((g) => chk[g]).map((g) => {
+    const c = (h) => {
+      const x = (chk[g][h] || {})["5"];
+      return x ? `<td><b class="${cls(x.excess)}">${signed(x.excess, 1, "%p")}</b><br><small>상승 ${x.win}% · ${x.n}건</small></td>` : `<td class="na">–</td>`;
+    };
+    const hi = (chk[g].hi || {})["5"], lo = (chk[g].lo || {})["5"];
+    const gap = hi && lo && hi.excess != null && lo.excess != null ? hi.excess - lo.excess : null;
+    const verdict = gap == null ? "–" : Math.min(hi.n, lo.n) < 30 ? "표본 적음" : gap > 1 ? "점수 높을수록 나음" : gap < -1 ? "오히려 반대" : "차이 없음";
+    return `<tr><th>${TAB_NAME[g]}</th>${c("hi")}${c("lo")}<td><small>${verdict}</small></td></tr>`;
+  }).join("");
+  return `<h3 class="fit-h">점수가 쓸모 있나</h3><div class="tile wide"><table class="score">
+    <thead><tr><th></th><th>점수 위 절반</th><th>아래 절반</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="hint">같은 날 같은 탭 후보를 점수순으로 반 나눠 5일 뒤 코스피 대비 성적(초과)을 비교합니다. 위 절반이 꾸준히 나아야 점수를 믿을 수 있습니다. 탭마다 30건 이상 쌓이기 전에는 우연이 큽니다.</p>`;
+}
+
 function renderScore() {
   const sc = state.score;
   if (!sc || !sc.stats) {
@@ -684,6 +704,7 @@ function renderScore() {
     hs.map((h) => `<td class="${cls(e["r" + h])}">${e["r" + h] == null ? "–" : signed(e["r" + h], 1, "%")}</td>`).join("") + "</tr>").join("");
   $("#scorecard").innerHTML = `<div class="tile wide"><table class="score">
       <thead><tr><th></th>${hs.map((h) => `<th>${h}일 뒤</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>${warn}
+    ${scoreCheckTable(sc.score_check)}
     ${featureTable(sc.features)}
     ${recent ? `<details class="rules"><summary>최근 기록 보기</summary><table class="score recent"><thead><tr><th>날짜</th><th>구분</th><th style="text-align:left">종목</th>${hs.map((h) => `<th>${h}일</th>`).join("")}</tr></thead><tbody>${recent}</tbody></table></details>` : ""}`;
 }

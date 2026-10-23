@@ -446,6 +446,31 @@ VALUE_RULES = {
 }
 
 
+# 저평가 점수: 네 가지를 각각 0~100으로 맞춰 가중평균 (예전 '하락률 × 중앙PBR/현재PBR'은
+# 주가 하락을 두 번 곱하고 거품 꺼진 종목을 과하게 우대해서 바꿈)
+VALUE_WEIGHTS = {"drop": 0.25, "cheap": 0.15, "per": 0.35, "eps": 0.25}
+
+
+def value_score(drop, pbr_ratio, per, eps_ratio):
+    """→ (0~100 점수, 항목별 0~100)."""
+    clip = lambda v: max(0.0, min(1.0, v))
+    parts = {
+        "drop": clip((drop - 20) / 30),              # 낙폭 20% → 0, 50% 이상 → 100
+        "cheap": clip((1 - pbr_ratio - 0.2) / 0.5),  # 1년 중앙 PBR 대비 할인 20% → 0, 70% 이상 → 100
+        "per": clip((15 - per) / 10),                # PER 15 → 0, 5 이하 → 100
+        "eps": clip((eps_ratio - 0.8) / 0.7),        # EPS 1년 전의 0.8배 → 0, 1.5배 이상 → 100
+    }
+    score = sum(VALUE_WEIGHTS[k] * v for k, v in parts.items()) * 100
+    return round(score, 1), {k: round(v * 100) for k, v in parts.items()}
+
+
+def rescore(group, x):
+    """기록 파일의 후보 점수. 저평가는 저장된 항목으로 지금 공식에 맞춰 다시 계산한다."""
+    if group == "value" and all(x.get(k) is not None for k in ("drop_60d", "pbr", "pbr_med", "per", "eps_ratio")) and x["pbr_med"]:
+        return value_score(x["drop_60d"], x["pbr"] / x["pbr_med"], x["per"], x["eps_ratio"])[0]
+    return x.get("score")
+
+
 def value_screen(universe, closes, fund_now, fund_hist, flows_5d, news_3d, rules=VALUE_RULES):
     """많이 떨어졌는데 장부가치 대비 싸졌고, 이익은 크게 줄지 않은 종목.
 
@@ -501,7 +526,7 @@ def value_screen(universe, closes, fund_now, fund_hist, flows_5d, news_3d, rules
             "eps_ratio": round(eps_ratio, 2),
             "flow5_eok": r1((f5 + i5) / EOK),
             "checks": checks,
-            "score": round(drop * (med / pbr), 1),
+            **dict(zip(("score", "score_parts"), value_score(drop, pbr_ratio, per, eps_ratio))),
             "news": news_3d.get(code, [])[:3],
         })
     out.sort(key=lambda x: -x["score"])
@@ -804,13 +829,16 @@ def scorecard(history, closes, index_closes, regimes=None):
     """
     days = list(closes.index)
     pos = {d: i for i, d in enumerate(days)}
-    stats, recent, by_regime = {}, [], {}
+    stats, recent, by_regime, halves = {}, [], {}, {}
     regimes = regimes or {}
     for date, groups in history:
         if date not in pos:
             continue
         i0 = pos[date]
         for g, items in groups.items():
+            # 그날 그 탭 후보를 점수순으로 줄 세워 위 절반·아래 절반 (2개 이상일 때만)
+            ranked = sorted(items, key=lambda y: -(rescore(g, y) or 0))
+            half = {y["code"]: ("hi" if k < len(ranked) // 2 else "lo") for k, y in enumerate(ranked)} if len(ranked) >= 2 else {}
             for x in items:
                 code = x["code"]
                 entry = {"date": date, "group": g, "code": code, "name": x["name"], "close": x["close"]}
@@ -827,6 +855,8 @@ def scorecard(history, closes, index_closes, regimes=None):
                     buckets = [stats.setdefault(g, {}).setdefault(n, {"rets": [], "ex": []})]
                     if regimes.get(date):
                         buckets.append(by_regime.setdefault(regimes[date], {}).setdefault(g, {}).setdefault(n, {"rets": [], "ex": []}))
+                    if x["code"] in half and not (len(ranked) % 2 and ranked.index(x) == len(ranked) // 2):
+                        buckets.append(halves.setdefault(g, {}).setdefault(half[x["code"]], {}).setdefault(n, {"rets": [], "ex": []}))
                     for s in buckets:
                         s["rets"].append(ret)
                         if ex is not None:
@@ -843,8 +873,10 @@ def scorecard(history, closes, index_closes, regimes=None):
         regime_out[rk] = {"days": sum(1 for d, _ in history if regimes.get(d) == rk),
                           "groups": {g: {str(n): summarize_returns(s["rets"], s["ex"]) for n, s in by_n.items()}
                                      for g, by_n in by_g.items()}}
+    score_check = {g: {h: {str(n): summarize_returns(s["rets"], s["ex"]) for n, s in by_n.items()} for h, by_n in hl.items()}
+                   for g, hl in halves.items()}
     recent.sort(key=lambda e: e["date"], reverse=True)
-    return out, recent[:60], feature_stats(recent), regime_out
+    return out, recent[:60], feature_stats(recent), regime_out, score_check
 
 
 def summarize_returns(rets, ex=None):
