@@ -9,7 +9,10 @@
   - `main.py` — 하루치 결과를 `site/data/{기준일}.json`으로 쓰고 `index.json`, `scorecard.json`을 갱신한다.
     실행: `python -m collector.main [YYYYMMDD]` (기준일을 안 주면 18시 이후는 오늘, 그 전은 전 영업일)
   - `sources.py` — 외부 데이터 접속 (KRX/pykrx, 네이버, 구글 뉴스, DART, CBOE, FRED, CNN, 금융투자협회 FreeSIS)
-  - `logic.py` — 시장 온도계, 종목 필터, 위험 공시 제외, 저평가, 성적표 계산
+  - `logic.py` — 시장 온도계, 종목 필터, 위험 공시 제외, 저평가, 성적표 계산,
+    장세 판정(`market_regime`: 상승장·횡보·하락장·패닉, 시나리오 적합도 `FIT`, 인버스 점검표).
+    `FIT`는 연구 결과(패닉 구간 추세 추종 붕괴, 이동평균 추세 추종, 인버스 매일 재조정 손실)에 기댄 규칙이고,
+    성적표의 장세별 기록(`by_regime`)으로 맞는지 계속 확인한다
   - `util.py` — KST, EOK(억), log
 - `site/` — 빌드 없는 정적 페이지 (`index.html`, `app.js`, `style.css`), 데이터는 `site/data/`
 - `probe/` — 데이터 출처 접속 시험 스크립트. 결과는 `docs/data-sources.md`에 정리

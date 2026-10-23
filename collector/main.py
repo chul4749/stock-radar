@@ -193,6 +193,9 @@ def main(argv):
     temp["credit_balance"] = logic.credit_summary(loans, funds)
     temp["summary"] = logic.summarize_temperature(temp)
     temp["thermo"] = logic.thermometer(temp)
+    kospi_long = safe("코스피 1년", lambda: sources.index_history("1001", year_ago, base), errors)
+    if kospi_long is not None:
+        temp["regime"] = logic.market_regime([float(v) for v in kospi_long.values], temp)
     # 전일·1주 전·1달 전 온도: 이전 기록 파일에서
     prev_files = sorted(n[:8] for n in os.listdir(DATA) if n[:8].isdigit() and n.endswith(".json") and n[:8] < base)
     hist = {}
@@ -240,14 +243,24 @@ def main(argv):
     kospi = safe("코스피 기간", lambda: sources.index_history("1001", used_days[0], base), errors)
     if kospi is not None:
         kospi.index = [d.strftime("%Y%m%d") for d in kospi.index]
-        history = []
+        history, regimes = [], {}
+        # 장세는 그날 저장된 시장 온도 + 그날까지의 코스피로 다시 판정 (예전 기록에도 같은 규칙 적용)
+        long_vals = kospi_long if kospi_long is not None else None
+        long_days = [d.strftime("%Y%m%d") for d in long_vals.index] if long_vals is not None else []
         for d in dates:
             with open(os.path.join(DATA, f"{d}.json"), encoding="utf-8") as f:
-                flt = json.load(f)["filter"]
+                rec = json.load(f)
+            flt = rec["filter"]
             history.append((d, {g: flt.get(g, []) for g in ("swing", "scalp", "value")}))
-        stats, recent, features = logic.scorecard(history, closes, kospi)
+            if d in long_days:
+                upto = [float(v) for v in long_vals.values[:long_days.index(d) + 1]]
+                rg = logic.market_regime(upto, rec.get("temperature") or {})
+                if rg:
+                    regimes[d] = rg["key"]
+        stats, recent, features, by_regime = logic.scorecard(history, closes, kospi, regimes)
         card = {"generated_at": out["generated_at"], "base_date": base, "days": len(history),
-                "horizons": list(logic.HORIZONS), "stats": stats, "recent": recent, "features": features}
+                "horizons": list(logic.HORIZONS), "stats": stats, "recent": recent, "features": features,
+                "by_regime": by_regime, "regimes": regimes}
         with open(os.path.join(DATA, "scorecard.json"), "w", encoding="utf-8") as f:
             json.dump(card, f, ensure_ascii=False, separators=(",", ":"), default=_json_default)
         log(f"  기록 {len(history)}일, 통계 {json.dumps(stats, ensure_ascii=False)}")

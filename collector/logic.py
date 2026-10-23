@@ -598,10 +598,115 @@ def sector_flows(universe, sectors, flows_5d, closes, top=8):
 
 # ---------------------------------------------------------------- 성적표
 
+# ---------------------------------------------------------------- 장세 판정
+
+# 장세별로 어떤 시나리오가 잘 맞는지 (연구 결과를 바탕으로 한 경향, 성적표 장세별 기록으로 계속 확인)
+# - 패닉(급락 뒤 높은 변동성)에서는 급반등이 잦아 추세 추종(스윙)이 가장 크게 깨진다 (Daniel & Moskowitz, Momentum Crashes)
+# - 하락 추세에서는 추세를 따르는 쪽이 낙폭을 줄이지만 횡보장에서는 신호가 자주 틀린다 (이동평균 추세 추종 연구)
+# - 인버스·곱버스는 매일 수익률을 다시 맞춰 변동성이 클수록 손실이 쌓인다 → 방향이 뚜렷한 짧은 구간에만
+REGIMES = {
+    "up": "상승장", "range": "횡보·전환", "down": "하락장", "panic": "패닉",
+}
+FIT = {
+    "up": {
+        "swing": ("good", "추세가 살아 있어 돈이 들어오는 종목이 더 가는 경향"),
+        "scalp": ("ok", "거래 몰린 종목이 하루 이틀 더 가는 경우가 많음"),
+        "value": ("bad", "오르는 장에서 혼자 떨어진 종목은 이유가 있는 경우가 많음"),
+        "inverse": ("bad", "추세를 거스르는 베팅"),
+    },
+    "range": {
+        "swing": ("ok", "가짜 돌파가 잦아 손절 기준을 짧게"),
+        "scalp": ("ok", "짧게 치고 빠지는 쪽이 상대적으로 유리"),
+        "value": ("ok", "많이 빠진 종목이 제자리로 돌아오는 경향"),
+        "inverse": ("bad", "방향이 없어 매일 재조정 손실만 쌓이기 쉬움"),
+    },
+    "down": {
+        "swing": ("bad", "꺾인 장에서 수급만 보고 따라가면 같이 밀리기 쉬움"),
+        "scalp": ("ok", "하루 이틀만, 손절 짧게"),
+        "value": ("ok", "싸 보여도 더 빠질 수 있어 나눠서 관찰"),
+        "inverse": ("good", "추세가 확인된 구간이라 1배 인버스를 짧게 고려할 만함"),
+    },
+    "panic": {
+        "swing": ("bad", "급반등 때 가장 크게 깨지는 구간 (추세 추종 붕괴)"),
+        "scalp": ("ok", "변동성이 커서 기회도 손실도 큼, 아주 짧게"),
+        "value": ("good", "공포가 극에 달하면 많이 빠진 종목이 크게 튀는 경향, 나눠서"),
+        "inverse": ("bad", "급반등이 잦고 변동성이 커 곱버스 손실이 커지는 구간, 추격 금지"),
+    },
+}
+
+
+def _ma(vals, n, back=0):
+    end = len(vals) - back
+    return sum(vals[end - n:end]) / n if end >= n else None
+
+
+def market_regime(kospi, t):
+    """코스피 종가(오래된 순, 60일 이상)와 그날 시장 온도 → 장세, 시나리오별 적합도, 인버스 점검표."""
+    if len(kospi) < 66:
+        return None
+    close, ma20, ma60 = kospi[-1], _ma(kospi, 20), _ma(kospi, 60)
+    ma20_prev = _ma(kospi, 20, back=5)
+    chg20 = (close / kospi[-21] - 1) * 100
+    th = (t.get("thermo") or {}).get("score")
+    kv = (t.get("korea_vol") or {}).get("pct_1y")
+    fo = (t.get("credit_balance") or {}).get("forced") or {}
+    forced_spike = bool(fo.get("avg20")) and fo["value"] >= 300 and fo["value"] >= fo["avg20"] * 2
+
+    panic = []
+    if th is not None and th < 25:
+        panic.append(f"시장 온도 {th}점 (극단적 공포)")
+    if chg20 <= -15:
+        panic.append(f"코스피 20일 새 {chg20:.1f}%")
+    if kv is not None and kv >= 90:
+        panic.append(f"국내 변동성 1년 중 {kv}% 위치")
+    if forced_spike:
+        panic.append(f"반대매매 {fo['value']:,.0f}억 (20일 평균의 {fo['value'] / fo['avg20']:.1f}배)")
+
+    below, rising = close < ma20 < ma60, ma20 > ma20_prev
+    if panic:
+        key = "panic"
+    elif below and not rising:
+        key = "down"
+    elif close > ma20 > ma60 and rising:
+        key = "up"
+    else:
+        key = "range"
+
+    fl = (t.get("flows") or {}).get("KOSPI") or {}
+    b = t.get("breadth") or {}
+    hy = (t.get("hy_spread") or {}).get("pct_1y")
+    checks = [
+        ("코스피가 20일선·60일선 아래", below),
+        ("20일선이 내려가는 중", not rising),
+        ("큰손(외국인+기관) 20일 중 순매수일 8일 이하", fl.get("pos_days20") is not None and fl["pos_days20"] <= 8),
+        ("신저가 종목이 신고가보다 많음", bool(b.get("new_lows")) and b["new_lows"][-1] > b["new_highs"][-1]),
+        ("미국 하이일드 1년 중 70% 이상 (자금시장 긴장)", hy is not None and hy >= 70),
+    ]
+    met = sum(1 for _, ok in checks if ok)
+    if met >= 4 and not panic:
+        verdict = ("consider", "인버스 고려 구간", "하락 추세가 확인됨. 1배 인버스를 짧게, 코스피가 20일선을 되찾으면 정리.")
+    elif met >= 4:
+        verdict = ("caution", "하락 추세지만 추격 주의",
+                   "이미 공포가 극에 달해 급반등이 잦은 구간. 지금 따라 들어가기보다 반등이 20일선 아래서 꺾일 때가 상대적으로 나은 자리.")
+    elif met == 3:
+        verdict = ("watch", "하락 신호 일부", "아직 추세가 확인되지 않음. 지켜보기.")
+    else:
+        verdict = ("no", "인버스 불리", "하락 추세 신호가 부족함.")
+    return {
+        "key": key, "label": REGIMES[key],
+        "trend": {"close": r1(close), "ma20": r1(ma20), "ma60": r1(ma60), "ma20_rising": rising, "chg20": r1(chg20)},
+        "panic": panic,
+        "fit": {g: {"grade": v[0], "why": v[1]} for g, v in FIT[key].items()},
+        "inverse": {"verdict": verdict[0], "label": verdict[1], "text": verdict[2],
+                    "checks": [{"label": l, "ok": ok} for l, ok in checks], "met": met,
+                    "blockers": panic},
+    }
+
+
 HORIZONS = (1, 5, 20)
 
 
-def scorecard(history, closes, index_closes):
+def scorecard(history, closes, index_closes, regimes=None):
     """과거 후보가 N영업일 뒤 얼마나 움직였나.
 
     history: [(기준일, {"scalp": [...], "swing": [...], "value": [...]})]
@@ -611,7 +716,8 @@ def scorecard(history, closes, index_closes):
     """
     days = list(closes.index)
     pos = {d: i for i, d in enumerate(days)}
-    stats, recent = {}, []
+    stats, recent, by_regime = {}, [], {}
+    regimes = regimes or {}
     for date, groups in history:
         if date not in pos:
             continue
@@ -630,10 +736,13 @@ def scorecard(history, closes, index_closes):
                     k0, k1 = index_closes.get(days[i0]), index_closes.get(days[i0 + n])
                     ex = ret - ((k1 / k0 - 1) * 100) if k0 and k1 else None
                     entry[f"r{n}"] = r1(ret)
-                    s = stats.setdefault(g, {}).setdefault(n, {"rets": [], "ex": []})
-                    s["rets"].append(ret)
-                    if ex is not None:
-                        s["ex"].append(ex)
+                    buckets = [stats.setdefault(g, {}).setdefault(n, {"rets": [], "ex": []})]
+                    if regimes.get(date):
+                        buckets.append(by_regime.setdefault(regimes[date], {}).setdefault(g, {}).setdefault(n, {"rets": [], "ex": []}))
+                    for s in buckets:
+                        s["rets"].append(ret)
+                        if ex is not None:
+                            s["ex"].append(ex)
                 recent.append(entry)
                 entry["features"] = features_of(x)
     out = {}
@@ -641,8 +750,13 @@ def scorecard(history, closes, index_closes):
         out[g] = {}
         for n, s in by_n.items():
             out[g][str(n)] = summarize_returns(s["rets"], s["ex"])
+    regime_out = {}
+    for rk, by_g in by_regime.items():
+        regime_out[rk] = {"days": sum(1 for d, _ in history if regimes.get(d) == rk),
+                          "groups": {g: {str(n): summarize_returns(s["rets"], s["ex"]) for n, s in by_n.items()}
+                                     for g, by_n in by_g.items()}}
     recent.sort(key=lambda e: e["date"], reverse=True)
-    return out, recent[:60], feature_stats(recent)
+    return out, recent[:60], feature_stats(recent), regime_out
 
 
 def summarize_returns(rets, ex=None):

@@ -163,7 +163,7 @@ def test_scorecard_returns_and_excess():
     kospi = pd.Series([1000, 1000, 1000, 1000, 1000, 1050, 1050.0], index=days)
     hist = [("d0", {"swing": [{"code": "A", "name": "가", "close": 100.0}], "scalp": [], "value": []}),
             ("d6", {"swing": [{"code": "A", "name": "가", "close": 120.0}], "scalp": [], "value": []})]
-    stats, recent, feats = logic.scorecard(hist, closes, kospi)
+    stats, recent, feats, _ = logic.scorecard(hist, closes, kospi)
     assert stats["swing"]["1"] == {"n": 1, "avg": 10.0, "win": 100, "excess": 10.0}
     assert stats["swing"]["5"]["avg"] == 20.0 and stats["swing"]["5"]["excess"] == 15.0
     assert "20" not in stats["swing"]
@@ -247,3 +247,38 @@ def test_thermometer_includes_credit_parts():
          "credit_balance": {"forced": {"value": 900, "pct_1y": 90}, "loan": {"value": 302710, "pct_1y": 30}}}
     parts = {p["key"]: p["score"] for p in logic.thermometer(t)["parts"]}
     assert parts["forced"] == 10 and parts["loan"] == 30
+
+
+def _kospi(trend, n=80, start=3000.0):
+    return [start * (1 + trend) ** i for i in range(n)]
+
+
+def test_regime_up_down_range():
+    calm = {"thermo": {"score": 60}}
+    assert logic.market_regime(_kospi(0.003), calm)["key"] == "up"
+    assert logic.market_regime(_kospi(-0.002), {"thermo": {"score": 40}})["key"] == "down"
+    flat = [3000 + (10 if i % 2 else -10) for i in range(80)]
+    assert logic.market_regime(flat, calm)["key"] == "range"
+    assert logic.market_regime(_kospi(0.003, n=30), calm) is None
+
+
+def test_regime_panic_blocks_inverse_chase():
+    t = {"thermo": {"score": 20}, "flows": {"KOSPI": {"pos_days20": 5, "days20": 20}},
+         "breadth": {"new_lows": [300], "new_highs": [50]}, "hy_spread": {"pct_1y": 95}}
+    r = logic.market_regime(_kospi(-0.01), t)
+    assert r["key"] == "panic" and r["inverse"]["met"] == 5
+    assert r["inverse"]["verdict"] == "caution" and r["fit"]["swing"]["grade"] == "bad"
+    t["thermo"]["score"] = 35
+    r = logic.market_regime(_kospi(-0.002), t)
+    assert r["key"] == "down" and r["inverse"]["verdict"] == "consider"
+
+
+def test_scorecard_splits_by_regime():
+    days = [f"2026100{i}" for i in range(1, 8)]
+    closes = pd.DataFrame({"A": [100, 101, 102, 103, 104, 105, 106]}, index=days, dtype=float)
+    kospi = pd.Series([1000.0] * 7, index=days)
+    hist = [(days[0], {"swing": [{"code": "A", "name": "a", "close": 100.0}]}),
+            (days[1], {"value": [{"code": "A", "name": "a", "close": 101.0}]})]
+    _, _, _, by = logic.scorecard(hist, closes, kospi, {days[0]: "up", days[1]: "panic"})
+    assert by["up"]["days"] == 1 and by["up"]["groups"]["swing"]["5"]["n"] == 1
+    assert by["panic"]["groups"]["value"]["1"]["avg"] == 1.0

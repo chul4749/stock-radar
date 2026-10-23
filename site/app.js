@@ -30,7 +30,7 @@ async function init() {
     sel.onchange = () => load(sel.value);
     await load(idx.latest);
     fetch("data/scorecard.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null))
-      .then((sc) => { state.score = sc; renderScore(); }).catch(() => renderScore());
+      .then((sc) => { state.score = sc; renderScore(); renderRegime(); }).catch(() => renderScore());
   } catch (e) {
     $("#cards").innerHTML = `<div class="empty">${esc(e.message || "데이터가 아직 없습니다")}</div>`;
   }
@@ -56,6 +56,7 @@ function render() {
   $("#meta").textContent = `기준일 ${ymd(d.base_date)} · 업데이트 ${gen}` + (d.backfill ? " · 나중에 다시 계산한 기록" : "");
   renderTemp();
   renderSectors();
+  renderRegime();
   renderFilter();
   renderRules();
   const n = d.filter.news_count;
@@ -82,6 +83,8 @@ const INFO = {
   us10y: "미국 10년 만기 국채 금리입니다. 금리가 오르면 성장주·기술주 가치가 낮게 평가되기 쉽고, 위험자산에서 돈이 빠지는 경우가 많습니다.",
   marketflows: "시장 전체에서 외국인·기관이 순매수(산 금액 − 판 금액)한 규모입니다. 단위는 억 원입니다.",
   selling: "60일 중 가장 낮은 가격(신저가)까지 떨어진 종목 수를 최근 5일 평균과 비교합니다. 신저가 종목이 늘면 버티던 종목까지 팔리고 있다는 뜻이고, 줄면 투매가 잦아들고 있다는 뜻입니다.",
+  regime: "코스피가 20일·60일 이동평균 위인지 아래인지(추세)와 시장 온도·변동성·반대매매(패닉 여부)로 지금 장을 상승장·횡보·하락장·패닉 넷 중 하나로 나눕니다. 시나리오별 적합도는 '급락 뒤 변동성이 큰 패닉 구간에선 추세 추종이 가장 크게 깨지고 낙폭 큰 종목이 크게 튄다', '하락 추세에선 추세를 따르는 쪽이 낙폭을 줄인다' 같은 연구 결과를 바탕으로 한 경향입니다.",
+  inverse: "지수가 떨어지면 오르는 ETF입니다. 하루 수익률을 매일 다시 맞추기 때문에, 지수가 오르내리며 제자리여도 손실이 쌓입니다(2배 상품은 더 심함). 그래서 방향이 뚜렷한 짧은 구간에만 맞고, 공포가 극에 달한 뒤 따라 들어가면 급반등에 크게 당하기 쉽습니다.",
   loan: "개인이 증권사에서 돈을 빌려 산 주식 금액(신용거래융자 잔고)입니다. 많이 쌓일수록 주가가 빠질 때 담보 부족으로 강제로 팔리는 물량(반대매매)이 커질 수 있습니다. 금융투자협회 자료라 하루 늦게 나옵니다.",
   forced: "외상으로 산 주식 대금(미수금)을 기한 안에 못 갚아 증권사가 강제로 판 금액입니다. 급락장에서 반대매매가 몰리면 좋은 종목도 같이 떨어집니다. 금융투자협회 자료라 하루 늦게 나옵니다.",
 };
@@ -154,7 +157,7 @@ function applyExpAll() {
 document.addEventListener("click", (e) => {
   const b = e.target.closest("button.info");
   if (!b) return;
-  const box = b.closest(".tile, .thermo, .part, .sum").querySelector(`[data-exp="${b.dataset.info}"]`);
+  const box = b.closest(".tile, .thermo, .part, .sum, .fit > li").querySelector(`[data-exp="${b.dataset.info}"]`);
   if (box) box.hidden = !box.hidden;
 });
 
@@ -423,6 +426,42 @@ function bars(daily) {
   }).join("");
   const labs = daily.map((d) => `<span>${d.date.slice(4, 6)}/${d.date.slice(6)}</span>`).join("");
   return `<div class="bars">${cols}</div><div class="barlab">${labs}</div>`;
+}
+
+/* ---------------- 지금 장세와 시나리오 ---------------- */
+
+const FIT_TXT = { good: ["◎", "잘 맞음"], ok: ["△", "조심해서"], bad: ["✕", "안 맞음"] };
+const INV_PRODUCTS = "예: KODEX 인버스(114800, 코스피200 1배) · KODEX 200선물인버스2X(252670, 2배, 하루~며칠만) · KODEX 코스닥150선물인버스(251340)";
+
+function regimeRecord(key, g) {
+  const r = ((state.score || {}).by_regime || {})[key];
+  const x = r && r.groups[g] && r.groups[g]["5"];
+  if (!x) return "이 장세 기록 아직 없음";
+  return `이 장세 기록: 5일 뒤 코스피 대비 ${signed(x.excess, 1, "%")} · 오른 비율 ${x.win}% (${x.n}건, ${r.days}일)${r.days < 10 ? " — 아직 참고만" : ""}`;
+}
+
+function renderRegime() {
+  const rg = state.data.temperature.regime;
+  const box = $("#regime-body");
+  document.querySelectorAll(".tabs button").forEach((b) => { if (rg) b.dataset.fit = rg.fit[b.dataset.tab].grade; else delete b.dataset.fit; });
+  if (!rg) { box.innerHTML = `<div class="empty">이 날짜는 장세 판정이 생기기 전 기록입니다.</div>`; return; }
+  const tr = rg.trend;
+  const tone = { up: "calm", range: "neutral", down: "fear", panic: "fear" }[rg.key];
+  const head = `<div class="sum ${tone}"><div class="row"><span class="t">지금 장세 ${infoBtn("regime")}</span><span class="lv">${esc(rg.label)}</span></div>` +
+    `<p>코스피 ${num(tr.close, 2)} · 20일선 ${num(tr.ma20, 0)} ${tr.ma20_rising ? "↗" : "↘"} · 60일선 ${num(tr.ma60, 0)} · 20일 ${signed(tr.chg20, 1, "%")}</p>` +
+    (rg.panic.length ? `<p>패닉 판정: ${rg.panic.map(esc).join(", ")}</p>` : "") + `${infoBox("regime")}</div>`;
+  const rows = ["swing", "scalp", "value"].map((g) => {
+    const f = rg.fit[g], [ic, lab] = FIT_TXT[f.grade];
+    return `<li class="fit-${f.grade}"><div class="row"><b>${ic} ${TAB_NAME[g]}</b><span>${lab}</span></div><p>${esc(f.why)}</p><small>${regimeRecord(rg.key, g)}</small></li>`;
+  }).join("");
+  const iv = rg.inverse, fi = rg.fit.inverse;
+  const ivTone = { consider: "fit-good", caution: "fit-bad", watch: "fit-ok", no: "fit-bad" }[iv.verdict];
+  const inv = `<li class="${ivTone} inv"><div class="row"><b>${FIT_TXT[fi.grade][0]} 인버스 ${infoBtn("inverse")}</b><span>${esc(iv.label)}</span></div>` +
+    `<p>${esc(iv.text)}</p><ul class="chk">${iv.checks.map((c) => `<li class="${c.ok ? "ok" : "no"}">${c.ok ? "✓" : "✗"} ${esc(c.label)}</li>`).join("")}</ul>` +
+    `<small>하락 신호 ${iv.met}/5${iv.blockers.length ? ` · 추격 주의: ${iv.blockers.map(esc).join(", ")}` : ""}</small>` +
+    `<p class="prod">${INV_PRODUCTS}. 2배 상품은 출렁이는 장에서 지수가 제자리여도 손실이 쌓입니다.</p>${infoBox("inverse")}</li>`;
+  box.innerHTML = head + `<ul class="fit">${rows}${inv}</ul>` +
+    `<p class="hint">연구 결과를 바탕으로 한 경향이고 매수·매도 추천이 아닙니다. '이 장세 기록'이 쌓이면 실제로 맞는지 확인할 수 있습니다.</p>`;
 }
 
 /* ---------------- 관심 종목 (☆ 눌러 저장, 이 브라우저에만) ---------------- */
