@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
-from . import logic, sources
+from . import logic, reindex, sources
 from .util import KST, log
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -234,9 +234,7 @@ def main(argv):
     path = os.path.join(DATA, f"{base}.json")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"), default=_json_default)
-    dates = sorted(n[:8] for n in os.listdir(DATA) if n[:8].isdigit() and n.endswith(".json"))
-    with open(os.path.join(DATA, "index.json"), "w", encoding="utf-8") as f:
-        json.dump({"dates": dates[::-1], "latest": dates[-1]}, f, ensure_ascii=False)
+    dates = reindex.write_index()
     log(f"\n저장 {path} ({os.path.getsize(path) // 1024}KB), 오류 {errors or '없음'}")
 
     t = step("성적표")

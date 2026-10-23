@@ -22,7 +22,7 @@
 
 - 사무실 PC에서는 증권 사이트가 대부분 막혀 있어 **수집은 GitHub Actions에서만** 한다.
 - `.github/workflows/collect.yml`: 평일 18:23 KST에 실행(20:47 예비 실행은 그날 데이터가 있으면 건너뜀) → 테스트 → 수집 → `data: YYYY-MM-DD` 커밋 → (설정 시) Pages 배포.
-  저장은 최신 main 위에 `site/data`를 통째로 얹는 방식이라 대기열에서 늦게 시작해도 충돌하지 않는다.
+  시작할 때 최신 main을 받고, 저장할 때도 최신 main 위에 새로 만든 파일만 덮어쓴다(다른 실행이 올린 날짜 파일을 지우지 않음).
 - `.github/workflows/pages.yml`: `site/` 코드(데이터 제외)가 main에 올라오면 수집 없이 바로 배포.
   수동 실행 때 `dates`에 과거 기준일을 넣으면 다시 계산한다(성적표 채우기용).
 - KRX는 로그인 필요: Secrets `KRX_ID`/`KRX_PW`.

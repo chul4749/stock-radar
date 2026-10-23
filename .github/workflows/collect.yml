@@ -28,7 +28,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 350
     steps:
+      # 대기열에서 기다린 실행도 예약 시점 커밋이 아니라 시작 시점의 최신 브랜치(코드·데이터)로 돈다
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -39,12 +42,13 @@ jobs:
         run: |
           git config user.name "stock-radar-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # 대기열에서 기다린 실행은 예전 커밋으로 시작하므로, 최신 브랜치 위에 방금 만든 데이터를 통째로 얹는다
+          # 저장할 때는 최신 main 위에 방금 만든 파일만 덮어쓴다 (그사이 다른 실행이 올린 날짜 파일을 지우지 않도록)
           save() {
-            mv site/data "$RUNNER_TEMP/data"
+            rm -rf "$RUNNER_TEMP/data" && cp -r site/data "$RUNNER_TEMP/data"
             git fetch -q origin "$GITHUB_REF_NAME"
             git checkout -q -f -B "$GITHUB_REF_NAME" "origin/$GITHUB_REF_NAME"
-            rm -rf site/data && mv "$RUNNER_TEMP/data" site/data
+            cp -r "$RUNNER_TEMP/data/." site/data/
+            python -m collector.reindex
             git add -A site/data
             git diff --cached --quiet || git commit -q -m "data: $1"
             git push -q origin "$GITHUB_REF_NAME"
