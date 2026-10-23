@@ -780,7 +780,8 @@ function companyBlock(x) {
   const m = (label, v) => `<div><small>${label}</small><b>${v}</b></div>`;
   const metrics = [
     m("시가총액", eokText(p.cap_eok ?? x.cap_eok)),
-    m("PER", p.per == null ? "–" : `${num(p.per, 1)}배${p.cns_per != null ? ` <small style="display:inline;font-size:11px">추정 ${num(p.cns_per, 1)}</small>` : ""}`),
+    m("PER", (p.per == null ? (p.eps != null && p.eps < 0 ? "적자" : "–") : `${num(p.per, 1)}배`) +
+      (p.cns_per != null ? ` <small style="display:inline;font-size:11px">추정 ${p.cns_per < 0 ? "적자" : num(p.cns_per, 1)}</small>` : "")),
     m("PBR", p.pbr == null ? "–" : `${num(p.pbr, 2)}배`),
     m("배당수익률", p.div_yield == null ? "–" : `${num(p.div_yield, 2)}%`),
     m("52주 범위", p.low52 && p.high52 ? `<span style="font-size:12px">${num(p.low52)}~${num(p.high52)}</span>` : "–"),
