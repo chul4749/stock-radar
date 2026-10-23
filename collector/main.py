@@ -191,6 +191,8 @@ def main(argv):
     log(f"  겹침 {len(overlap)}")
     for group in (scalp[:10], swing[:10], value[:10]):
         logic.enrich(group, closes, sectors, quality)
+    for x in value[:10]:   # 저평가도 상세 화면에서 일별 수급을 보이게
+        x["flow"] = logic.flow_detail(x["code"], flows_daily, flows_5d, pension_5d)
     # 종목 상세(눌렀을 때)용 기업 정보: 화면에 나가는 후보만, 네이버 지금 시점 값
     for x in scalp[:10] + swing[:10] + value[:10]:
         if profile(x["code"]):

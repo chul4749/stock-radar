@@ -466,3 +466,12 @@ def test_regime_transition_distance():
     rg = logic.market_regime(_kospi(-0.002, n=80), {"thermo": {"score": 30}})
     tr = logic.regime_transition(rg)
     assert tr["to"] == "횡보·전환" and tr["items"][0]["ok"] is False and tr["gap20"] > 0
+
+
+def test_flow_detail_counts_streak_and_daily():
+    d = lambda f, i: {"foreign": pd.Series({"A": f}), "inst": pd.Series({"A": i})}
+    daily = [("20261021", d(-1e8, 0)), ("20261022", d(2e8, 1e8)), ("20261023", d(0, 5e8))]
+    five = {"foreign": pd.Series({"A": 1e8}), "inst": pd.Series({"A": 6e8})}
+    fl = logic.flow_detail("A", daily, five, None)
+    assert fl["streak"] == 2 and fl["days_pos"] == 2 and fl["inst_today"] == 5.0
+    assert [x["sum"] for x in fl["daily"]] == [-1.0, 3.0, 5.0] and fl["pension_5d"] == 0.0

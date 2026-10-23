@@ -399,6 +399,29 @@ RULES = {
 }
 
 
+def _money(series, code):
+    v = series.get(code) if series is not None else None
+    return 0.0 if v is None or (isinstance(v, float) and math.isnan(v)) else float(v)
+
+
+def flow_detail(code, flows_daily, flows_5d, pension_5d):
+    """종목 하나의 기관·외국인 수급 요약 (억): 오늘, 5일 합, 순매수한 날 수, 연속일, 일별 합."""
+    day = [_money(fl["foreign"], code) + _money(fl["inst"], code) for _, fl in flows_daily]
+    streak = 0
+    for v in reversed(day):
+        if v <= 0:
+            break
+        streak += 1
+    last = flows_daily[-1][1] if flows_daily else {}
+    return {
+        "foreign_today": r1(_money(last.get("foreign"), code) / EOK), "inst_today": r1(_money(last.get("inst"), code) / EOK),
+        "foreign_5d": r1(_money(flows_5d["foreign"], code) / EOK), "inst_5d": r1(_money(flows_5d["inst"], code) / EOK),
+        "pension_5d": r1(_money(pension_5d, code) / EOK),
+        "days_pos": sum(1 for v in day if v > 0), "streak": streak,
+        "daily": [{"date": d, "sum": r1(v / EOK)} for (d, _), v in zip(flows_daily, day)],
+    }
+
+
 def screen(universe, closes, values, flows_daily, flows_5d, pension_5d, news_today, news_3d, rules=RULES):
     """단타·스윙 후보.
 
@@ -414,10 +437,7 @@ def screen(universe, closes, values, flows_daily, flows_5d, pension_5d, news_tod
     ma60 = closes.rolling(60).mean()
     avg_val20 = values.iloc[-21:-1].mean()
 
-    def money(series, code):
-        v = series.get(code) if series is not None else None
-        return 0.0 if v is None or (isinstance(v, float) and math.isnan(v)) else float(v)
-
+    money = _money
     for code, info in universe.items():
         if code not in closes.columns:
             continue
@@ -428,29 +448,16 @@ def screen(universe, closes, values, flows_daily, flows_5d, pension_5d, news_tod
             continue
 
         close = closes[code].iloc[-1]
+        flow = flow_detail(code, flows_daily, flows_5d, pension_5d)
         f_today = money(flows_daily[-1][1]["foreign"], code) if flows_daily else 0.0
         i_today = money(flows_daily[-1][1]["inst"], code) if flows_daily else 0.0
         f5, i5 = money(flows_5d["foreign"], code), money(flows_5d["inst"], code)
-        p5 = money(pension_5d, code)
-        days_pos = sum(1 for _, fl in flows_daily
-                       if money(fl["foreign"], code) + money(fl["inst"], code) > 0)
-        streak = 0
-        for _, fl in reversed(flows_daily):
-            if money(fl["foreign"], code) + money(fl["inst"], code) > 0:
-                streak += 1
-            else:
-                break
+        days_pos, streak = flow["days_pos"], flow["streak"]
         base = {
             "code": code, "name": info["name"], "market": info["market"],
             "close": close, "change": r1(info["change"]),
             "value_eok": r1(info["value"] / EOK), "cap_eok": round(info["cap"] / EOK),
-            "flow": {
-                "foreign_today": r1(f_today / EOK), "inst_today": r1(i_today / EOK),
-                "foreign_5d": r1(f5 / EOK), "inst_5d": r1(i5 / EOK), "pension_5d": r1(p5 / EOK),
-                "days_pos": days_pos, "streak": streak,
-                "daily": [{"date": d, "sum": r1((money(fl["foreign"], code) + money(fl["inst"], code)) / EOK)}
-                          for d, fl in flows_daily],
-            },
+            "flow": flow,
         }
 
         # 단타: 오늘 기사 + 거래대금 급증 + 상승 + 기관·외국인 순매수
