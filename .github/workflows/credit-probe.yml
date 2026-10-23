@@ -1,7 +1,12 @@
-name: credit-probe
+name: credit-probe  # probe/ 안의 시험 스크립트를 골라 돌린다
 
 on:
   workflow_dispatch:
+    inputs:
+      script:
+        description: "probe/ 안의 시험 스크립트 이름 (확장자 빼고)"
+        required: false
+        default: credit
 
 jobs:
   probe:
@@ -13,4 +18,6 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install requests
-      - run: python probe/credit.py
+      - run: python "probe/${SCRIPT}.py"
+        env:
+          SCRIPT: ${{ inputs.script || 'credit' }}
