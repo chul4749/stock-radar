@@ -87,7 +87,7 @@ const INFO = {
   regime: "코스피가 20일·60일 이동평균 위인지 아래인지(추세)와 시장 온도·변동성·반대매매(패닉 여부)로 지금 장을 상승장·횡보·하락장·패닉 넷 중 하나로 나눕니다. 시나리오별 적합도는 '급락 뒤 변동성이 큰 패닉 구간에선 추세 추종이 가장 크게 깨지고 낙폭 큰 종목이 크게 튄다', '하락 추세에선 추세를 따르는 쪽이 낙폭을 줄인다' 같은 연구 결과를 바탕으로 한 경향입니다.",
   inverse: "지수가 떨어지면 오르는 ETF입니다. 하루 수익률을 매일 다시 맞추기 때문에, 지수가 오르내리며 제자리여도 손실이 쌓입니다(2배 상품은 더 심함). 그래서 방향이 뚜렷한 짧은 구간에만 맞고, 공포가 극에 달한 뒤 따라 들어가면 급반등에 크게 당하기 쉽습니다.",
   score_swing: "강도는 0~100점으로, 지금까지 이 탭에 걸린 후보들(날짜마다 상위 10개)의 계산값 중 몇 % 위치인지입니다. 100점에 가까울수록 역대 후보 중에서도 강한 편이고, 세 탭 모두 같은 눈금이라 비교할 수 있습니다. 계산값은 통과한 종목끼리 순서를 매기는 식입니다. 시가총액에 비해 최근 5일 기관·외국인이 얼마나 많이 샀는지(%)에, 며칠 연속 샀는지를 더 얹었습니다. 덩치에 비해 큰손이 꾸준히 사는 종목이 위로 옵니다. 계산값은 탭마다 공식이 달라 그 자체로는 다른 탭과 비교할 수 없습니다.",
-  score_scalp: "강도는 0~100점으로, 지금까지 이 탭에 걸린 후보들(날짜마다 상위 10개)의 계산값 중 몇 % 위치인지입니다. 100점에 가까울수록 역대 후보 중에서도 강한 편이고, 세 탭 모두 같은 눈금이라 비교할 수 있습니다. 계산값은 통과한 종목끼리 순서를 매기는 식입니다. 오늘 거래대금이 평소(20일 평균)의 몇 배인지에, 그 거래 중 기관·외국인 순매수 비중만큼 더 얹었습니다. 평소보다 돈이 확 몰리고 큰손도 산 종목이 위로 옵니다. 계산값은 탭마다 공식이 달라 그 자체로는 다른 탭과 비교할 수 없습니다.",
+  score_scalp: "강도는 0~100점으로, 지금까지 이 탭에 걸린 후보들의 계산값 중 몇 % 위치인지입니다. 세 탭 모두 같은 눈금이라 비교할 수 있습니다. 계산값은 세 가지를 0~100점으로 맞춰 가중평균합니다: 큰손 확인(오늘 거래대금 중 기관·외국인 순매수 비중 0%→0, 20%→100) 50%, 거래 증가(평소의 3배→0, 8배→100, 15배를 넘으면 오히려 깎여 30배에 0) 25%, 상승폭(5~15%가 100, 3%나 상한가 근처 29%로 갈수록 0) 25%. 거래가 폭발하고 크게 튄 '주목받는 종목'은 이후 성적이 나쁜 경향이 있어(Barber·Odean 2008, 이 사이트 기록에서도 확인), 큰손이 확인해 준 적당한 급등을 위로 올립니다.",
   score_value: "강도는 0~100점으로, 지금까지 이 탭에 걸린 후보들의 계산값 중 몇 % 위치인지입니다. 세 탭 모두 같은 눈금이라 비교할 수 있습니다. 계산값은 네 가지를 0~100점으로 맞춰 가중평균합니다: 낙폭(60일 고점 대비 20%→0점, 50%→100점) 25%, 싸짐(1년 중앙 PBR 대비 할인 20%→0, 70%→100) 15%, PER(15→0, 5→100) 35%, 이익(EPS 1년 전의 0.8배→0, 1.5배→100, 올해 추정 EPS가 있으면 '지금 대비 추정'도 같은 눈금으로 반반 섞음) 25%. 싸면서 이익이 버티는 종목이 위로 오도록 했습니다.",
   futures: "외국인이 코스피200 선물을 산 계약 수에서 판 계약 수를 뺀 값입니다(1계약 ≈ 지수 × 25만 원). 외국인은 선물로 지수 방향에 베팅하거나 현물을 헤지하는 경우가 많아, 며칠씩 한 방향으로 쌓이면 지수가 그쪽으로 움직이는 경향이 있습니다. 한국 장세를 먼저 보여 주는 지표로 많이 봅니다.",
   loan: "개인이 증권사에서 돈을 빌려 산 주식 금액(신용거래융자 잔고)입니다. 많이 쌓일수록 주가가 빠질 때 담보 부족으로 강제로 팔리는 물량(반대매매)이 커질 수 있습니다. 금융투자협회 자료라 하루 늦게 나옵니다.",
@@ -649,6 +649,10 @@ function scoreFormula(x) {
     const ratio = parseFloat((x.checks[1] || {}).value);
     return `시총 대비 5일 순매수 ${num(ratio, 2)}% × (1 + 연속 ${x.flow.streak}일 ÷ 5)`;
   }
+  if (state.tab === "scalp" && x.score_parts) {
+    const p = x.score_parts;
+    return `큰손 확인 ${p.flow} · 거래 증가 ${p.volume} · 상승폭 ${p.move}점의 가중평균 (50·25·25%)`;
+  }
   if (state.tab === "scalp") {
     const extra = x.value_mult ? Math.max(0, (x.score / x.value_mult - 1) * 100) : 0;
     return `거래대금 평소의 ${num(x.value_mult, 1)}배 × (1 + 오늘 순매수/거래대금 ${num(extra, 1)}%)`;
@@ -818,6 +822,91 @@ function lineChart(ch) {
     <div class="barlab"><span style="text-align:left">${ymd(ch.dates[0])}</span><span style="text-align:right">${ymd(ch.dates[n - 1])}</span></div>`;
 }
 
+// 재무 지표 뜻 (상세의 '지표 설명 보기')
+const FIN_INFO = {
+  "시가총액": "주가 × 주식 수. 시장이 매기는 회사 전체 값입니다.",
+  "PER": "주가 ÷ 주당순이익. 지금 이익으로 회사 값을 몇 년이면 버는지입니다. 낮을수록 싸지만, 이익이 줄 회사는 낮아 보여도 비쌀 수 있습니다. 적자면 계산되지 않습니다.",
+  "PBR": "주가 ÷ 주당순자산. 1보다 낮으면 회사가 가진 순자산보다 싸게 거래된다는 뜻입니다.",
+  "배당수익률": "1년 배당금 ÷ 주가. 은행 이자처럼 받는 몫입니다.",
+  "52주 중 위치": "최근 1년 최저가를 0%, 최고가를 100%로 놓았을 때 지금 주가가 어디쯤인지입니다.",
+  "매출액": "물건·서비스를 팔아 들어온 돈 전체입니다. 회사 덩치와 성장을 봅니다.",
+  "영업이익": "매출에서 원가·인건비·판매비를 뺀 본업 이익입니다. 마이너스면 본업에서 적자입니다.",
+  "당기순이익": "영업이익에 이자·투자 손익·세금 등을 모두 반영한 최종 이익입니다. 일회성 손익이 섞일 수 있습니다.",
+  "영업이익률": "영업이익 ÷ 매출. 100원 팔아 몇 원 남기는지입니다. 업종마다 보통 수준이 다릅니다.",
+  "ROE": "순이익 ÷ 자기자본. 주주 돈으로 1년에 몇 % 벌었는지입니다. 10% 넘으면 좋은 편으로 봅니다.",
+  "부채비율": "부채 ÷ 자기자본. 100%면 빚과 자기 돈이 같다는 뜻입니다. 200% 넘으면 높은 편으로 봅니다(금융·건설 등은 원래 높음).",
+};
+
+// 연간 실적 흐름을 문장으로: 실제 값의 방향 + 올해 추정
+function finTrend(title, years, vals) {
+  const act = years.map((y, i) => [y, vals[i]]).filter(([y, v]) => !y.est && v != null);
+  const est = years.map((y, i) => [y, vals[i]]).find(([y, v]) => y.est && v != null);
+  if (act.length < 2) return "";
+  const yr = (y) => y.label.slice(0, 4);
+  const [y0, v0] = act[0], [y1, v1] = act[act.length - 1];
+  const prevV = act[act.length - 2][1];
+  const pct = /률|ROE|비율/.test(title);
+  // 전체 방향과 지난해 방향이 다르면 덧붙인다 (예: 2년 새 늘었지만 지난해엔 줄어듦)
+  const lastTurn = () => (act.length > 2 && prevV > 0 && v1 > 0 && Math.sign(v1 - v0) !== Math.sign(v1 - prevV)
+    ? `, 다만 ${yr(y1)}년엔 ${Math.abs(Math.round((v1 / prevV - 1) * 100))}% ${v1 >= prevV ? "늘어남" : "줄어듦"}` : "");
+  const f = (v) => (pct ? `${num(v, 1)}%` : eokText(v));
+  let line;
+  if (title === "영업이익" || title === "당기순이익") {
+    const neg = act.filter(([, v]) => v < 0).length;
+    const prev = act[act.length - 2][1];
+    if (neg === act.length) line = `${act.length}년 연속 적자 (${f(v1)})`;
+    else if (v1 < 0 && prev >= 0) line = `${yr(y1)}년 적자 전환 (${f(prev)} → ${f(v1)})`;
+    else if (v1 >= 0 && prev < 0) line = `${yr(y1)}년 흑자 전환 (${f(prev)} → ${f(v1)})`;
+    else if (v1 < 0) line = `적자 지속 (${f(v1)})`;
+    else line = `흑자 유지, ${yr(y0)}년 대비 ${v1 >= v0 ? "늘어남" : "줄어듦"} (${f(v0)} → ${f(v1)})${lastTurn()}`;
+    if (est) line += est[1] < 0 ? (v1 < 0 ? `. 올해도 적자 전망 (${f(est[1])})` : `. 올해 적자 전환 전망 (${f(est[1])})`)
+      : v1 < 0 ? `. 올해 흑자 전환 전망 (${f(est[1])})` : `. 올해 ${est[1] >= v1 ? "늘어날" : "줄어들"} 전망 (${f(est[1])})`;
+    return line;
+  }
+  if (pct) {
+    const lvl = title === "부채비율" ? (v1 < 100 ? "낮은 편(안정)" : v1 <= 200 ? "보통" : "높은 편(주의)")
+      : title === "ROE" ? (v1 < 0 ? "적자" : v1 < 5 ? "낮은 편" : v1 < 10 ? "보통" : v1 < 20 ? "좋은 편" : "매우 높음")
+      : v1 < 0 ? "적자" : v1 < 5 ? "낮은 편" : v1 < 15 ? "보통" : "높은 편";
+    const dir = Math.abs(v1 - v0) < 1 ? "비슷" : v1 > v0 ? "오름" : "내림";
+    line = `${lvl} (${f(v1)}), ${yr(y0)}년 ${f(v0)}에서 ${dir}`;
+    if (est && title !== "부채비율") line += `. 올해 추정 ${f(est[1])}`;
+    return line;
+  }
+  const ch = v0 ? Math.round((v1 / v0 - 1) * 100) : null;
+  let streak = 1;
+  for (let i = act.length - 1; i > 0 && Math.sign(act[i][1] - act[i - 1][1]) === Math.sign(v1 - act[act.length - 2][1]); i--) streak++;
+  line = `${act.length - 1}년 새 ${ch == null ? "" : `${Math.abs(ch)}% `}${v1 >= v0 ? "늘어남" : "줄어듦"} (${f(v0)} → ${f(v1)})` +
+    (streak >= 3 ? `, ${streak - 1}년 연속 ${v1 >= act[act.length - 2][1] ? "증가" : "감소"}` : lastTurn());
+  if (est) line += `. 올해 추정 ${f(est[1])}로 ${est[1] >= v1 ? (v1 >= prevV ? "더 늘어날" : "다시 늘어날") : (v1 < prevV ? "더 줄어들" : "줄어들")} 전망`;
+  return line;
+}
+
+// 실적 한 줄 요약: 매출 방향 + 영업이익 상태
+function finVerdict(a) {
+  const row = (t) => (a.rows.find((r) => r.title === t) || {}).values;
+  const lastAct = (vals) => { const v = vals ? a.years.map((y, i) => (!y.est ? vals[i] : null)).filter((x) => x != null) : []; return v; };
+  const rev = lastAct(row("매출액")), op = lastAct(row("영업이익"));
+  if (rev.length < 2 || op.length < 2) return "";
+  const opRow = row("영업이익"), ei = a.years.findIndex((y) => y.est);
+  const opEst = ei >= 0 && opRow ? opRow[ei] : null;
+  const [tone, text] = finVerdictBase(rev, op);
+  // 올해 추정 영업이익이 지난해와 반대 방향이면 덧붙인다
+  if (opEst == null) return [tone, text];
+  if (tone === "bad" && opEst > op.at(-1)) return ["mid", `${text} (다만 올해는 영업이익 회복 전망)`];
+  if (tone === "good" && opEst < op.at(-1)) return ["mid", `${text} (다만 올해는 영업이익 감소 전망)`];
+  return [tone, text];
+}
+
+function finVerdictBase(rev, op) {
+  const revUp = rev.at(-1) >= rev.at(-2), opNow = op.at(-1), opPrev = op.at(-2);
+  if (opNow < 0 && !revUp) return ["bad", "매출이 줄고 본업이 적자인 상태 — 실적이 나빠지는 중"];
+  if (opNow < 0) return ["mid", "매출은 늘었지만 본업은 아직 적자"];
+  if (opPrev < 0) return ["good", "본업이 흑자로 돌아섬 — 실적 회복 중"];
+  if (revUp && opNow >= opPrev) return ["good", "매출과 영업이익이 함께 늘고 있음 — 실적 좋아지는 중"];
+  if (!revUp && opNow < opPrev) return ["bad", "매출과 영업이익이 함께 줄고 있음 — 실적 둔화"];
+  return ["mid", "매출과 이익 방향이 엇갈림"];
+}
+
 // 종목 상세의 기업 정보 (네이버 증권, 수집 시점 값)
 function companyBlock(x) {
   const p = x.profile;
@@ -837,9 +926,14 @@ function companyBlock(x) {
   const fmt = (t, v) => (v == null ? "–" : /률|ROE|비율/.test(t) ? `${num(v, 1)}%` : eokText(v));
   const table = a ? `<table class="score fin"><thead><tr><th></th>${a.years.map((y) => `<th class="${y.est ? "est" : ""}">${esc(y.label.replace(" (추정)", ""))}${y.est ? "<br><small>추정</small>" : ""}</th>`).join("")}</tr></thead>` +
     `<tbody>${a.rows.map((r) => `<tr><th>${esc(r.title)}</th>${r.values.map((v, i) => `<td class="${a.years[i].est ? "est" : ""}">${fmt(r.title, v)}</td>`).join("")}</tr>`).join("")}</tbody></table>` : "";
-  return `<div class="company"><h3>기업 정보 <small>네이버 증권 · ${esc((p.as_of || "").slice(5))} 수집</small></h3>` +
+  const vd = a ? finVerdict(a) : "";
+  const trends = a ? a.rows.map((r) => [r.title, finTrend(r.title, a.years, r.values)]).filter(([, t]) => t) : [];
+  const flow = trends.length ? `<div class="finflow">${vd ? `<p class="verdict v-${vd[0]}">${esc(vd[1])}</p>` : ""}` +
+    `<ul>${trends.map(([t, l]) => `<li><b>${esc(t)}</b> ${esc(l)}</li>`).join("")}</ul></div>` : "";
+  const help = `<details class="rules"><summary>지표 설명 보기</summary><ul class="finhelp">${Object.entries(FIN_INFO).map(([k, v]) => `<li><b>${k}</b> ${esc(v)}</li>`).join("")}</ul></details>`;
+  return `<div class="company"><h3>기업 정보 <small>네이버 증권 · ${esc((p.as_of || "").slice(5))} 수집 (시총·PER 등은 수집 시점 값)</small></h3>` +
     (p.summary ? `<p class="summary">${esc(p.summary)}</p>` : "") +
-    `<div class="nums">${metrics}</div>${table}</div>`;
+    `<div class="nums">${metrics}</div>${table}${flow}${help}</div>`;
 }
 
 function openDetail(code) {
@@ -850,7 +944,7 @@ function openDetail(code) {
   const q = x.quality || {};
   const fl = x.flow;
   $("#detail-body").innerHTML = `${cardHead(x)}
-    <p class="hint">${groups.join(" · ")} 후보${x.sector ? " · " + esc(x.sector) : ""} · 시가총액 ${num(x.cap_eok)}억 · 거래대금 ${num(x.value_eok)}억</p>
+    <p class="hint">${groups.join(" · ")} 후보${x.sector ? " · " + esc(x.sector) : ""} · 기준일 시총 ${eokText(x.cap_eok)} · 거래대금 ${num(x.value_eok)}억</p>
     ${companyBlock(x)}
     ${x.chart ? lineChart(x.chart) : ""}
     <div class="nums">

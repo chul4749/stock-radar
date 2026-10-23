@@ -385,3 +385,11 @@ def test_futures_isin_candidates():
     from collector import sources
     assert sources._isin_check("KR700593000") == "3"
     assert sources._isin_check("KR4A017C000") == "3"
+
+
+def test_scalp_score_prefers_confirmed_over_overheated():
+    hot, _ = logic.scalp_score(28, 29.5, 0.02)      # 거래 폭발 + 상한가 근처 + 큰손 거의 없음
+    solid, parts = logic.scalp_score(6, 9, 0.25)    # 적당한 급등 + 큰손 순매수 비중 25%
+    assert solid > hot and parts["flow"] == 100 and parts["move"] == 100
+    x = {"value_mult": 6, "change": 9, "value_eok": 100, "flow": {"foreign_today": 15, "inst_today": 10}}
+    assert logic.rescore("scalp", x) == solid

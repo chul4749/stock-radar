@@ -257,9 +257,9 @@ def main(argv):
             "value_rules": logic.VALUE_RULES,
             "value": value[:10], "value_total": len(value),
             "overlap": overlap,
-            # 강도(역대 후보 중 위치) 계산용: 통과한 후보 전체의 점수. score_ver 2 = 저평가 새 공식
+            # 강도(역대 후보 중 위치) 계산용: 통과한 후보 전체의 점수. score_ver 2 = 저평가 새 공식, 3 = 단타 새 공식
             "all_scores": {g: [x["score"] for x in items] for g, items in (("scalp", scalp), ("swing", swing), ("value", value))},
-            "score_ver": 2,
+            "score_ver": 3,
             "excluded": excluded,
         },
         "sectors": sector_flow,
@@ -323,9 +323,9 @@ def past_scores(base):
             flt = json.load(f).get("filter", {})
         for g in ("scalp", "swing", "value"):
             full = (flt.get("all_scores") or {}).get(g)
-            if full is not None and (g != "value" or flt.get("score_ver", 1) >= 2):
+            if full is not None and flt.get("score_ver", 1) >= {"value": 2, "scalp": 3}.get(g, 1):
                 out.setdefault(g, []).extend(full)
-            else:  # 예전 파일: 상위 10개만, 저평가는 지금 공식으로 다시 계산
+            else:  # 예전 파일: 상위 10개만, 저평가·단타는 지금 공식으로 다시 계산
                 out.setdefault(g, []).extend(v for v in (logic.rescore(g, x) for x in flt.get(g) or []) if v is not None)
     return out
 

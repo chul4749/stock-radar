@@ -413,8 +413,8 @@ def screen(universe, closes, values, flows_daily, flows_5d, pension_5d, news_tod
                  "value": f"{(f_today + i_today) / EOK:+,.0f}억"},
             ]
             if all(c["ok"] for c in checks):
-                score = mult * (1 + max(0, f_today + i_today) / info["value"])
-                scalp.append({**base, "checks": checks, "score": round(score, 2),
+                score, parts = scalp_score(mult, info["change"], max(0, f_today + i_today) / info["value"])
+                scalp.append({**base, "checks": checks, "score": score, "score_parts": parts,
                               "value_mult": r1(mult), "news": news_today[code][:4]})
 
         # 스윙: 3일 내 기사 + 며칠째 기관·외국인 순매수 + 정배열 + 과열 아님
@@ -479,10 +479,36 @@ def value_score(drop, pbr_ratio, per, eps_ratio, fwd_ratio=None):
     return round(score, 1), {k: round(v * 100) for k, v in parts.items()}
 
 
+# 단타 점수: 거래량이 폭발하고 크게 튄 '주목받는 종목'은 이후 성적이 나쁜 경향(개인의 주목 매수, Barber·Odean 2008)이
+# 실제 기록에서도 보여(거래가 가장 몰린 쪽이 더 나빴음), 큰손 확인을 중심에 두고 과열은 깎는다
+SCALP_WEIGHTS = {"flow": 0.5, "volume": 0.25, "move": 0.25}
+
+
+def scalp_score(mult, change, net_ratio):
+    """mult = 거래대금/20일 평균, change = 등락률(%), net_ratio = 기관+외국인 순매수 / 거래대금 → (0~100, 항목별 0~100)."""
+    clip = lambda v: max(0.0, min(1.0, v))
+    vol = clip(math.log(max(mult, 1e-9) / 3) / math.log(8 / 3))   # 3배 → 0, 8배 이상 → 100
+    if mult > 15:
+        vol *= clip(1 - (mult - 15) / 15)                          # 15배 넘으면 깎여 30배에 0
+    if change < 5:
+        move = clip((change - 3) / 2)                              # 3% → 0, 5% → 100
+    elif change <= 15:
+        move = 1.0
+    else:
+        move = clip((29 - change) / 14)                            # 15% → 100, 상한가 근처 29% → 0
+    parts = {"flow": clip(net_ratio / 0.2), "volume": vol, "move": move}  # 순매수 비중 0% → 0, 20% 이상 → 100
+    score = sum(SCALP_WEIGHTS[k] * v for k, v in parts.items()) * 100
+    return round(score, 1), {k: round(v * 100) for k, v in parts.items()}
+
+
 def rescore(group, x):
-    """기록 파일의 후보 점수. 저평가는 저장된 항목으로 지금 공식에 맞춰 다시 계산한다."""
+    """기록 파일의 후보 점수. 저평가·단타는 저장된 항목으로 지금 공식에 맞춰 다시 계산한다."""
     if group == "value" and all(x.get(k) is not None for k in ("drop_60d", "pbr", "pbr_med", "per", "eps_ratio")) and x["pbr_med"]:
         return value_score(x["drop_60d"], x["pbr"] / x["pbr_med"], x["per"], x["eps_ratio"], x.get("eps_fwd_ratio"))[0]
+    fl = x.get("flow") or {}
+    if group == "scalp" and x.get("value_mult") and x.get("value_eok") and x.get("change") is not None:
+        net = (fl.get("foreign_today") or 0) + (fl.get("inst_today") or 0)
+        return scalp_score(x["value_mult"], x["change"], max(0, net) / x["value_eok"])[0]
     return x.get("score")
 
 
