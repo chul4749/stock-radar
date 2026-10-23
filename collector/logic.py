@@ -116,7 +116,8 @@ def credit_summary(loans, funds):
     if funds:
         last = funds[-1]
         forced = [(iso(r["TMPV1"]), eok(r["TMPV6"])) for r in funds]
-        recent = [v for _, v in forced[-20:]]
+        # 오늘 급증을 평균과 비교하므로 평균에는 오늘을 넣지 않는다 (앞 20일)
+        recent = [v for _, v in forced[-21:-1]] or [forced[-1][1]]
         out["forced"] = {**series_stat(forced), "unpaid": r1(eok(last.get("TMPV5"))),
                          "ratio": last.get("TMPV7"), "avg20": r1(sum(recent) / len(recent))}
     return out or None
@@ -514,7 +515,7 @@ def scalp_score(mult, change, net_ratio):
     if mult > 15:
         vol *= clip(1 - (mult - 15) / 15)                          # 15배 넘으면 깎여 30배에 0
     if change < 5:
-        move = clip((change - 3) / 2)                              # 3% → 0, 5% → 100
+        move = clip((change - 2) / 3)                              # 필터 하한 2% → 0, 5% → 100
     elif change <= 15:
         move = 1.0
     else:
@@ -1001,6 +1002,8 @@ def scorecard(history, closes, index_closes, regimes=None, opens=None, bench=Non
                         k0, k1 = index_closes.get(days[i0]), index_closes.get(days[i0 + n])
                     ex = ret - ((k1 / k0 - 1) * 100) if k0 and k1 else None
                     entry[f"r{n}"] = r1(ret)
+                    if ex is not None:
+                        entry[f"x{n}"] = r1(ex)
                     key = (g, code, n)
                     if key in last_counted and i0 - last_counted[key] < n:
                         entry.setdefault("dup", []).append(n)
@@ -1064,13 +1067,13 @@ def features_of(x):
 
 
 def feature_stats(entries, horizon=5):
-    """스윙·단타 후보(수급 관점)만 대상으로 조건 있음/없음 비교."""
+    """스윙·단타 후보(수급 관점)만 대상으로 조건 있음/없음 비교. 날마다 시장 움직임이 달라 시장 지수 대비 초과 수익으로 본다."""
     out = []
-    pool = [e for e in entries if e["group"] in ("swing", "scalp") and e.get(f"r{horizon}") is not None
+    pool = [e for e in entries if e["group"] in ("swing", "scalp") and e.get(f"x{horizon}") is not None
             and horizon not in e.get("dup", [])]
     for key, label in FEATURES.items():
-        yes = [e[f"r{horizon}"] for e in pool if e.get("features", {}).get(key)]
-        no = [e[f"r{horizon}"] for e in pool if not e.get("features", {}).get(key)]
+        yes = [e[f"x{horizon}"] for e in pool if e.get("features", {}).get(key)]
+        no = [e[f"x{horizon}"] for e in pool if not e.get("features", {}).get(key)]
         out.append({"key": key, "label": label, "horizon": horizon,
                     "yes": summarize_returns(yes), "no": summarize_returns(no)})
     return out

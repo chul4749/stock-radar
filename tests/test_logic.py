@@ -169,7 +169,7 @@ def test_scorecard_returns_and_excess():
     assert "20" not in stats["swing"]
     assert recent[0]["date"] == "d6" and "r1" not in recent[0]
     streak = next(f for f in feats if f["key"] == "streak3")
-    assert streak["yes"] is None and streak["no"]["n"] == 1 and streak["no"]["avg"] == 20.0
+    assert streak["yes"] is None and streak["no"]["n"] == 1 and streak["no"]["avg"] == 15.0  # 코스피 +5% 대비 초과
 
 
 def test_risk_codes_and_enrich():
@@ -227,7 +227,7 @@ def test_credit_summary_units_and_ratio():
     assert c["loan"]["value"] == 310000.0 and c["loan"]["date"] == "2026-10-10"
     assert c["loan"]["change"] == 5000.0 and c["loan"]["kospi"] == 230000.0
     assert c["forced"]["value"] == 1000.0 and c["forced"]["unpaid"] == 10000.0
-    assert c["forced"]["ratio"] == 1.0 and c["forced"]["avg20"] == 550.0
+    assert c["forced"]["ratio"] == 1.0 and c["forced"]["avg20"] == 500.0  # 오늘(1000억) 뺀 앞 9일 평균
     assert logic.credit_summary(None, None) is None
 
 

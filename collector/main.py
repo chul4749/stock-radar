@@ -101,7 +101,7 @@ def main(argv):
     nv = [] if backfill else (safe("네이버 주요뉴스", sources.naver_main_news, errors) or [])
     log(f"  네이버 주요뉴스 {len(nv)}{' (과거 기준일이라 생략)' if backfill else ''}")
     dart = safe("DART", lambda: sources.dart_today(base), errors) or []
-    log(f"  DART {len(dart)} (호재성 {sum(1 for x in dart if x['good'])})")
+    log(f"  DART {len(dart)} (재료성 {sum(1 for x in dart if x['good'])})")
     all_items = news + nv + dart
     # 악재성 공시는 최근 5영업일을 본다 (기준일은 위에서 받음)
     dart_bad = [x for x in dart if x["bad"]]
