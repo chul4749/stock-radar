@@ -30,7 +30,7 @@ async function init() {
     sel.onchange = () => load(sel.value);
     await load(idx.latest);
     fetch("data/scorecard.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null))
-      .then((sc) => { state.score = sc; renderScore(); renderRegime(); }).catch(() => renderScore());
+      .then((sc) => { state.score = sc; renderScore(); renderRegime(); renderTurn(); }).catch(() => renderScore());
   } catch (e) {
     $("#cards").innerHTML = `<div class="empty">${esc(e.message || "데이터가 아직 없습니다")}</div>`;
   }
@@ -59,6 +59,7 @@ function render() {
   renderRegime();
   renderFilter();
   renderToday();
+  renderTurn();
   renderRules();
   const n = d.filter.news_count;
   $("#sources").textContent = `데이터: KRX(시세·수급), 구글 뉴스 ${n.google}건 · 네이버 ${n.naver}건 · DART 공시 ${n.dart}건, CBOE(VIX), FRED(하이일드), CNN(공포·탐욕). 네이버·CNN은 비공식 경로라 바뀌면 빠질 수 있습니다.`;
@@ -90,6 +91,8 @@ const INFO = {
   score_scalp: "강도는 0~100점으로, 지금까지 이 탭에 걸린 후보들의 계산값 중 몇 % 위치인지입니다. 세 탭 모두 같은 눈금이라 비교할 수 있습니다. 계산값은 세 가지를 0~100점으로 맞춰 가중평균합니다: 큰손 확인(오늘 거래대금 중 기관·외국인 순매수 비중 0%→0, 20%→100) 50%, 거래 증가(평소의 3배→0, 8배→100, 15배를 넘으면 오히려 깎여 30배에 0) 25%, 상승폭(5~15%가 100, 필터 하한 2%나 상한가 근처 29%로 갈수록 0) 25%. 거래가 폭발하고 크게 튄 '주목받는 종목'은 이후 성적이 나쁜 경향이 있어(Barber·Odean 2008, 이 사이트 기록에서도 확인), 큰손이 확인해 준 적당한 급등을 위로 올립니다.",
   score_value: "강도는 0~100점으로, 지금까지 이 탭에 걸린 후보들의 계산값 중 몇 % 위치인지입니다. 세 탭 모두 같은 눈금이라 비교할 수 있습니다. 계산값은 네 가지를 0~100점으로 맞춰 가중평균합니다: 낙폭(60일 고점 대비 20%→0점, 50%→100점) 25%, 싸짐(1년 중앙 PBR 대비 할인 20%→0, 70%→100) 15%, PER(15→0, 5→100) 35%, 이익(EPS 1년 전의 0.8배→0, 1.5배→100, 올해 추정 EPS가 있으면 '지금 대비 추정'도 같은 눈금으로 반반 섞음) 25%. 싸면서 이익이 버티는 종목이 위로 오도록 했습니다.",
   futures: "외국인이 코스피200 선물을 산 금액에서 판 금액을 뺀 값입니다. 금액은 계약 수 × 그날 선물 가격 × 25만 원으로 계산했고, 계약 수는 작게 같이 적었습니다. 외국인은 선물로 지수 방향에 베팅하거나 현물을 헤지하는 경우가 많아, 며칠씩 한 방향으로 쌓이면 지수가 그쪽으로 움직이는 경향이 있습니다. 한국 장세를 먼저 보여 주는 지표로 많이 봅니다.",
+  signals: "급락 뒤 '사도 되는 시점'을 세 단계로 확인합니다. 1단계 투매 진정(신저가·반대매매가 줄고 변동성이 꺾임) → 2단계 수급 전환(외국인 선물·현물 큰손이 다시 사고 시장 온도가 오름) → 3단계 추세 확인(코스피가 20일선을 되찾고 20일선이 오름). 앞 단계를 통과해야 다음 단계로 올라갑니다. 바닥은 아무도 못 맞히므로 단계마다 나눠서 들어가는 방식(1/3 → 2/3 → 상승장 루틴)을 가이드로 붙였습니다.",
+  transition: "지금 장세에서 다음 장세로 바뀌려면 코스피와 20일·60일 이동평균이 어떻게 돼야 하는지와, 지금 얼마나 남았는지입니다. 20일선까지 2% 안쪽이거나 20일선 기울기가 거의 평평해지면 '전환 임박'으로 표시합니다.",
   loan: "개인이 증권사에서 돈을 빌려 산 주식 금액(신용거래융자 잔고)입니다. 많이 쌓일수록 주가가 빠질 때 담보 부족으로 강제로 팔리는 물량(반대매매)이 커질 수 있습니다. 금융투자협회 자료라 하루 늦게 나옵니다.",
   forced: "외상으로 산 주식 대금(미수금)을 기한 안에 못 갚아 증권사가 강제로 판 금액입니다. 급락장에서 반대매매가 몰리면 좋은 종목도 같이 떨어집니다. 금융투자협회 자료라 하루 늦게 나옵니다.",
 };
@@ -496,6 +499,9 @@ function renderToday() {
     rows.push(["맞는 시나리오", good.length ? `<b class="good">${good.join("·")}</b>` : "<span class=\"na\">없음</span>"]);
     if (bad.length) rows.push(["피할 시나리오", `<b class="bad">${bad.join("·")}</b>`]);
     rows.push(["인버스", esc(rg.inverse.label)]);
+    const sg = d.temperature.signals, tn = d.temperature.transition;
+    if (sg) rows.push(["사도 되는 신호", `<b style="color:${SIG_COLOR[sg.level]}">${sg.level}단계</b> <small>${esc(sg.guide)}</small>`]);
+    if (tn) rows.push(["장의 전환", `20일선까지 ${tn.gap20 > 0 ? `${num(tn.gap20, 1)}% 남음` : "회복"}${tn.near ? ` <span class="tag new">전환 임박</span>` : ""}`]);
   }
   const tops = ["swing", "scalp", "value"].filter((g) => (f[g] || []).length).map((g) => {
     const x = f[g][0];
@@ -509,6 +515,35 @@ function renderToday() {
   if (Object.keys(state.watch).length) rows.push(["관심 종목", hits.length ? `<b>${hits.map((c) => esc(state.watch[c])).join(", ")}</b> 오늘 걸림` : `<span class="na">오늘 걸린 종목 없음</span>`]);
   $("#today-body").innerHTML = rows.length ? `<div class="today">${rows.map(([k, v]) => `<div class="tr"><span class="k">${k}</span><span class="v">${v}</span></div>`).join("")}</div>` +
     `<p class="hint">아래 칸들의 결론만 모은 것입니다. 매수·매도 추천이 아닙니다.</p>` : "";
+}
+
+/* ---------------- 장의 전환 · 사도 되는 신호 ---------------- */
+
+const SIG_COLOR = ["var(--faint)", "var(--g1)", "var(--g3)", "var(--g4)"];
+
+function renderTurn() {
+  const t = state.data.temperature, sig = t.signals, tr = t.transition, box = $("#turn-body");
+  if (!sig || !tr) { box.innerHTML = `<div class="empty">이 날짜는 전환 신호가 생기기 전 기록입니다.</div>`; return; }
+  // 신호등: 1·2·3단계, 통과한 단계까지 불이 켜짐
+  const lights = sig.stages.map((st, i) => `<div class="lamp ${i < sig.level ? "on" : ""}" style="--c:${SIG_COLOR[i + 1]}"><i></i><b>${i + 1}단계</b><small>${esc(st.name)}</small></div>`).join("");
+  // 최근 날짜별 단계 띠
+  const lv = (state.score || {}).signal_levels || {};
+  const ds = Object.keys(lv).sort().filter((d) => d <= state.data.base_date).slice(-20);
+  const strip = ds.length > 1 ? `<div class="rgstrip"><div class="cells">${ds.map((d) => `<i style="background:${SIG_COLOR[lv[d]]}" title="${ymd(d)} ${lv[d]}단계"></i>`).join("")}</div><small>최근 ${ds.length}일 신호 단계 (회색 0 → 초록 3)</small></div>` : "";
+  const stageCards = sig.stages.map((st, i) => `<li class="${st.pass ? "fit-good" : i === sig.level ? "fit-ok" : ""}"><div class="row"><b>${i + 1}단계 · ${esc(st.name)}</b><span>${st.met}/${st.checks.length} ${st.pass ? "통과" : `(${st.need}개 필요)`}</span></div>${checkList(st.checks)}</li>`).join("");
+  const sigBox = `<div class="sum ${sig.level >= 2 ? "calm" : sig.level === 1 ? "neutral" : "fear"}">
+      <div class="row"><span class="t">사도 되는 신호 ${infoBtn("signals")}</span><span class="lv">${sig.level}단계</span></div>
+      <div class="lamps">${lights}</div>
+      <p class="guide">${esc(sig.guide)}</p><p>${esc(sig.next)}</p>${sig.applies ? "" : `<p><small>지금은 이미 상승 추세라 이 신호보다 아래 '장의 전환'(꺾임 경고)을 보세요.</small></p>`}
+      ${strip}${infoBox("signals")}</div>`;
+  // 장의 전환: 다음 장세까지 남은 조건
+  const gap = Math.max(-10, Math.min(10, tr.gap20));
+  const gauge = `<div class="gapbar"><span class="mid"></span><i style="left:${50 - gap * 5}%"></i></div><div class="barlab"><span style="text-align:left">20일선 아래</span><span>20일선</span><span style="text-align:right">위</span></div>`;
+  const turnBox = `<div class="sum neutral turnbox"><div class="row"><span class="t">장의 전환 ${infoBtn("transition")}</span><span class="lv">${esc(tr.from)} → ${esc(tr.to)}</span>${tr.near ? `<span class="tag new">전환 임박</span>` : ""}</div>
+      <p>코스피가 20일선보다 ${tr.gap20 > 0 ? `${num(tr.gap20, 1)}% 아래` : `${num(-tr.gap20, 1)}% 위`}, 60일선보다 ${tr.gap60 > 0 ? `${num(tr.gap60, 1)}% 아래` : `${num(-tr.gap60, 1)}% 위`}</p>
+      ${gauge}${checkList(tr.items)}<p><small>전환 조건 ${tr.met}/${tr.items.length}</small></p>${infoBox("transition")}</div>`;
+  box.innerHTML = sigBox + `<ul class="fit sigstages">${stageCards}</ul>` + turnBox +
+    `<p class="hint">급락 뒤 바닥은 보통 '투매 진정 → 수급 전환 → 추세 확인' 순서로 확인됩니다. 단계마다 나눠서 들어가는 가이드이고, 매수 추천이 아닙니다.</p>`;
 }
 
 /* ---------------- 지금 장세와 시나리오 ---------------- */

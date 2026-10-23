@@ -435,3 +435,34 @@ def test_mark_streaks_counts_consecutive_days():
     assert (a["streak_days"], a["since"]) == (4, "20261020")
     assert (b["streak_days"], b["since"]) == (1, None)   # 어제 빠졌다가 다시 들어오면 새로 시작
     assert today["swing"][0]["streak_days"] == 1
+
+
+def _signal_temp(close_above=False, rising=False):
+    rg = logic.market_regime(_kospi(-0.002, n=80), {"thermo": {"score": 30}})
+    rg["trend"].update({"close": 6500 if close_above else 6000, "ma20": 6400, "ma20_rising": rising,
+                        "ma20_slope": 0.5 if rising else -1.0})
+    return {"regime": rg,
+            "breadth": {"new_lows": [300, 300, 300, 300, 300, 150], "new_highs": [10] * 6},
+            "credit_balance": {"forced": {"value": 100, "avg20": 200}},
+            "korea_vol": {"value": 30, "spark": [40, 45, 50, 48, 44, 40, 36, 33, 31, 30]},
+            "futures": {"streak": 4, "d5": 3000, "d5_eok": 6000},
+            "flows": {"KOSPI": {"foreign": {"d5": 500}, "inst": {"d5": 200}}},
+            "thermo": {"score": 40, "history": {"week": {"score": 25}}}}
+
+
+def test_entry_signals_levels():
+    t = _signal_temp()
+    sig = logic.entry_signals(t)
+    assert sig["level"] == 2 and sig["stages"][0]["met"] == 3 and "추세 확인" in sig["next"]
+    t = _signal_temp(close_above=True, rising=True)
+    assert logic.entry_signals(t)["level"] == 3
+    t = _signal_temp()
+    t["breadth"]["new_lows"][-1] = 500
+    t["credit_balance"]["forced"]["value"] = 900
+    assert logic.entry_signals(t)["level"] == 0      # 1단계를 못 넘으면 뒤 단계가 맞아도 0
+
+
+def test_regime_transition_distance():
+    rg = logic.market_regime(_kospi(-0.002, n=80), {"thermo": {"score": 30}})
+    tr = logic.regime_transition(rg)
+    assert tr["to"] == "횡보·전환" and tr["items"][0]["ok"] is False and tr["gap20"] > 0

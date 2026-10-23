@@ -322,3 +322,18 @@ table.fin .est { color: var(--faint); }
 .tag.earn-down { background: var(--neutral-bg); color: var(--down); }
 .tag.new { background: var(--fear-bg); color: var(--up); font-weight: 700; margin-top: 6px; }
 .tag.stay { background: var(--neutral-bg); color: var(--sub); margin-top: 6px; }
+.lamps { display: flex; gap: 8px; margin: 8px 0 4px; }
+.lamp { flex: 1; text-align: center; font-size: 12px; color: var(--faint); }
+.lamp i { display: block; width: 22px; height: 22px; margin: 0 auto 3px; border-radius: 50%; background: var(--line); }
+.lamp.on { color: var(--text); }
+.lamp.on i { background: var(--c); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 30%, transparent); }
+.lamp b { display: block; font-size: 12px; }
+.lamp small { font-size: 11px; }
+.sum .guide { font-weight: 700; color: var(--text); font-size: 14px; }
+.sigstages { margin-top: 8px; }
+.turnbox { margin-top: 10px; }
+.turnbox .row { flex-wrap: wrap; }
+.gapbar { position: relative; height: 8px; border-radius: 4px; margin: 10px 0 2px;
+  background: linear-gradient(90deg, var(--down), var(--line) 50%, var(--up)); opacity: .8; }
+.gapbar .mid { position: absolute; left: 50%; top: -3px; width: 2px; height: 14px; background: var(--text); }
+.gapbar i { position: absolute; top: -4px; width: 4px; height: 16px; margin-left: -2px; border-radius: 2px; background: var(--text); box-shadow: 0 0 0 2px var(--card); }

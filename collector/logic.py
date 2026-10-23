@@ -1003,6 +1003,102 @@ def market_regime(kospi, t, dates=None):
     return out
 
 
+# ---------------------------------------------------------------- 장의 전환 · 사도 되는 신호
+
+def regime_transition(rg):
+    """지금 장세에서 다음 장세로 넘어가려면 무엇이 얼마나 남았나 (코스피·이동평균 거리, 20일선 기울기)."""
+    if not rg:
+        return None
+    tr = rg["trend"]
+    close, ma20, ma60, slope = tr["close"], tr["ma20"], tr["ma60"], tr["ma20_slope"]
+    gap20 = (ma20 / close - 1) * 100          # +면 20일선이 위에 있음 (회복까지 남은 %)
+    gap60 = (ma60 / close - 1) * 100
+    key = rg["trend_key"]
+    items = []
+    if key in ("down", "range"):
+        target = "횡보·전환" if key == "down" else "상승장"
+        items = [
+            {"label": "코스피가 20일선 위로", "ok": close > ma20,
+             "value": "회복" if close > ma20 else f"{gap20:.1f}% 남음"},
+            {"label": "20일선이 다시 오름 (5일 전보다 높음)", "ok": slope > 0, "value": f"{slope:+.2f}%"},
+            {"label": "20일선이 60일선 위로", "ok": ma20 > ma60, "value": f"{(ma60 / ma20 - 1) * 100:.1f}% 남음" if ma20 <= ma60 else "회복"},
+        ]
+    else:
+        target = "횡보·전환 (상승 추세 꺾임)"
+        items = [
+            {"label": "코스피가 20일선 아래로", "ok": close < ma20,
+             "value": "이탈" if close < ma20 else f"{-gap20:.1f}% 여유"},
+            {"label": "20일선이 내려가기 시작", "ok": slope < 0, "value": f"{slope:+.2f}%"},
+        ]
+    met = sum(1 for i in items if i["ok"])
+    # 전환 임박: 20일선까지 2% 안쪽이거나, 20일선 기울기가 거의 평평해짐
+    near = (key in ("down", "range") and close <= ma20 and gap20 <= 2) or (key == "up" and close >= ma20 and -gap20 <= 2) \
+        or abs(slope) < 0.3
+    return {"from": rg["label"], "to": target, "items": items, "met": met, "near": near,
+            "gap20": round(gap20, 1), "gap60": round(gap60, 1)}
+
+
+def entry_signals(t):
+    """하락·급락 뒤 '사도 되는 신호'를 3단계로: 투매 진정 → 수급 전환 → 추세 확인. 단계는 앞 단계를 통과해야 올라간다."""
+    rg = t.get("regime")
+    if not rg:
+        return None
+    b = t.get("breadth") or {}
+    lows = b.get("new_lows") or []
+    fo = (t.get("credit_balance") or {}).get("forced") or {}
+    kv = t.get("korea_vol") or {}
+    kv_recent = [v for v in (kv.get("spark") or [])[-10:] if v is not None]
+    fu = t.get("futures") or {}
+    fl = (t.get("flows") or {}).get("KOSPI") or {}
+    th = t.get("thermo") or {}
+    week = (th.get("history") or {}).get("week")
+    tr = rg["trend"]
+
+    def chk(label, ok, value):
+        return {"label": label, "ok": bool(ok), "value": value}
+
+    lows_avg = sum(lows[-6:-1]) / 5 if len(lows) >= 6 else None
+    big5 = ((fl.get("foreign") or {}).get("d5") or 0) + ((fl.get("inst") or {}).get("d5") or 0) if fl else None
+    stages = [
+        {"name": "투매 진정", "need": 2, "guide": "1/3만 나눠서", "checks": [
+            chk("신저가 종목이 최근 5일 평균보다 적음", lows_avg is not None and lows[-1] < lows_avg,
+                f"{lows[-1]} / 평균 {lows_avg:.0f}" if lows_avg is not None else "–"),
+            chk("반대매매가 20일 평균 이하", fo.get("avg20") and fo["value"] <= fo["avg20"],
+                f"{fo['value']:,.0f}억 / 평균 {fo['avg20']:,.0f}억" if fo.get("avg20") else "–"),
+            chk("국내 변동성이 최근 10일 최고보다 10% 이상 내려옴", kv_recent and kv["value"] <= max(kv_recent) * 0.9,
+                f"{kv['value']}% / 최고 {max(kv_recent)}%" if kv_recent else "–"),
+        ]},
+        {"name": "수급 전환", "need": 2, "guide": "2/3까지", "checks": [
+            chk("외국인 선물 3일 이상 연속 순매수 또는 5일 합 순매수",
+                fu and ((fu.get("streak") or 0) >= 3 or (fu.get("d5") or 0) > 0),
+                (f"{fu['streak']:+d}일째 · 5일 {fu.get('d5_eok') if fu.get('d5_eok') is not None else fu.get('d5'):+,}" +
+                 ("억" if fu.get("d5_eok") is not None else "계약")) if fu else "–"),
+            chk("코스피 외국인+기관 현물 5일 순매수", big5 is not None and big5 > 0,
+                f"{big5:+,.0f}억" if big5 is not None else "–"),
+            chk("시장 온도가 1주 전보다 오름", week and th.get("score") is not None and th["score"] > week["score"],
+                f"{th.get('score')}점 / 1주 전 {week['score']}점" if week else "–"),
+        ]},
+        {"name": "추세 확인", "need": 2, "guide": "상승장 루틴으로 (스윙 위주)", "checks": [
+            chk("코스피가 20일선 위", tr["close"] > tr["ma20"], f"{tr['close']:,.0f} / {tr['ma20']:,.0f}"),
+            chk("20일선이 다시 오름", tr["ma20_rising"], f"{tr['ma20_slope']:+.2f}%"),
+        ]},
+    ]
+    level = 0
+    for st in stages:
+        st["met"] = sum(1 for c in st["checks"] if c["ok"])
+        st["pass"] = st["met"] >= st["need"]
+    for st in stages:
+        if not st["pass"]:
+            break
+        level += 1
+    guides = ["기다림 — 투매가 아직 진정되지 않음", "1/3만 나눠서 (투매가 진정되는 중)",
+              "2/3까지 (돈이 다시 들어오기 시작)", "상승장 루틴으로 — 스윙 위주, 저평가는 줄이기"]
+    nxt = stages[level] if level < len(stages) else None
+    return {"level": level, "guide": guides[level], "stages": stages,
+            "next": (f"다음 단계 '{nxt['name']}'까지 {max(0, nxt['need'] - nxt['met'])}개 더" if nxt else "세 단계 모두 통과"),
+            "applies": rg["trend_key"] != "up" or rg["key"] == "panic"}
+
+
 # ---------------------------------------------------------------- 성적표
 
 HORIZONS = (1, 5, 20)

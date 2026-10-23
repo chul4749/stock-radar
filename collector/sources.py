@@ -90,10 +90,19 @@ def net_purchase(fromdate, todate, investor):
 
 
 def market_flows(fromdate, todate):
-    """시장 전체 투자자별 순매수(원). {KOSPI: DataFrame, KOSDAQ: DataFrame}"""
+    """시장 전체 투자자별 순매수(원). {KOSPI: DataFrame, KOSDAQ: DataFrame}
+
+    KRX가 가끔 빈 표를 돌려줘서(2026-10-23 코스피), 비어 있으면 실패로 보고 다시 받는다.
+    """
     from pykrx import stock
-    return {m: retry(lambda: stock.get_market_trading_value_by_date(fromdate, todate, m))
-            for m in ("KOSPI", "KOSDAQ")}
+
+    def fetch(m):
+        df = stock.get_market_trading_value_by_date(fromdate, todate, m)
+        if df is None or len(df) == 0 or "외국인합계" not in df.columns:
+            raise ValueError(f"{m} 투자자별 순매수가 비어 있음")
+        return df
+
+    return {m: retry(lambda: fetch(m), tries=4, wait=5) for m in ("KOSPI", "KOSDAQ")}
 
 
 def fundamentals(ymd):

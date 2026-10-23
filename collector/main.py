@@ -231,6 +231,9 @@ def main(argv):
     flows = safe("시장 수급", lambda: sources.market_flows(used_days[-20], base), errors)
     if flows:
         temp["flows"] = {m: logic.flows_summary(df) for m, df in flows.items()}
+        for m, v in temp["flows"].items():
+            if not v:
+                errors.append(f"시장 수급 {m}: 빈 응답")
     for key, sid in (("usdkrw", "DEXKOUS"), ("us10y", "DGS10")):
         rows = safe(sid, lambda: sources.fred(sid), errors)
         rows = [r for r in rows if r[0] < iso(base)] if rows else rows
@@ -262,6 +265,9 @@ def main(argv):
                 hist[key] = {"date": d, "score": th["score"], "label": th["label"]}
     if temp["thermo"]:
         temp["thermo"]["history"] = hist
+    if temp.get("regime"):
+        temp["transition"] = logic.regime_transition(temp["regime"])
+        temp["signals"] = logic.entry_signals(temp)
 
     out = {
         "version": 1,
@@ -297,7 +303,7 @@ def main(argv):
     kospi = safe("코스피 기간", lambda: sources.index_history("1001", used_days[0], base), errors)
     if kospi is not None:
         kospi.index = [d.strftime("%Y%m%d") for d in kospi.index]
-        history, regimes, backfill_dates = [], {}, []
+        history, regimes, backfill_dates, signal_levels = [], {}, [], {}
         # 장세는 그날 저장된 시장 온도 + 그날까지의 코스피로 다시 판정 (예전 기록에도 같은 규칙 적용)
         long_vals = kospi_long if kospi_long is not None else None
         long_days = [d.strftime("%Y%m%d") for d in long_vals.index] if long_vals is not None else []
@@ -315,6 +321,9 @@ def main(argv):
                 rg = logic.market_regime(upto, rec.get("temperature") or {})
                 if rg:
                     regimes[d] = rg["key"]
+            sig = (rec.get("temperature") or {}).get("signals")
+            if sig:
+                signal_levels[d] = sig["level"]
         # 다음 날 시가에 사서 종목이 속한 시장 지수와 비교 (코스닥 종목은 코스닥 지수)
         bench = {}
         for mk, ticker in (("KOSPI", "1001"), ("KOSDAQ", "2001")):
@@ -327,7 +336,7 @@ def main(argv):
                 "horizons": list(logic.HORIZONS), "stats": stats, "recent": recent, "features": features,
                 "by_regime": by_regime, "regimes": regimes, "score_check": score_check,
                 "method": {"entry": "다음 날 시가", "bench": "종목이 속한 시장 지수", "cost": logic.COST, "dedup": True},
-                "backfill_dates": backfill_dates}
+                "backfill_dates": backfill_dates, "signal_levels": signal_levels}
         with open(os.path.join(DATA, "scorecard.json"), "w", encoding="utf-8") as f:
             json.dump(card, f, ensure_ascii=False, separators=(",", ":"), default=_json_default)
         log(f"  기록 {len(history)}일, 통계 {json.dumps(stats, ensure_ascii=False)}")
