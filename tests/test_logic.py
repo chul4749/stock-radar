@@ -294,3 +294,10 @@ def test_regime_explains_decision_and_chart():
     t["thermo"]["score"] = 20
     r = logic.market_regime(_kospi(-0.002, n=200), t)
     assert r["key"] == "panic" and r["trend_key"] == "down" and "하락장" in r["next"] and "chart" not in r
+
+
+def test_score_percentiles_common_scale():
+    items = [{"score": 1.1}, {"score": 0.2}]
+    logic.score_percentiles(items, [0.1, 0.3, 0.5, 0.9])
+    assert items[0]["score_pct"] == 92 and items[0]["score_pool"] == 6
+    assert items[1]["score_pct"] == 25

@@ -85,9 +85,9 @@ const INFO = {
   selling: "60일 중 가장 낮은 가격(신저가)까지 떨어진 종목 수를 최근 5일 평균과 비교합니다. 신저가 종목이 늘면 버티던 종목까지 팔리고 있다는 뜻이고, 줄면 투매가 잦아들고 있다는 뜻입니다.",
   regime: "코스피가 20일·60일 이동평균 위인지 아래인지(추세)와 시장 온도·변동성·반대매매(패닉 여부)로 지금 장을 상승장·횡보·하락장·패닉 넷 중 하나로 나눕니다. 시나리오별 적합도는 '급락 뒤 변동성이 큰 패닉 구간에선 추세 추종이 가장 크게 깨지고 낙폭 큰 종목이 크게 튄다', '하락 추세에선 추세를 따르는 쪽이 낙폭을 줄인다' 같은 연구 결과를 바탕으로 한 경향입니다.",
   inverse: "지수가 떨어지면 오르는 ETF입니다. 하루 수익률을 매일 다시 맞추기 때문에, 지수가 오르내리며 제자리여도 손실이 쌓입니다(2배 상품은 더 심함). 그래서 방향이 뚜렷한 짧은 구간에만 맞고, 공포가 극에 달한 뒤 따라 들어가면 급반등에 크게 당하기 쉽습니다.",
-  score_swing: "통과한 종목끼리 순서를 매기는 정렬용 점수입니다. 시가총액에 비해 최근 5일 기관·외국인이 얼마나 많이 샀는지(%)에, 며칠 연속 샀는지를 더 얹었습니다. 덩치에 비해 큰손이 꾸준히 사는 종목이 위로 옵니다. 탭마다 공식이 달라 다른 탭 점수와 비교할 수 없습니다.",
-  score_scalp: "통과한 종목끼리 순서를 매기는 정렬용 점수입니다. 오늘 거래대금이 평소(20일 평균)의 몇 배인지에, 그 거래 중 기관·외국인 순매수 비중만큼 더 얹었습니다. 평소보다 돈이 확 몰리고 큰손도 산 종목이 위로 옵니다. 탭마다 공식이 달라 다른 탭 점수와 비교할 수 없습니다.",
-  score_value: "통과한 종목끼리 순서를 매기는 정렬용 점수입니다. 60일 고점에서 많이 빠졌을수록, 그리고 지금 PBR이 1년 중앙값보다 쌀수록 높습니다. 많이 빠졌고 평소보다 싸게 거래되는 종목이 위로 옵니다. 탭마다 공식이 달라 다른 탭 점수와 비교할 수 없습니다.",
+  score_swing: "강도는 0~100점으로, 지금까지 이 탭에 걸린 후보들(날짜마다 상위 10개)의 계산값 중 몇 % 위치인지입니다. 100점에 가까울수록 역대 후보 중에서도 강한 편이고, 세 탭 모두 같은 눈금이라 비교할 수 있습니다. 계산값은 통과한 종목끼리 순서를 매기는 식입니다. 시가총액에 비해 최근 5일 기관·외국인이 얼마나 많이 샀는지(%)에, 며칠 연속 샀는지를 더 얹었습니다. 덩치에 비해 큰손이 꾸준히 사는 종목이 위로 옵니다. 계산값은 탭마다 공식이 달라 그 자체로는 다른 탭과 비교할 수 없습니다.",
+  score_scalp: "강도는 0~100점으로, 지금까지 이 탭에 걸린 후보들(날짜마다 상위 10개)의 계산값 중 몇 % 위치인지입니다. 100점에 가까울수록 역대 후보 중에서도 강한 편이고, 세 탭 모두 같은 눈금이라 비교할 수 있습니다. 계산값은 통과한 종목끼리 순서를 매기는 식입니다. 오늘 거래대금이 평소(20일 평균)의 몇 배인지에, 그 거래 중 기관·외국인 순매수 비중만큼 더 얹었습니다. 평소보다 돈이 확 몰리고 큰손도 산 종목이 위로 옵니다. 계산값은 탭마다 공식이 달라 그 자체로는 다른 탭과 비교할 수 없습니다.",
+  score_value: "강도는 0~100점으로, 지금까지 이 탭에 걸린 후보들(날짜마다 상위 10개)의 계산값 중 몇 % 위치인지입니다. 100점에 가까울수록 역대 후보 중에서도 강한 편이고, 세 탭 모두 같은 눈금이라 비교할 수 있습니다. 계산값은 통과한 종목끼리 순서를 매기는 식입니다. 60일 고점에서 많이 빠졌을수록, 그리고 지금 PBR이 1년 중앙값보다 쌀수록 높습니다. 많이 빠졌고 평소보다 싸게 거래되는 종목이 위로 옵니다. 계산값은 탭마다 공식이 달라 그 자체로는 다른 탭과 비교할 수 없습니다.",
   loan: "개인이 증권사에서 돈을 빌려 산 주식 금액(신용거래융자 잔고)입니다. 많이 쌓일수록 주가가 빠질 때 담보 부족으로 강제로 팔리는 물량(반대매매)이 커질 수 있습니다. 금융투자협회 자료라 하루 늦게 나옵니다.",
   forced: "외상으로 산 주식 대금(미수금)을 기한 안에 못 갚아 증권사가 강제로 판 금액입니다. 급락장에서 반대매매가 몰리면 좋은 종목도 같이 떨어집니다. 금융투자협회 자료라 하루 늦게 나옵니다.",
 };
@@ -621,10 +621,18 @@ function scoreRow(x) {
   const list = state.data.filter[state.tab] || [];
   const i = list.findIndex((y) => y.code === x.code);
   if (i < 0 || x.score == null) return "";
-  const top = list[0].score || 1, total = state.data.filter[state.tab + "_total"] || list.length;
-  const pct = Math.max(3, Math.min(100, (x.score / top) * 100));
-  return `<div class="scorerow"><div class="row"><span>점수 <b>${num(x.score, x.score >= 10 ? 1 : 2)}</b> · ${total}개 중 ${i + 1}위 ${infoBtn("score_" + state.tab)}</span><small>1위 대비 ${Math.round((x.score / top) * 100)}%</small></div>` +
-    `<div class="sbar"><i style="width:${pct.toFixed(1)}%"></i></div><small class="f">${scoreFormula(x)}</small>${infoBox("score_" + state.tab)}</div>`;
+  const total = state.data.filter[state.tab + "_total"] || list.length;
+  const raw = `계산값 ${num(x.score, x.score >= 10 ? 1 : 2)} = ${scoreFormula(x)}`;
+  // 강도: 지금까지 이 탭 후보들 중 몇 % 위치인지 (탭끼리 같은 0~100 눈금). 예전 기록엔 없어서 1위 대비로 대신
+  if (x.score_pct != null) {
+    return `<div class="scorerow"><div class="row"><span>강도 <b>${x.score_pct}점</b> · 오늘 ${i + 1}위/${total} ${infoBtn("score_" + state.tab)}</span>` +
+      `<small>역대 상위 ${Math.max(1, 100 - x.score_pct)}%</small></div>` +
+      `<div class="sbar"><i style="width:${Math.max(3, x.score_pct)}%"></i></div>` +
+      `<small class="f">역대 ${TAB_NAME[state.tab]} 후보 ${num(x.score_pool)}개 기준 · ${raw}</small>${infoBox("score_" + state.tab)}</div>`;
+  }
+  const top = list[0].score || 1, rel = Math.round((x.score / top) * 100);
+  return `<div class="scorerow"><div class="row"><span>오늘 ${i + 1}위/${total} ${infoBtn("score_" + state.tab)}</span><small>1위 대비 ${rel}%</small></div>` +
+    `<div class="sbar"><i style="width:${Math.max(3, Math.min(100, rel))}%"></i></div><small class="f">${raw}</small>${infoBox("score_" + state.tab)}</div>`;
 }
 
 function card(x) {

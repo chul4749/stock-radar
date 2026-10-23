@@ -145,6 +145,9 @@ def main(argv):
     for x in value[:5]:
         log(f"   저평가 {x['name']} -{x['drop_60d']}% PBR {x['pbr']}/{x['pbr_med']}")
     overlap = logic.mark_overlap(scalp, swing, value)
+    past = past_scores(base)
+    for g, items in (("scalp", scalp), ("swing", swing), ("value", value)):
+        logic.score_percentiles(items, past.get(g, []))
     log(f"  겹침 {len(overlap)}")
     for group in (scalp[:10], swing[:10], value[:10]):
         logic.enrich(group, closes, sectors, quality)
@@ -264,6 +267,19 @@ def main(argv):
             json.dump(card, f, ensure_ascii=False, separators=(",", ":"), default=_json_default)
         log(f"  기록 {len(history)}일, 통계 {json.dumps(stats, ensure_ascii=False)}")
     return 0
+
+
+def past_scores(base):
+    """기준일 전 기록 파일들의 탭별 후보 점수 (파일엔 탭마다 상위 10개만 남아 있음)."""
+    out = {}
+    for n in os.listdir(DATA):
+        if not (n[:8].isdigit() and n.endswith(".json") and n[:8] < base):
+            continue
+        with open(os.path.join(DATA, n), encoding="utf-8") as f:
+            flt = json.load(f).get("filter", {})
+        for g in ("scalp", "swing", "value"):
+            out.setdefault(g, []).extend(x["score"] for x in flt.get(g) or [] if x.get("score") is not None)
+    return out
 
 
 def _json_default(o):

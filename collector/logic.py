@@ -23,6 +23,16 @@ def pct_rank(values, x):
     return round(100 * (below + 0.5 * equal) / len(vals))
 
 
+def score_percentiles(items, past_scores):
+    """정렬 점수를 탭끼리 같은 눈금(0~100)으로: 지금까지 그 탭 후보 점수들 중 몇 % 위치인지."""
+    pool = list(past_scores) + [x["score"] for x in items if x.get("score") is not None]
+    for x in items:
+        if x.get("score") is not None:
+            x["score_pct"] = pct_rank(pool, x["score"])
+            x["score_pool"] = len(pool)
+    return items
+
+
 def r1(x):
     return None if x is None or (isinstance(x, float) and math.isnan(x)) else round(float(x), 1)
 
