@@ -2,7 +2,9 @@ name: collect
 
 on:
   schedule:
-    - cron: "10 9 * * 1-5"   # 평일 18:10 KST (장 마감·수급 확정 뒤)
+    # 정각 근처는 GitHub 예약이 몰려 몇 시간씩 늦어질 수 있어 비켜 잡는다
+    - cron: "23 9 * * 1-5"    # 평일 18:23 KST (장 마감·수급 확정 뒤)
+    - cron: "47 11 * * 1-5"   # 평일 20:47 KST 예비: 그날 데이터가 이미 있으면 건너뜀
   workflow_dispatch:
     inputs:
       base_date:
@@ -54,6 +56,7 @@ jobs:
           python -m collector.main ${{ inputs.base_date }}
           save "$(date -u +%F)"
         env:
+          IF_MISSING: ${{ github.event.schedule == '47 11 * * 1-5' && '1' || '' }}
           KRX_ID: ${{ secrets.KRX_ID }}
           KRX_PW: ${{ secrets.KRX_PW }}
       - uses: actions/upload-artifact@v4

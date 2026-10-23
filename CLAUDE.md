@@ -18,7 +18,9 @@
 ## 운영
 
 - 사무실 PC에서는 증권 사이트가 대부분 막혀 있어 **수집은 GitHub Actions에서만** 한다.
-- `.github/workflows/collect.yml`: 평일 18:10 KST에 실행 → 테스트 → 수집 → `data: YYYY-MM-DD` 커밋 → (설정 시) Pages 배포.
+- `.github/workflows/collect.yml`: 평일 18:23 KST에 실행(20:47 예비 실행은 그날 데이터가 있으면 건너뜀) → 테스트 → 수집 → `data: YYYY-MM-DD` 커밋 → (설정 시) Pages 배포.
+  저장은 최신 main 위에 `site/data`를 통째로 얹는 방식이라 대기열에서 늦게 시작해도 충돌하지 않는다.
+- `.github/workflows/pages.yml`: `site/` 코드(데이터 제외)가 main에 올라오면 수집 없이 바로 배포.
   수동 실행 때 `dates`에 과거 기준일을 넣으면 다시 계산한다(성적표 채우기용).
 - KRX는 로그인 필요: Secrets `KRX_ID`/`KRX_PW`.
 - VKOSPI는 경로를 못 찾아 코스피200 20일 실현 변동성으로 대신한다.
@@ -28,7 +30,7 @@
 ## 화면 규칙
 
 - 사용자는 한국어 사용자. 화면 문구는 쉬운 한국어로, 전문 용어에는 ⓘ 설명(`INFO`)과 한 줄 해석(`interpret`)을 붙인다.
-- 사용자 설정(탭, '설명 항상 펼치기')은 `localStorage`에 저장하고, 접근은 항상 try/catch로 감싼다.
+- 사용자 설정(탭, '설명 항상 펼치기', 관심 종목)은 `localStorage`에 저장하고, 접근은 항상 try/catch로 감싼다.
 - 모바일(390px 폭)에서 먼저 확인한다. 라이트·다크 모두 CSS 변수(`--text`, `--sub`, `--line` 등)를 쓴다.
 
 ## 작업 습관

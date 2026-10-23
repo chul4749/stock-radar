@@ -7,10 +7,11 @@ const signed = (v, d = 1, unit = "") => (v == null ? "–" : (v > 0 ? "+" : "") 
 const cls = (v) => (v == null ? "na" : v > 0 ? "up" : v < 0 ? "down" : "");
 const ymd = (s) => `${s.slice(0, 4)}.${s.slice(4, 6)}.${s.slice(6, 8)}`;
 
-let state = { data: null, tab: "swing", score: null, expAll: false };
+let state = { data: null, tab: "swing", score: null, expAll: false, watch: {} };
 try {
   state.tab = localStorage.getItem("tab") || "swing";
   state.expAll = localStorage.getItem("expAll") === "1";
+  state.watch = JSON.parse(localStorage.getItem("watch") || "{}") || {};
 } catch (e) { /* 저장 불가 환경 */ }
 
 async function load(date) {
@@ -266,6 +267,9 @@ function tile(label, value, sub, sparkVals, opts = {}) {
   const key = opts.key;
   const line = key ? interpret(key, state.data.temperature) : "";
   const zb = key ? zoneFor(key, state.data.temperature) : "";
+  // 해외·협회 자료는 하루 이상 늦게 나오므로, 기준일과 다른 날짜면 언제 값인지 붙인다
+  const b = state.data.base_date, baseIso = `${b.slice(0, 4)}-${b.slice(4, 6)}-${b.slice(6)}`;
+  if (opts.date && opts.date !== baseIso) sub += ` · <span class="asof">${opts.date.slice(5)} 기준</span>`;
   return `<div class="tile${opts.wide ? " wide" : ""}"><div class="l">${label} ${key ? infoBtn(key) : ""}</div><div class="v ${opts.vcls || ""}">${value}</div>` +
     `<div class="s">${sub}</div>${sparkVals ? `<div style="color:var(--faint)">${spark(sparkVals)}</div>` : ""}${opts.extra || ""}${zb}` +
     `${line ? `<div class="why">${esc(line)}</div>` : ""}${key ? infoBox(key) : ""}</div>`;
@@ -324,17 +328,17 @@ function renderTemp() {
     const x = ix[k];
     if (x) tiles.push(tile(name, num(x.close, 2), `<span class="${cls(x.change)}">${signed(x.change, 2, "%")}</span> · 20일 ${signed(x.change_20d, 1, "%")}`, x.spark, { key: k }));
   }
-  if (t.vix) tiles.push(tile("미국 VIX (공포지수)", num(t.vix.value, 1), `5일 ${signed(t.vix.change, 1)}${pctText(t.vix.pct_1y)}`, t.vix.spark, { key: "vix" }));
-  if (t.korea_vol) tiles.push(tile("국내 변동성 <small>(VKOSPI 대체)</small>", num(t.korea_vol.value, 1) + "%", `코스피200 20일 실제 변동성${pctText(t.korea_vol.pct_1y)}`, t.korea_vol.spark, { key: "korea_vol" }));
+  if (t.vix) tiles.push(tile("미국 VIX (공포지수)", num(t.vix.value, 1), `5일 ${signed(t.vix.change, 1)}${pctText(t.vix.pct_1y)}`, t.vix.spark, { key: "vix", date: t.vix.date }));
+  if (t.korea_vol) tiles.push(tile("국내 변동성 <small>(VKOSPI 대체)</small>", num(t.korea_vol.value, 1) + "%", `코스피200 20일 실제 변동성${pctText(t.korea_vol.pct_1y)}`, t.korea_vol.spark, { key: "korea_vol", date: t.korea_vol.date }));
   if (t.fear_greed) {
     const fg = t.fear_greed;
     const kr = { "extreme fear": "극단적 공포", fear: "공포", neutral: "중립", greed: "탐욕", "extreme greed": "극단적 탐욕" }[fg.rating] || fg.rating;
     tiles.push(tile("CNN 공포·탐욕", `${num(fg.score)} <small style="font-size:13px;font-weight:500">${esc(kr)}</small>`,
-      `전일 ${num(fg.prev)} · 1주 전 ${num(fg.week_ago)} · 1달 전 ${num(fg.month_ago)}${fg.year_ago != null ? ` · 1년 전 ${num(fg.year_ago)}` : ""}`, fg.spark, { key: "cnn" }));
+      `전일 ${num(fg.prev)} · 1주 전 ${num(fg.week_ago)} · 1달 전 ${num(fg.month_ago)}${fg.year_ago != null ? ` · 1년 전 ${num(fg.year_ago)}` : ""}`, fg.spark, { key: "cnn", date: fg.date }));
   }
-  if (t.hy_spread) tiles.push(tile("미국 하이일드 스프레드", num(t.hy_spread.value, 2) + "%p", `20일 ${signed(t.hy_spread.change, 2, "%p")}${pctText(t.hy_spread.pct_1y)}`, t.hy_spread.spark, { key: "credit" }));
-  if (t.usdkrw) tiles.push(tile("원/달러 환율", num(t.usdkrw.value, 1) + "원", `5일 ${signed(t.usdkrw.change, 1)}${pctText(t.usdkrw.pct_1y)} · ${t.usdkrw.date.slice(5)} 기준`, t.usdkrw.spark, { key: "usdkrw" }));
-  if (t.us10y) tiles.push(tile("미국 10년 국채금리", num(t.us10y.value, 2) + "%", `5일 ${signed(t.us10y.change, 2, "%p")}${pctText(t.us10y.pct_1y)}`, t.us10y.spark, { key: "us10y" }));
+  if (t.hy_spread) tiles.push(tile("미국 하이일드 스프레드", num(t.hy_spread.value, 2) + "%p", `20일 ${signed(t.hy_spread.change, 2, "%p")}${pctText(t.hy_spread.pct_1y)}`, t.hy_spread.spark, { key: "credit", date: t.hy_spread.date }));
+  if (t.usdkrw) tiles.push(tile("원/달러 환율", num(t.usdkrw.value, 1) + "원", `5일 ${signed(t.usdkrw.change, 1)}${pctText(t.usdkrw.pct_1y)}`, t.usdkrw.spark, { key: "usdkrw", date: t.usdkrw.date }));
+  if (t.us10y) tiles.push(tile("미국 10년 국채금리", num(t.us10y.value, 2) + "%", `5일 ${signed(t.us10y.change, 2, "%p")}${pctText(t.us10y.pct_1y)}`, t.us10y.spark, { key: "us10y", date: t.us10y.date }));
   if (t.breadth) {
     const b = t.breadth;
     const bm = b.by_market || {};
@@ -363,11 +367,11 @@ function renderTemp() {
   const cb = t.credit_balance || {};
   if (cb.loan) {
     const l = cb.loan;
-    tiles.push(tile("신용융자 잔고 (빚투)", eokText(l.value), `코스피 ${eokText(l.kospi)} · 코스닥 ${eokText(l.kosdaq)}<br>5일 ${l.change == null ? "–" : (l.change > 0 ? "+" : "−") + eokText(Math.abs(l.change))} · ${l.date.slice(5)} 기준`, l.spark, { key: "loan" }));
+    tiles.push(tile("신용융자 잔고 (빚투)", eokText(l.value), `코스피 ${eokText(l.kospi)} · 코스닥 ${eokText(l.kosdaq)}<br>5일 ${l.change == null ? "–" : (l.change > 0 ? "+" : "−") + eokText(Math.abs(l.change))}`, l.spark, { key: "loan", date: l.date }));
   }
   if (cb.forced) {
     const f = cb.forced;
-    tiles.push(tile("반대매매 (강제 매도)", eokText(f.value), `미수금 ${eokText(f.unpaid)} 중 ${num(f.ratio, 1)}% · 20일 평균 ${eokText(f.avg20)}<br>${f.date.slice(5)} 기준`, f.spark, { key: "forced" }));
+    tiles.push(tile("반대매매 (강제 매도)", eokText(f.value), `미수금 ${eokText(f.unpaid)} 중 ${num(f.ratio, 1)}% · 20일 평균 ${eokText(f.avg20)}`, f.spark, { key: "forced", date: f.date }));
   }
   if (!cb.loan && !cb.forced) tiles.push(tile("신용잔고·반대매매", `<span class="na">–</span>`, "이번 기준일엔 받지 못함", null));
   $("#tiles").innerHTML = tiles.join("");
@@ -387,6 +391,7 @@ function renderFilter() {
   $("#n-swing").textContent = f.swing_total;
   $("#n-scalp").textContent = f.scalp_total;
   $("#n-value").textContent = f.value_total ?? "–";
+  renderWatch();
   renderOverlap();
   renderExcluded();
   document.querySelectorAll(".tabs button").forEach((b) => b.setAttribute("aria-selected", b.dataset.tab === state.tab));
@@ -420,6 +425,41 @@ function bars(daily) {
   return `<div class="bars">${cols}</div><div class="barlab">${labs}</div>`;
 }
 
+/* ---------------- 관심 종목 (☆ 눌러 저장, 이 브라우저에만) ---------------- */
+
+const starBtn = (x) => {
+  const on = !!state.watch[x.code];
+  return `<button class="star${on ? " on" : ""}" type="button" data-code="${x.code}" data-name="${esc(x.name)}" aria-pressed="${on}" aria-label="관심 종목${on ? " 해제" : "에 추가"}">${on ? "★" : "☆"}</button>`;
+};
+
+function renderWatch() {
+  const codes = Object.keys(state.watch);
+  if (!codes.length) { $("#watch").innerHTML = ""; return; }
+  const f = state.data.filter;
+  const rows = codes.map((c) => {
+    const groups = ["swing", "scalp", "value"].filter((g) => (f[g] || []).some((y) => y.code === c));
+    const name = esc(state.watch[c]);
+    return groups.length
+      ? `<li class="hit"><button class="more" type="button" data-code="${c}">${name}</button> <span class="tag both">${groups.map((g) => TAB_NAME[g]).join("·")}</span></li>`
+      : `<li class="miss">${name} <small>조건 밖</small></li>`;
+  });
+  const hits = rows.filter((r) => r.startsWith('<li class="hit"')).length;
+  $("#watch").innerHTML = `<div class="watch"><div class="l">관심 종목 <small>${hits ? `오늘 ${hits}개 걸림` : "오늘 걸린 종목 없음"}</small></div><ul>${rows.join("")}</ul></div>`;
+}
+
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button.star");
+  if (!b) return;
+  const c = b.dataset.code;
+  if (state.watch[c]) delete state.watch[c]; else state.watch[c] = b.dataset.name;
+  try { localStorage.setItem("watch", JSON.stringify(state.watch)); } catch (err) { /* 무시 */ }
+  const on = !!state.watch[c];
+  document.querySelectorAll(`button.star[data-code="${c}"]`).forEach((s) => {
+    s.classList.toggle("on", on); s.textContent = on ? "★" : "☆"; s.setAttribute("aria-pressed", on);
+  });
+  renderWatch();
+});
+
 function renderOverlap() {
   const f = state.data.filter;
   const codes = f.overlap || [];
@@ -452,7 +492,7 @@ function valueCard(x) {
 function cardHead(x) {
   return `<div class="hd">
       <a class="nm" href="https://m.stock.naver.com/domestic/stock/${x.code}" target="_blank" rel="noopener">${esc(x.name)}<span class="mk">${esc(x.market)} ${x.code}${x.sector ? " · " + esc(x.sector) : ""}</span></a>
-      <div class="px"><b>${num(x.close)}</b><span class="${cls(x.change)}">${signed(x.change, 1, "%")}</span></div>
+      <div class="px">${starBtn(x)}<b>${num(x.close)}</b><span class="${cls(x.change)}">${signed(x.change, 1, "%")}</span></div>
     </div>${x.overlap ? `<span class="tag both">두 관점 겹침</span>` : ""}`;
 }
 

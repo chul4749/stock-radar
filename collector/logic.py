@@ -166,6 +166,14 @@ def thermometer(t):
     hy = t.get("hy_spread")
     if hy and hy.get("pct_1y") is not None:
         add("credit", "자금시장 (하이일드)", 100 - hy["pct_1y"], f"{hy['value']}%p · 1년 중 {hy['pct_1y']}% 위치")
+    cb = t.get("credit_balance") or {}
+    fo = cb.get("forced")
+    if fo and fo.get("pct_1y") is not None:
+        add("forced", "반대매매 (강제 매도)", 100 - fo["pct_1y"], f"{fo['value']:,.0f}억 · 1년 중 {fo['pct_1y']}% 위치")
+    lo = cb.get("loan")
+    if lo and lo.get("pct_1y") is not None:
+        # 빚투가 많이 쌓일수록 탐욕 쪽 (CNN 방식의 '레버리지 수요')
+        add("loan", "빚투 (신용융자)", lo["pct_1y"], f"{lo['value'] / 10000:.1f}조 · 1년 중 {lo['pct_1y']}% 위치")
     if len(parts) < 3:
         return None
     score = round(sum(p["score"] for p in parts) / len(parts))
@@ -203,6 +211,15 @@ def summarize_temperature(t):
             level, tone, text = "줄어드는 중", "calm", f"60일 신저가 종목 {now}개, 최근 5일 평균 {avg:.0f}개보다 적음."
         else:
             level, tone, text = "비슷함", "neutral", f"60일 신저가 종목 {now}개, 최근 5일 평균 {avg:.0f}개와 비슷."
+        # 반대매매가 20일 평균의 2배 넘게 몰리면 신저가와 상관없이 매도 압력이 커지는 중으로 본다
+        fo = (t.get("credit_balance") or {}).get("forced")
+        if fo and fo.get("avg20"):
+            mult = fo["value"] / fo["avg20"]
+            if mult >= 2 and fo["value"] >= 300:
+                level, tone = "커지는 중", "fear"
+                text += f" 반대매매 {fo['value']:,.0f}억, 20일 평균의 {mult:.1f}배."
+            else:
+                text += f" 반대매매 {fo['value']:,.0f}억 (20일 평균 {fo['avg20']:,.0f}억)."
         out.append({"key": "selling", "title": "매도 압력", "level": level, "tone": tone, "text": text})
 
     # 3. 자금시장: 하이일드 스프레드

@@ -229,3 +229,21 @@ def test_credit_summary_units_and_ratio():
     assert c["forced"]["value"] == 1000.0 and c["forced"]["unpaid"] == 10000.0
     assert c["forced"]["ratio"] == 1.0 and c["forced"]["avg20"] == 550.0
     assert logic.credit_summary(None, None) is None
+
+
+def test_forced_selling_spike_raises_selling_pressure():
+    b = {"new_lows": [100] * 6, "new_highs": [100] * 6, "up": 1, "down": 1}
+    calm = {"breadth": b, "credit_balance": {"forced": {"value": 300, "avg20": 250, "pct_1y": 50}}}
+    s = {x["key"]: x for x in logic.summarize_temperature(calm)}
+    assert s["selling"]["level"] == "비슷함" and "반대매매 300억" in s["selling"]["text"]
+    spike = {"breadth": b, "credit_balance": {"forced": {"value": 900, "avg20": 300, "pct_1y": 98}}}
+    s = {x["key"]: x for x in logic.summarize_temperature(spike)}
+    assert s["selling"]["level"] == "커지는 중" and "3.0배" in s["selling"]["text"]
+
+
+def test_thermometer_includes_credit_parts():
+    t = {"vix": {"value": 20, "pct_1y": 50}, "korea_vol": {"value": 20, "pct_1y": 50},
+         "fear_greed": {"score": 50},
+         "credit_balance": {"forced": {"value": 900, "pct_1y": 90}, "loan": {"value": 302710, "pct_1y": 30}}}
+    parts = {p["key"]: p["score"] for p in logic.thermometer(t)["parts"]}
+    assert parts["forced"] == 10 and parts["loan"] == 30

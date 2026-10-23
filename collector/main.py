@@ -48,6 +48,9 @@ def main(argv):
     days = sources.business_days(wanted, 82)
     base = days[-1]
     log(f"  기준일 {base} (요청 {wanted}), 영업일 {len(days)}개 {days[0]}~{base}")
+    if os.environ.get("IF_MISSING") and os.path.exists(os.path.join(DATA, f"{base}.json")):
+        log("  예비 실행: 이미 수집한 기준일이라 건너뜀")
+        return 0
 
     t = step("전종목 목록")
     listing = sources.listing(base)
