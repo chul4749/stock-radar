@@ -641,6 +641,23 @@ def value_screen(universe, closes, fund_now, fund_hist, flows_5d, news_3d, rules
     return out
 
 
+def mark_streaks(groups, prev_filters):
+    """같은 탭에 며칠 연속 걸렸는지(오늘 포함)와 처음 걸린 날을 붙인다.
+
+    groups: {"swing": [...], ...} 오늘 후보, prev_filters: [(기준일, filter dict)] 최근 날짜부터 (기록 파일엔 탭마다 상위 10개만)
+    """
+    for g, items in groups.items():
+        for x in items:
+            days, first = 1, None
+            for d, flt in prev_filters:
+                if any(y["code"] == x["code"] for y in flt.get(g) or []):
+                    days, first = days + 1, d
+                else:
+                    break
+            x["streak_days"], x["since"] = days, first
+    return groups
+
+
 def mark_overlap(scalp, swing, value):
     """수급·추세 관점(단타·스윙)과 저평가 관점에 동시에 걸린 종목 코드."""
     flow_codes = {x["code"] for x in scalp} | {x["code"] for x in swing}

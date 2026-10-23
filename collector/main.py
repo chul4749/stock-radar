@@ -179,6 +179,12 @@ def main(argv):
         profile(x["code"])
     logic.apply_forward_eps(value, profiles)
     overlap = logic.mark_overlap(scalp, swing, value)
+    # 며칠째 걸려 있는지: 기준일 전 기록을 최근 날짜부터 거슬러 본다
+    prev = []
+    for n in sorted((n for n in os.listdir(DATA) if n[:8].isdigit() and n.endswith(".json") and n[:8] < base), reverse=True)[:30]:
+        with open(os.path.join(DATA, n), encoding="utf-8") as f:
+            prev.append((n[:8], json.load(f).get("filter", {})))
+    logic.mark_streaks({"scalp": scalp, "swing": swing, "value": value}, prev)
     past = past_scores(base)
     for g, items in (("scalp", scalp), ("swing", swing), ("value", value)):
         logic.score_percentiles(items, past.get(g, []))

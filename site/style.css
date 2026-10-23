@@ -320,3 +320,5 @@ table.fin .est { color: var(--faint); }
 .part-hd small.half { font-size: 10px; color: var(--faint); border: 1px solid var(--line); border-radius: 4px; padding: 0 3px; }
 .tag.earn-up { background: var(--fear-bg); color: var(--up); }
 .tag.earn-down { background: var(--neutral-bg); color: var(--down); }
+.tag.new { background: var(--fear-bg); color: var(--up); font-weight: 700; margin-top: 6px; }
+.tag.stay { background: var(--neutral-bg); color: var(--sub); margin-top: 6px; }

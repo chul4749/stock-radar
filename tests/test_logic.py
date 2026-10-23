@@ -423,3 +423,15 @@ def test_parse_earnings_from_dart_viewer_text():
     assert logic.parse_earnings(turn)["label"] == "영업이익 흑자 전환"
     assert logic.parse_earnings(loss)["label"] == "영업이익 적자 전환"
     assert logic.parse_earnings("관계없는 문서") is None
+
+
+def test_mark_streaks_counts_consecutive_days():
+    today = {"value": [{"code": "A"}, {"code": "B"}], "swing": [{"code": "A"}]}
+    prev = [("20261022", {"value": [{"code": "A"}], "swing": []}),
+            ("20261021", {"value": [{"code": "A"}, {"code": "B"}]}),
+            ("20261020", {"value": [{"code": "A"}]})]
+    logic.mark_streaks(today, prev)
+    a, b = today["value"]
+    assert (a["streak_days"], a["since"]) == (4, "20261020")
+    assert (b["streak_days"], b["since"]) == (1, None)   # 어제 빠졌다가 다시 들어오면 새로 시작
+    assert today["swing"][0]["streak_days"] == 1

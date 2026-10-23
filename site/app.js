@@ -501,6 +501,9 @@ function renderToday() {
     const x = f[g][0];
     return `<button class="more pick" type="button" data-code="${x.code}">${esc(x.name)}</button><small>${TAB_NAME[g]}${x.score_pct != null ? ` ${x.score_pct}점` : ""}</small>`;
   });
+  const fresh = ["swing", "scalp", "value"].map((g) => [g, (f[g] || []).filter((x) => x.streak_days === 1).length]).filter(([, n]) => n);
+  if (["swing", "scalp", "value"].some((g) => (f[g] || []).some((x) => x.streak_days != null)))
+    rows.push(["새로 걸림", fresh.length ? fresh.map(([g, n]) => `${TAB_NAME[g]} ${n}개`).join(" · ") : `<span class="na">없음 (모두 어제도 있던 종목)</span>`]);
   if (tops.length) rows.push(["탭별 1위", `<span class="picks">${tops.map((p) => `<span>${p}</span>`).join("")}</span>`]);
   const hits = Object.keys(state.watch).filter((c) => ["swing", "scalp", "value"].some((g) => (f[g] || []).some((y) => y.code === c)));
   if (Object.keys(state.watch).length) rows.push(["관심 종목", hits.length ? `<b>${hits.map((c) => esc(state.watch[c])).join(", ")}</b> 오늘 걸림` : `<span class="na">오늘 걸린 종목 없음</span>`]);
@@ -671,7 +674,14 @@ function cardHead(x) {
   return `<div class="hd">
       <a class="nm" data-code="${x.code}" href="https://m.stock.naver.com/domestic/stock/${x.code}" target="_blank" rel="noopener">${esc(x.name)}<span class="mk">${esc(x.market)} ${x.code}${x.sector ? " · " + esc(x.sector) : ""}</span></a>
       <div class="px">${starBtn(x)}<b>${num(x.close)}</b><span class="${cls(x.change)}">${signed(x.change, 1, "%")}</span></div>
-    </div>${x.overlap ? `<span class="tag both">두 관점 겹침</span>` : ""}`;
+    </div>${streakTag(x)}${x.overlap ? `<span class="tag both">두 관점 겹침</span>` : ""}`;
+}
+
+// 같은 탭에 며칠 연속 걸렸는지: 오늘 처음이면 '새로', 아니면 'N일째'
+function streakTag(x) {
+  if (x.streak_days == null) return "";
+  return x.streak_days <= 1 ? `<span class="tag new">새로</span>`
+    : `<span class="tag stay" title="${x.since ? ymd(x.since) + "부터" : ""}">${x.streak_days}일째</span>`;
 }
 
 function newsList(items) {
