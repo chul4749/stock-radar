@@ -375,6 +375,8 @@ def test_futures_summary_and_inverse_check():
     rows = [(f"202610{d:02d}", -1000 if d % 2 else 400, 0, 0, 900.0) for d in range(1, 23)]
     f = logic.futures_summary(rows)
     assert f["today"] == 400 and f["d5"] == -1000 * 2 + 400 * 3 and len(f["cum20"]) == 20
+    assert f["today_eok"] == round(400 * 900 * 250000 / 1e8) and f["streak"] == 1 and len(f["daily"]) == 20
+    assert f["d20_eok"] == sum(x["foreign_eok"] for x in f["daily"]) and f["up_days20"] == 10
     t = {"thermo": {"score": 35}, "futures": f, "flows": {"KOSPI": {"pos_days20": 5, "days20": 20}},
          "breadth": {"new_lows": [300], "new_highs": [50]}, "hy_spread": {"pct_1y": 95}}
     r = logic.market_regime(_kospi(-0.002), t)

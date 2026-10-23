@@ -62,19 +62,42 @@ def series_stat(rows, days_back=5, year=252):
     }
 
 
+FUT_MULT = 250_000  # 코스피200 선물 1포인트 = 25만 원
+
+
 def futures_summary(rows):
-    """[(날짜, 외국인, 기관, 개인, 가격)] → 외국인 코스피200 선물 순매수 요약 (계약)."""
+    """[(날짜, 외국인, 기관, 개인, 가격)] (계약) → 외국인 코스피200 선물 순매수 요약.
+
+    금액(억 원) = 계약 × 그날 선물 가격 × 25만 원. 가격이 비면 가장 가까운 앞날 가격으로 채운다.
+    """
     if not rows or len(rows) < 2:
         return None
-    fx = [r[1] for r in rows]
+    last_price, daily = None, []
+    for d, fo, ins, ret, price in rows:
+        last_price = price or last_price
+        eok = (lambda c: round(c * last_price * FUT_MULT / EOK)) if last_price else (lambda c: None)
+        daily.append({"date": d, "foreign": fo, "inst": ins, "retail": ret,
+                      "foreign_eok": eok(fo), "inst_eok": eok(ins or 0), "retail_eok": eok(ret or 0)})
+    recent = daily[-20:]
+    total = lambda key, n: sum((x[key] or 0) for x in daily[-n:])
     cum, acc = [], 0
-    for v in fx[-20:]:
-        acc += v
+    for x in recent:
+        acc += x["foreign"]
         cum.append(acc)
+    up_days = sum(1 for x in recent if x["foreign"] > 0)
+    # 지금 방향이 며칠째 이어지는지
+    streak, sign = 0, (1 if daily[-1]["foreign"] > 0 else -1)
+    for x in reversed(daily):
+        if (x["foreign"] > 0) - (x["foreign"] < 0) != sign:
+            break
+        streak += 1
     return {"date": f"{rows[-1][0][:4]}-{rows[-1][0][4:6]}-{rows[-1][0][6:]}",
-            "today": fx[-1], "d5": sum(fx[-5:]), "d20": sum(fx[-20:]),
-            "inst_today": rows[-1][2], "retail_today": rows[-1][3],
-            "price": rows[-1][4], "cum20": cum}
+            "today": daily[-1]["foreign"], "d5": total("foreign", 5), "d20": total("foreign", 20),
+            "today_eok": daily[-1]["foreign_eok"], "d5_eok": total("foreign_eok", 5), "d20_eok": total("foreign_eok", 20),
+            "inst_today": daily[-1]["inst"], "retail_today": daily[-1]["retail"],
+            "inst_today_eok": daily[-1]["inst_eok"], "retail_today_eok": daily[-1]["retail_eok"],
+            "price": rows[-1][4], "cum20": cum, "up_days20": up_days, "days20": len(recent),
+            "streak": streak * sign, "daily": recent}
 
 
 def credit_summary(loans, funds):

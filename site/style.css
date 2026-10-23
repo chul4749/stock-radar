@@ -311,3 +311,9 @@ table.fin .est { color: var(--faint); }
 .finflow ul, .finhelp { list-style: none; margin: 0; padding: 0; font-size: 13px; }
 .finflow li, .finhelp li { padding: 3px 0; color: var(--sub); }
 .finflow li b, .finhelp li b { color: var(--text); margin-right: 4px; }
+.tile.fut .futhead { display: flex; align-items: baseline; gap: 8px; }
+.tile.fut .futhead .v { font-size: 22px; }
+.tile.fut .nums small { display: block; }
+.tile.fut .nums div > small:last-child { font-size: 10px; color: var(--faint); }
+.tile.fut svg.futchart { height: 90px; margin-top: 8px; }
+.futwho td small { display: block; font-size: 10px; color: var(--faint); }

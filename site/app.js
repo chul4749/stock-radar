@@ -89,7 +89,7 @@ const INFO = {
   score_swing: "강도는 0~100점으로, 지금까지 이 탭에 걸린 후보들(날짜마다 상위 10개)의 계산값 중 몇 % 위치인지입니다. 100점에 가까울수록 역대 후보 중에서도 강한 편이고, 세 탭 모두 같은 눈금이라 비교할 수 있습니다. 계산값은 통과한 종목끼리 순서를 매기는 식입니다. 시가총액에 비해 최근 5일 기관·외국인이 얼마나 많이 샀는지(%)에, 며칠 연속 샀는지를 더 얹었습니다. 덩치에 비해 큰손이 꾸준히 사는 종목이 위로 옵니다. 계산값은 탭마다 공식이 달라 그 자체로는 다른 탭과 비교할 수 없습니다.",
   score_scalp: "강도는 0~100점으로, 지금까지 이 탭에 걸린 후보들의 계산값 중 몇 % 위치인지입니다. 세 탭 모두 같은 눈금이라 비교할 수 있습니다. 계산값은 세 가지를 0~100점으로 맞춰 가중평균합니다: 큰손 확인(오늘 거래대금 중 기관·외국인 순매수 비중 0%→0, 20%→100) 50%, 거래 증가(평소의 3배→0, 8배→100, 15배를 넘으면 오히려 깎여 30배에 0) 25%, 상승폭(5~15%가 100, 3%나 상한가 근처 29%로 갈수록 0) 25%. 거래가 폭발하고 크게 튄 '주목받는 종목'은 이후 성적이 나쁜 경향이 있어(Barber·Odean 2008, 이 사이트 기록에서도 확인), 큰손이 확인해 준 적당한 급등을 위로 올립니다.",
   score_value: "강도는 0~100점으로, 지금까지 이 탭에 걸린 후보들의 계산값 중 몇 % 위치인지입니다. 세 탭 모두 같은 눈금이라 비교할 수 있습니다. 계산값은 네 가지를 0~100점으로 맞춰 가중평균합니다: 낙폭(60일 고점 대비 20%→0점, 50%→100점) 25%, 싸짐(1년 중앙 PBR 대비 할인 20%→0, 70%→100) 15%, PER(15→0, 5→100) 35%, 이익(EPS 1년 전의 0.8배→0, 1.5배→100, 올해 추정 EPS가 있으면 '지금 대비 추정'도 같은 눈금으로 반반 섞음) 25%. 싸면서 이익이 버티는 종목이 위로 오도록 했습니다.",
-  futures: "외국인이 코스피200 선물을 산 계약 수에서 판 계약 수를 뺀 값입니다(1계약 ≈ 지수 × 25만 원). 외국인은 선물로 지수 방향에 베팅하거나 현물을 헤지하는 경우가 많아, 며칠씩 한 방향으로 쌓이면 지수가 그쪽으로 움직이는 경향이 있습니다. 한국 장세를 먼저 보여 주는 지표로 많이 봅니다.",
+  futures: "외국인이 코스피200 선물을 산 금액에서 판 금액을 뺀 값입니다. 금액은 계약 수 × 그날 선물 가격 × 25만 원으로 계산했고, 계약 수는 작게 같이 적었습니다. 외국인은 선물로 지수 방향에 베팅하거나 현물을 헤지하는 경우가 많아, 며칠씩 한 방향으로 쌓이면 지수가 그쪽으로 움직이는 경향이 있습니다. 한국 장세를 먼저 보여 주는 지표로 많이 봅니다.",
   loan: "개인이 증권사에서 돈을 빌려 산 주식 금액(신용거래융자 잔고)입니다. 많이 쌓일수록 주가가 빠질 때 담보 부족으로 강제로 팔리는 물량(반대매매)이 커질 수 있습니다. 금융투자협회 자료라 하루 늦게 나옵니다.",
   forced: "외상으로 산 주식 대금(미수금)을 기한 안에 못 갚아 증권사가 강제로 판 금액입니다. 급락장에서 반대매매가 몰리면 좋은 종목도 같이 떨어집니다. 금융투자협회 자료라 하루 늦게 나옵니다.",
 };
@@ -135,7 +135,9 @@ function interpret(key, t) {
     case "futures": {
       const f = t.futures; if (!f) return "";
       const dir = f.d20 < 0 ? "20일 누적 순매도 → 지수 하락 쪽 베팅" : "20일 누적 순매수 → 지수 상승 쪽 베팅";
-      return f.d5 * f.d20 < 0 ? `${dir}, 다만 최근 5일은 반대 방향` : dir;
+      let out = f.d5 * f.d20 < 0 ? `${dir}, 다만 최근 5일은 반대로 ${f.d5 < 0 ? "팔고" : "사고"} 있음` : dir;
+      if (f.streak && Math.abs(f.streak) >= 3) out += ` · ${Math.abs(f.streak)}일 연속 ${f.streak > 0 ? "순매수" : "순매도"}`;
+      return out;
     }
     case "loan": {
       const l = (t.credit_balance || {}).loan; if (!l) return "";
@@ -319,6 +321,47 @@ function highLowChart(b) {
     (d0 && d1 ? `<div class="barlab"><span style="text-align:left">${ymd(d0)}</span><span style="text-align:right">${ymd(d1)}</span></div>` : "");
 }
 
+// 외국인 코스피200 선물: 금액(억 원)이 먼저, 계약 수는 보조. 최근 20일 일별 막대 + 누적선
+const sEok = (v) => (v == null ? "–" : `${v > 0 ? "+" : v < 0 ? "−" : ""}${eokText(Math.abs(v))}`);
+const sCt = (v) => (v == null ? "" : `${v > 0 ? "+" : ""}${num(v)}계약`);
+
+function futuresTile(f) {
+  const b = state.data.base_date, baseIso = `${b.slice(0, 4)}-${b.slice(4, 6)}-${b.slice(6)}`;
+  const asof = f.date && f.date !== baseIso ? ` <span class="asof">${f.date.slice(5)} 기준</span>` : "";
+  if (!f.daily) {  // 예전 기록: 계약 수만 있음
+    return tile("외국인 선물 순매수", `<span class="${cls(f.today)}">${sCt(f.today)}</span>`, `5일 ${sCt(f.d5)} · 20일 ${sCt(f.d20)}`, f.cum20, { key: "futures", date: f.date });
+  }
+  const d = f.daily, n = d.length, w = 300, h = 90, mid = h / 2;
+  const maxBar = Math.max(1, ...d.map((x) => Math.abs(x.foreign_eok || 0)));
+  const bw = w / n - 2;
+  const bars = d.map((x, i) => {
+    const v = x.foreign_eok || 0, bh = (Math.abs(v) / maxBar) * (mid - 4);
+    return `<rect x="${(i * w / n + 1).toFixed(1)}" y="${(v >= 0 ? mid - bh : mid).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1, bh).toFixed(1)}" fill="var(--${v >= 0 ? "up" : "down"})" opacity="${i === n - 1 ? 1 : 0.55}"><title>${ymd(x.date)} ${sEok(v)} (${sCt(x.foreign)})</title></rect>`;
+  }).join("");
+  let acc = 0;
+  const cum = d.map((x) => (acc += x.foreign_eok || 0));
+  const cmin = Math.min(0, ...cum), cmax = Math.max(0, ...cum), cy = (v) => h - 4 - ((v - cmin) / (cmax - cmin || 1)) * (h - 8);
+  const line = `<polyline points="${cum.map((v, i) => `${((i + 0.5) * w / n).toFixed(1)},${cy(v).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--text)" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>`;
+  const chart = `<svg class="futchart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="최근 ${n}일 외국인 선물 순매수">` +
+    `<line x1="0" x2="${w}" y1="${mid}" y2="${mid}" stroke="var(--line)" stroke-width="1" vector-effect="non-scaling-stroke"/>${bars}${line}</svg>` +
+    `<div class="legend"><span><i style="background:var(--up)"></i>순매수</span><span><i style="background:var(--down)"></i>순매도</span><span><i style="background:var(--text)"></i>20일 누적</span><span class="rng">누적 ${sEok(f.d20_eok)}</span></div>` +
+    `<div class="barlab"><span style="text-align:left">${ymd(d[0].date)}</span><span style="text-align:right">${ymd(d[n - 1].date)}</span></div>`;
+  const streak = f.streak ? `${f.streak > 0 ? "순매수" : "순매도"} ${Math.abs(f.streak)}일째` : "";
+  const who = [["외국인", f.today_eok, f.today], ["기관", f.inst_today_eok, f.inst_today], ["개인", f.retail_today_eok, f.retail_today]]
+    .map(([k, e, c]) => `<td class="${cls(e)}">${sEok(e)}<small>${sCt(c)}</small></td>`).join("");
+  const line1 = interpret("futures", state.data.temperature);
+  return `<div class="tile wide fut"><div class="l">외국인 코스피200 선물 순매수 ${infoBtn("futures")}${asof}</div>
+    <div class="futhead"><div class="v ${cls(f.today_eok)}">${sEok(f.today_eok)}</div><div class="s">${sCt(f.today)}${streak ? ` · ${streak}` : ""}</div></div>
+    <div class="nums">
+      <div><small>최근 5일</small><b class="${cls(f.d5_eok)}">${sEok(f.d5_eok)}</b><small>${sCt(f.d5)}</small></div>
+      <div><small>최근 20일</small><b class="${cls(f.d20_eok)}">${sEok(f.d20_eok)}</b><small>${sCt(f.d20)}</small></div>
+      <div><small>20일 중 순매수일</small><b>${f.up_days20}일</b><small>/ ${f.days20}일</small></div>
+    </div>
+    ${chart}
+    <table class="flowtbl futwho"><thead><tr><th>오늘</th><th>외국인</th><th>기관</th><th>개인</th></tr></thead><tbody><tr><td>순매수</td>${who}</tr></tbody></table>
+    ${line1 ? `<div class="why">${esc(line1)}</div>` : ""}${infoBox("futures")}</div>`;
+}
+
 // 억 원 → "1.23조" / "456억"
 const eokText = (v) => (v == null ? "–" : Math.abs(v) >= 10000 ? `${num(v / 10000, 2)}조` : `${num(v)}억`);
 
@@ -341,6 +384,8 @@ function renderTemp() {
     const x = ix[k];
     if (x) tiles.push(tile(name, num(x.close, 2), `<span class="${cls(x.change)}">${signed(x.change, 2, "%")}</span> · 20일 ${signed(x.change_20d, 1, "%")}`, x.spark, { key: k }));
   }
+  if (t.futures) tiles.push(futuresTile(t.futures));  // 한국 장세를 먼저 보여 주는 지표라 지수 바로 다음에
+
   if (t.vix) tiles.push(tile("미국 VIX (공포지수)", num(t.vix.value, 1), `5일 ${signed(t.vix.change, 1)}${pctText(t.vix.pct_1y)}`, t.vix.spark, { key: "vix", date: t.vix.date }));
   if (t.korea_vol) tiles.push(tile("국내 변동성 <small>(VKOSPI 대체)</small>", num(t.korea_vol.value, 1) + "%", `코스피200 20일 실제 변동성${pctText(t.korea_vol.pct_1y)}`, t.korea_vol.spark, { key: "korea_vol", date: t.korea_vol.date }));
   if (t.fear_greed) {
@@ -376,12 +421,6 @@ function renderTemp() {
       }
     }
     tiles.push(`<div class="tile wide"><div class="l">시장 전체 순매수 (억 원) ${infoBtn("marketflows")}</div>${infoBox("marketflows")}<table class="flowtbl"><thead><tr><th></th><th>오늘</th><th>5일</th><th>20일</th></tr></thead><tbody>${rows.join("")}</tbody></table></div>`);
-  }
-  if (t.futures) {
-    const f = t.futures;
-    const won = (c) => (f.price ? ` (약 ${eokText(Math.abs(c) * f.price * 250000 / 1e8)})` : "");
-    tiles.push(tile("외국인 선물 순매수", `<span class="${cls(f.today)}">${f.today > 0 ? "+" : ""}${num(f.today)}계약</span>`,
-      `5일 ${f.d5 > 0 ? "+" : ""}${num(f.d5)} · 20일 ${f.d20 > 0 ? "+" : ""}${num(f.d20)}계약${won(f.d20)}`, f.cum20, { key: "futures", date: f.date }));
   }
   const cb = t.credit_balance || {};
   if (cb.loan) {
