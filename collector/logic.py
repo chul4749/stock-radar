@@ -180,10 +180,7 @@ def thermometer(t):
     fo = cb.get("forced")
     if fo and fo.get("pct_1y") is not None:
         add("forced", "반대매매 (강제 매도)", 100 - fo["pct_1y"], f"{fo['value']:,.0f}억 · 1년 중 {fo['pct_1y']}% 위치")
-    lo = cb.get("loan")
-    if lo and lo.get("pct_1y") is not None:
-        # 빚투가 많이 쌓일수록 탐욕 쪽 (CNN 방식의 '레버리지 수요')
-        add("loan", "빚투 (신용융자)", lo["pct_1y"], f"{lo['value'] / 10000:.1f}조 · 1년 중 {lo['pct_1y']}% 위치")
+    # 빚투(신용융자)는 많으면 탐욕이지만 급감도 위험 신호라 방향이 모호해 온도계에서는 뺀다 (칸으로만 보여 줌)
     if len(parts) < 3:
         return None
     score = round(sum(p["score"] for p in parts) / len(parts))
@@ -872,19 +869,29 @@ def market_regime(kospi, t, dates=None):
 HORIZONS = (1, 5, 20)
 
 
-def scorecard(history, closes, index_closes, regimes=None):
+COST = 0.2  # 왕복 거래 비용(%): 매도 세금 + 수수료 대략
+
+
+def scorecard(history, closes, index_closes, regimes=None, opens=None, bench=None, cost=COST):
     """과거 후보가 N영업일 뒤 얼마나 움직였나.
 
     history: [(기준일, {"scalp": [...], "swing": [...], "value": [...]})]
-    closes:  DataFrame(행=영업일, 열=티커)
-    index_closes: Series(index=영업일) 코스피
-    반환: {그룹: {N: {n, avg, win, excess}}}, 최근 기록 목록
+    closes / opens: DataFrame(행=영업일, 열=티커) 종가·시가
+    index_closes: Series(index=영업일) 코스피 종가 (bench 가 없을 때 비교 기준)
+    bench: {"KOSPI": (시가 Series, 종가 Series), "KOSDAQ": (...)} — 종목이 속한 시장 지수와 비교
+
+    실제로 할 수 있는 매매에 맞춘다:
+    - 결과는 장 마감 뒤에 나오므로 다음 영업일 시가에 사서 N영업일째 종가에 판다 (opens 가 있을 때)
+    - 거래 비용 cost(%)를 뺀다
+    - 같은 탭에서 같은 종목이 N일 안에 다시 걸리면 그 N일 성적에는 한 번만 센다 (구간 겹침 방지)
+    반환: 탭별 성적, 최근 기록, 조건별 성적, 장세별 성적, 점수 위·아래 절반 성적
     """
     days = list(closes.index)
     pos = {d: i for i, d in enumerate(days)}
     stats, recent, by_regime, halves = {}, [], {}, {}
     regimes = regimes or {}
-    for date, groups in history:
+    last_counted = {}
+    for date, groups in sorted(history, key=lambda h: h[0]):
         if date not in pos:
             continue
         i0 = pos[date]
@@ -899,17 +906,27 @@ def scorecard(history, closes, index_closes, regimes=None):
                     if i0 + n >= len(days) or code not in closes.columns:
                         continue
                     c1 = closes[code].iloc[i0 + n]
-                    if c1 is None or math.isnan(c1) or not x["close"]:
+                    buy = opens[code].iloc[i0 + 1] if opens is not None and code in opens.columns else x["close"]
+                    if c1 is None or math.isnan(c1) or buy is None or math.isnan(buy) or not buy:
                         continue
-                    ret = (c1 / x["close"] - 1) * 100
-                    k0, k1 = index_closes.get(days[i0]), index_closes.get(days[i0 + n])
+                    ret = (c1 / buy - 1) * 100 - cost
+                    mk = bench.get(x.get("market")) if bench else None
+                    if mk is not None:
+                        k0, k1 = mk[0].get(days[i0 + 1]), mk[1].get(days[i0 + n])
+                    else:
+                        k0, k1 = index_closes.get(days[i0]), index_closes.get(days[i0 + n])
                     ex = ret - ((k1 / k0 - 1) * 100) if k0 and k1 else None
                     entry[f"r{n}"] = r1(ret)
+                    key = (g, code, n)
+                    if key in last_counted and i0 - last_counted[key] < n:
+                        entry.setdefault("dup", []).append(n)
+                        continue
+                    last_counted[key] = i0
                     buckets = [stats.setdefault(g, {}).setdefault(n, {"rets": [], "ex": []})]
                     if regimes.get(date):
                         buckets.append(by_regime.setdefault(regimes[date], {}).setdefault(g, {}).setdefault(n, {"rets": [], "ex": []}))
-                    if x["code"] in half and not (len(ranked) % 2 and ranked.index(x) == len(ranked) // 2):
-                        buckets.append(halves.setdefault(g, {}).setdefault(half[x["code"]], {}).setdefault(n, {"rets": [], "ex": []}))
+                    if code in half and not (len(ranked) % 2 and ranked.index(x) == len(ranked) // 2):
+                        buckets.append(halves.setdefault(g, {}).setdefault(half[code], {}).setdefault(n, {"rets": [], "ex": []}))
                     for s in buckets:
                         s["rets"].append(ret)
                         if ex is not None:
@@ -965,7 +982,8 @@ def features_of(x):
 def feature_stats(entries, horizon=5):
     """스윙·단타 후보(수급 관점)만 대상으로 조건 있음/없음 비교."""
     out = []
-    pool = [e for e in entries if e["group"] in ("swing", "scalp") and e.get(f"r{horizon}") is not None]
+    pool = [e for e in entries if e["group"] in ("swing", "scalp") and e.get(f"r{horizon}") is not None
+            and horizon not in e.get("dup", [])]
     for key, label in FEATURES.items():
         yes = [e[f"r{horizon}"] for e in pool if e.get("features", {}).get(key)]
         no = [e[f"r{horizon}"] for e in pool if not e.get("features", {}).get(key)]

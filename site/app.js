@@ -702,7 +702,12 @@ function renderScore() {
   const recent = (sc.recent || []).filter((e) => e.r1 != null).slice(0, 15).map((e) =>
     `<tr><td>${e.date.slice(4, 6)}/${e.date.slice(6)}</td><td>${TAB_NAME[e.group]}</td><td style="text-align:left">${esc(e.name)}</td>` +
     hs.map((h) => `<td class="${cls(e["r" + h])}">${e["r" + h] == null ? "–" : signed(e["r" + h], 1, "%")}</td>`).join("") + "</tr>").join("");
-  $("#scorecard").innerHTML = `<div class="tile wide"><table class="score">
+  const m = sc.method;
+  const how = m ? `<p class="hint">다음 날 시가에 사서 N영업일째 종가에 판 성적입니다(거래 비용 ${m.cost}% 뺌). '초과'는 같은 기간 종목이 속한 시장 지수(코스피·코스닥)보다 얼마나 더 올랐는지이고, 같은 종목이 며칠 연속 걸리면 겹치는 구간은 한 번만 셉니다.</p>`
+    : `<p class="hint">기준일 종가 기준, 코스피 대비 성적입니다 (예전 계산 방식).</p>`;
+  const bf = (sc.backfill_dates || []).length
+    ? `<p class="hint">${sc.backfill_dates.length}일(${ymd(sc.backfill_dates[0])}~${ymd(sc.backfill_dates.at(-1))})은 나중에 다시 계산한 기록이라, 그날 실제로 보이던 뉴스와 달라 스윙·단타 성적은 조금 할인해서 보세요.</p>` : "";
+  $("#scorecard").innerHTML = how + bf + `<div class="tile wide"><table class="score">
       <thead><tr><th></th>${hs.map((h) => `<th>${h}일 뒤</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>${warn}
     ${scoreCheckTable(sc.score_check)}
     ${featureTable(sc.features)}
@@ -712,7 +717,8 @@ function renderScore() {
 function featureTable(fs) {
   if (!fs || !fs.length) return "";
   const cell = (s) => (s ? `<b class="${cls(s.avg)}">${signed(s.avg, 1, "%")}</b><br><small>상승 ${s.win}% · ${s.n}건</small>` : `<span class="na">–</span>`);
-  const rows = fs.map((f) => `<tr><th>${esc(f.label)}</th><td>${cell(f.yes)}</td><td>${cell(f.no)}</td></tr>`).join("");
+  // 한쪽이라도 비어 있는 조건(예: 아직 한 건도 없는 '두 관점 겹침')은 빼고 보여 준다
+  const rows = fs.filter((f) => f.yes && f.no).map((f) => `<tr><th>${esc(f.label)}</th><td>${cell(f.yes)}</td><td>${cell(f.no)}</td></tr>`).join("");
   return `<h3 class="sub">조건별 성적 <small>스윙·단타 후보, ${fs[0].horizon}일 뒤</small></h3>
     <div class="tile wide"><table class="score"><thead><tr><th></th><th>조건 있음</th><th>없음</th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="hint">기록이 쌓이면 어떤 조건이 실제로 도움이 됐는지 보입니다. 건수가 적을 때는 참고만 하세요.</p>`;

@@ -66,6 +66,7 @@ def main(argv):
     closes = pd.DataFrame({d: daily[d]["종가"] for d in used_days}).T.astype(float)
     values = pd.DataFrame({d: daily[d]["거래대금"] for d in used_days}).T.astype(float)
     closes = closes.replace(0, float("nan"))
+    opens = pd.DataFrame({d: daily[d]["시가"] for d in used_days}).T.astype(float).replace(0, float("nan"))
     log(f"  {len(used_days)}일, {time.time() - t:.0f}초")
 
     t = step("종목별 수급")
@@ -265,7 +266,7 @@ def main(argv):
     kospi = safe("코스피 기간", lambda: sources.index_history("1001", used_days[0], base), errors)
     if kospi is not None:
         kospi.index = [d.strftime("%Y%m%d") for d in kospi.index]
-        history, regimes = [], {}
+        history, regimes, backfill_dates = [], {}, []
         # 장세는 그날 저장된 시장 온도 + 그날까지의 코스피로 다시 판정 (예전 기록에도 같은 규칙 적용)
         long_vals = kospi_long if kospi_long is not None else None
         long_days = [d.strftime("%Y%m%d") for d in long_vals.index] if long_vals is not None else []
@@ -273,16 +274,29 @@ def main(argv):
             with open(os.path.join(DATA, f"{d}.json"), encoding="utf-8") as f:
                 rec = json.load(f)
             flt = rec["filter"]
+            # 기준일 이틀 뒤 이후에 계산된 기록 = 나중에 다시 계산한 날 (그날 실제로 보던 뉴스와 다를 수 있음)
+            made = (rec.get("generated_at") or "")[:10].replace("-", "")
+            if rec.get("backfill") or (made and (datetime.strptime(made, "%Y%m%d") - datetime.strptime(d, "%Y%m%d")).days >= 2):
+                backfill_dates.append(d)
             history.append((d, {g: flt.get(g, []) for g in ("swing", "scalp", "value")}))
             if d in long_days:
                 upto = [float(v) for v in long_vals.values[:long_days.index(d) + 1]]
                 rg = logic.market_regime(upto, rec.get("temperature") or {})
                 if rg:
                     regimes[d] = rg["key"]
-        stats, recent, features, by_regime, score_check = logic.scorecard(history, closes, kospi, regimes)
+        # 다음 날 시가에 사서 종목이 속한 시장 지수와 비교 (코스닥 종목은 코스닥 지수)
+        bench = {}
+        for mk, ticker in (("KOSPI", "1001"), ("KOSDAQ", "2001")):
+            oc = safe(f"{mk} 시가·종가", lambda: sources.index_open_close(ticker, used_days[0], base), errors)
+            if oc is not None:
+                bench[mk] = oc
+        stats, recent, features, by_regime, score_check = logic.scorecard(
+            history, closes, kospi, regimes, opens=opens, bench=bench or None)
         card = {"generated_at": out["generated_at"], "base_date": base, "days": len(history),
                 "horizons": list(logic.HORIZONS), "stats": stats, "recent": recent, "features": features,
-                "by_regime": by_regime, "regimes": regimes, "score_check": score_check}
+                "by_regime": by_regime, "regimes": regimes, "score_check": score_check,
+                "method": {"entry": "다음 날 시가", "bench": "종목이 속한 시장 지수", "cost": logic.COST, "dedup": True},
+                "backfill_dates": backfill_dates}
         with open(os.path.join(DATA, "scorecard.json"), "w", encoding="utf-8") as f:
             json.dump(card, f, ensure_ascii=False, separators=(",", ":"), default=_json_default)
         log(f"  기록 {len(history)}일, 통계 {json.dumps(stats, ensure_ascii=False)}")

@@ -123,6 +123,14 @@ def index_history(ticker, fromdate, todate):
     return df["종가"].astype(float)
 
 
+def index_open_close(ticker, fromdate, todate):
+    """지수 시가·종가 (index=YYYYMMDD 문자열)."""
+    from pykrx import stock
+    df = retry(lambda: stock.get_index_ohlcv(fromdate, todate, ticker))
+    df.index = [d.strftime("%Y%m%d") for d in df.index]
+    return df["시가"].astype(float), df["종가"].astype(float)
+
+
 # ---------------------------------------------------------------- 해외·심리 지표
 
 def vix():

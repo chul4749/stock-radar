@@ -163,7 +163,7 @@ def test_scorecard_returns_and_excess():
     kospi = pd.Series([1000, 1000, 1000, 1000, 1000, 1050, 1050.0], index=days)
     hist = [("d0", {"swing": [{"code": "A", "name": "가", "close": 100.0}], "scalp": [], "value": []}),
             ("d6", {"swing": [{"code": "A", "name": "가", "close": 120.0}], "scalp": [], "value": []})]
-    stats, recent, feats, _, _ = logic.scorecard(hist, closes, kospi)
+    stats, recent, feats, _, _ = logic.scorecard(hist, closes, kospi, cost=0)
     assert stats["swing"]["1"] == {"n": 1, "avg": 10.0, "win": 100, "excess": 10.0}
     assert stats["swing"]["5"]["avg"] == 20.0 and stats["swing"]["5"]["excess"] == 15.0
     assert "20" not in stats["swing"]
@@ -246,7 +246,7 @@ def test_thermometer_includes_credit_parts():
          "fear_greed": {"score": 50},
          "credit_balance": {"forced": {"value": 900, "pct_1y": 90}, "loan": {"value": 302710, "pct_1y": 30}}}
     parts = {p["key"]: p["score"] for p in logic.thermometer(t)["parts"]}
-    assert parts["forced"] == 10 and parts["loan"] == 30
+    assert parts["forced"] == 10 and "loan" not in parts
 
 
 def _kospi(trend, n=80, start=3000.0):
@@ -279,7 +279,7 @@ def test_scorecard_splits_by_regime():
     kospi = pd.Series([1000.0] * 7, index=days)
     hist = [(days[0], {"swing": [{"code": "A", "name": "a", "close": 100.0}]}),
             (days[1], {"value": [{"code": "A", "name": "a", "close": 101.0}]})]
-    _, _, _, by, _ = logic.scorecard(hist, closes, kospi, {days[0]: "up", days[1]: "panic"})
+    _, _, _, by, _ = logic.scorecard(hist, closes, kospi, {days[0]: "up", days[1]: "panic"}, cost=0)
     assert by["up"]["days"] == 1 and by["up"]["groups"]["swing"]["5"]["n"] == 1
     assert by["panic"]["groups"]["value"]["1"]["avg"] == 1.0
 
@@ -319,7 +319,7 @@ def test_scorecard_score_halves():
     kospi = pd.Series([1000.0] * 7, index=days)
     hist = [(days[0], {"swing": [{"code": "A", "name": "a", "close": 100.0, "score": 2.0},
                                  {"code": "B", "name": "b", "close": 100.0, "score": 1.0}]})]
-    *_, check = logic.scorecard(hist, closes, kospi)
+    *_, check = logic.scorecard(hist, closes, kospi, cost=0)
     assert check["swing"]["hi"]["5"]["avg"] == 10.0 and check["swing"]["lo"]["5"]["avg"] == -5.0
 
 
@@ -336,3 +336,23 @@ def test_parse_profile_naver_shapes():
     assert p["annual"]["years"][1] == {"label": "2026.12 (추정)", "est": True}
     assert p["annual"]["rows"] == [{"title": "영업이익", "values": [14612.0, None]}]
     assert logic.parse_profile({}, {})["summary"] is None
+
+
+def test_scorecard_next_open_market_bench_dedup_cost():
+    days = [f"d{i}" for i in range(8)]
+    # A(코스닥): 기준일 종가 100, 다음 날 시가 110(갭), 5일째 종가 121
+    closes = pd.DataFrame({"A": [100, 112, 115, 118, 119, 121, 121, 121.0]}, index=days)
+    opens = pd.DataFrame({"A": [100, 110, 112, 115, 118, 119, 121, 121.0]}, index=days)
+    kospi = pd.Series([1000.0] * 8, index=days)
+    kq_open = pd.Series([800, 808, 800, 800, 800, 800, 800, 800.0], index=days)
+    kq_close = pd.Series([800, 800, 800, 800, 800, 824, 824, 824.0], index=days)
+    a = {"code": "A", "name": "가", "close": 100.0, "market": "KOSDAQ"}
+    hist = [("d0", {"scalp": [a]}), ("d1", {"scalp": [{**a, "close": 112.0}]})]
+    stats, recent, *_ = logic.scorecard(hist, closes, kospi, opens=opens,
+                                        bench={"KOSDAQ": (kq_open, kq_close)}, cost=0.2)
+    s5 = stats["scalp"]["5"]
+    # 다음 날 시가 110에 사서 121에 팜: +10% − 0.2%. 코스닥은 808 → 824 (+1.98%)
+    assert s5["n"] == 1 and s5["avg"] == 9.8 and s5["excess"] == round(9.8 - (824 / 808 - 1) * 100, 1)
+    # 하루 뒤 다시 걸린 같은 종목은 5일 성적에 중복으로 세지 않음 (1일 성적은 따로 셈)
+    assert stats["scalp"]["1"]["n"] == 2
+    assert next(e for e in recent if e["date"] == "d1")["dup"] == [5]
