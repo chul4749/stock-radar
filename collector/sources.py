@@ -342,7 +342,11 @@ DART_BAD = ["유상증자", "전환사채", "신주인수권부사채", "교환�
             "관리종목", "투자경고", "투자위험", "상장폐지"]
 
 DART_GOOD = ["공급계약", "판매", "수주", "자기주식취득", "자기주식 취득", "무상증자", "영업(잠정)실적",
-             "실적", "특허", "기술이전", "기술도입", "신규시설투자", "타법인주식", "합병", "현금ㆍ현물배당"]
+             "잠정실적", "손익구조", "특허", "기술이전", "기술도입", "신규시설투자", "타법인주식", "합병", "현금ㆍ현물배당"]
+# '실적'이 들어가도 재료가 아닌 공시 (회사채 발행 보고, 실적 발표 일정 안내)
+DART_NOT_GOOD = ["증권발행실적", "실적공시예고", "결산실적공시예고"]
+# 실적 공시: 제목만으로는 좋고 나쁨을 모른다 → 본문에서 영업이익 증감을 읽어 판단 (earnings_direction)
+DART_EARNINGS = ["잠정)실적", "잠정실적", "손익구조"]
 
 
 def dart_today(ymd, max_pages=15):
@@ -379,7 +383,8 @@ def dart_today(ymd, max_pages=15):
                         "at": f"{ymd[:4]}-{ymd[4:6]}-{ymd[6:]}T{hhmm.group(1) if hhmm else '00:00'}+09:00",
                         "kind": "공시", "source": "DART",
                         "good": any(k in title for k in DART_GOOD) and not any(k in title for k in DART_BAD)
-                                and "정정" not in title[:4],
+                                and not any(k in title for k in DART_NOT_GOOD) and "정정" not in title[:4],
+                        "earnings": any(k in title for k in DART_EARNINGS) and not any(k in title for k in DART_NOT_GOOD),
                         "bad": any(k in title for k in DART_BAD)
                                and not any(k in title for k in ("미지정", "철회", "해제", "취소", "지정유예"))})
         if new == 0:
