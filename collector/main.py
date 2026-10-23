@@ -101,6 +101,21 @@ def main(argv):
     nv = [] if backfill else (safe("네이버 주요뉴스", sources.naver_main_news, errors) or [])
     log(f"  네이버 주요뉴스 {len(nv)}{' (과거 기준일이라 생략)' if backfill else ''}")
     dart = safe("DART", lambda: sources.dart_today(base), errors) or []
+    # 실적 공시는 제목만으로 좋고 나쁨을 모르니 본문에서 영업이익 방향을 읽어, 줄었거나 적자면 재료에서 뺀다
+    read_ok = 0
+    for x in [x for x in dart if x.get("earnings")][:40]:
+        try:
+            e = logic.parse_earnings(sources.dart_document_text(x["url"].split("rcpNo=")[1]))
+        except Exception as err:
+            log(f"  실적 본문 {x['corp']} 실패: {type(err).__name__}")
+            e = None
+        if e:
+            read_ok += 1
+            x["earn"], x["earn_text"] = e["dir"], e["label"]
+            if e["dir"] == "down":
+                x["good"] = False
+        time.sleep(0.3)
+    log(f"  실적 공시 {sum(1 for x in dart if x.get('earnings'))}건 중 방향 읽음 {read_ok}건")
     log(f"  DART {len(dart)} (재료성 {sum(1 for x in dart if x['good'])})")
     all_items = news + nv + dart
     # 악재성 공시는 최근 5영업일을 본다 (기준일은 위에서 받음)

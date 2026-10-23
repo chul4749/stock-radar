@@ -338,6 +338,33 @@ class NameMatcher:
         return found
 
 
+def parse_earnings(text):
+    """실적 공시 본문 → 영업이익 방향. 잠정실적 표: 당해실적 | 이번 | 직전분기 | 증감 | 전환 | 전년 같은 분기 | 증감 | 전환.
+
+    전년 같은 분기와 비교한다 (계절성 때문에 직전 분기보다 낫다). 읽지 못하면 None.
+    """
+    m = re.search(r"영업이익 \| 당해실적 \| (.*?) \| 누계실적", text or "")
+    if not m:
+        return None
+    f = [x.strip() for x in m.group(1).split("|")]
+    num = lambda v: float(v.replace(",", "")) if re.fullmatch(r"-?[\d,]+(\.\d+)?", v) else None
+    cur = num(f[0]) if f else None
+    prev = num(f[4]) if len(f) > 4 else None
+    turn = f[6] if len(f) > 6 else ""
+    if cur is None:
+        return None
+    if "적자전환" in turn or (cur < 0 and prev is not None and prev >= 0):
+        return {"dir": "down", "label": "영업이익 적자 전환", "cur": cur, "prev": prev}
+    if cur < 0:
+        return {"dir": "down", "label": "영업이익 적자 지속", "cur": cur, "prev": prev}
+    if "흑자전환" in turn or (prev is not None and prev < 0):
+        return {"dir": "up", "label": "영업이익 흑자 전환", "cur": cur, "prev": prev}
+    if not prev:
+        return None
+    ch = (cur / prev - 1) * 100
+    return {"dir": "up" if ch >= 0 else "down", "label": f"영업이익 전년 같은 분기 대비 {ch:+.0f}%", "cur": cur, "prev": prev}
+
+
 def attach_news(items, matcher, since, until):
     """뉴스·공시 → {코드: [기사…]} (since ≤ 시각 ≤ until)."""
     out = {}

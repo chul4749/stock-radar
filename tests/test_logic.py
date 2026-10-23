@@ -411,3 +411,15 @@ def test_thermometer_halves_overlapping_price_signals():
 
 def test_scalp_needs_meaningful_big_hand_buying():
     assert logic.RULES["scalp_min_net_ratio"] == 2.0
+
+
+def test_parse_earnings_from_dart_viewer_text():
+    up = "영업이익 | 당해실적 | 8,972 | 1,398 | 541.67 | - | 2,830 | 217.05 | - | 누계실적 | 10,306"
+    down = "영업이익 | 당해실적 | 4,815 | 47,954 | -90.0 | - | 10,765 | -55.3 | - | 누계실적 | 63,071"
+    turn = "영업이익 | 당해실적 | 1,176 | 301 | 290.7 | - | -2,626 | - | 흑자전환 | 누계실적 | 225"
+    loss = "영업이익 | 당해실적 | -500 | 300 | - | 적자전환 | 200 | - | 적자전환 | 누계실적 | 1"
+    assert logic.parse_earnings(up)["label"] == "영업이익 전년 같은 분기 대비 +217%"
+    assert logic.parse_earnings(down)["dir"] == "down"
+    assert logic.parse_earnings(turn)["label"] == "영업이익 흑자 전환"
+    assert logic.parse_earnings(loss)["label"] == "영업이익 적자 전환"
+    assert logic.parse_earnings("관계없는 문서") is None

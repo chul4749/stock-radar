@@ -677,7 +677,8 @@ function cardHead(x) {
 function newsList(items) {
   return (items || []).map((n) => {
     const at = n.at.slice(5, 16).replace("T", " ").replace("-", "/");
-    const tag = n.kind === "공시" ? `<span class="tag dart">공시</span>` : "";
+    const tag = (n.kind === "공시" ? `<span class="tag dart">공시</span>` : "") +
+      (n.earn ? `<span class="tag earn-${n.earn}" title="${esc(n.earn_text || "")}">실적${n.earn === "up" ? "↑" : "↓"}</span>` : "");
     return `<li>${tag}<a href="${esc(n.url)}" target="_blank" rel="noopener">${esc(n.title)}</a><small>${esc(n.source)} ${at}</small></li>`;
   }).join("");
 }
@@ -1020,7 +1021,7 @@ function renderRules() {
     <ul><li>보통주만 (우선주·스팩·관리종목·투자주의환기종목 제외)</li>
     <li>최근 5영업일 안에 유상증자·전환사채·최대주주 변경·횡령·거래정지 같은 악재성 공시가 있으면 제외</li><li>시가총액 ${eok(r.min_cap)} 이상, 거래대금 ${eok(r.min_value)} 이상</li>
     <li>기사 제목에 종목명이 나온 종목만. 종목을 4개 이상 나열한 시황 기사는 제외</li>
-    <li>공시는 계약·수주·자사주 취득·실적 발표·특허·합병 등 재료가 되는 제목만 (제목만으로는 좋고 나쁨을 알 수 없는 실적·합병 공시도 포함)</li></ul>
+    <li>공시는 계약·수주·자사주 취득·실적 발표·특허·합병 등 재료가 되는 제목만. 실적 공시는 본문에서 영업이익을 전년 같은 분기와 비교해 늘었거나 흑자 전환한 것만 넣음 (줄었거나 적자면 제외, 본문을 못 읽으면 그대로 포함). 합병·타법인주식 공시는 제목만으로는 좋고 나쁨을 알 수 없어 그대로 포함</li></ul>
     <h3>단타</h3>
     <ul><li>전 영업일 장 마감 뒤 ~ 기준일 사이 기사·공시</li><li>거래대금이 20일 평균의 ${r.scalp_value_mult}배 이상</li>
     <li>${r.scalp_min_change}% 이상 상승</li><li>기준일 기관+외국인 순매수가 그날 거래대금의 ${r.scalp_min_net_ratio ?? 0}% 이상</li></ul>

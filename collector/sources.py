@@ -393,6 +393,21 @@ def dart_today(ymd, max_pages=15):
     return out
 
 
+def dart_document_text(rcp_no):
+    """DART 공시 본문(공시뷰어)을 글자만 ' | '로 이어 붙여 돌려준다. 접속이 자주 끊겨 넉넉히 재시도한다."""
+    main = retry(lambda: get("https://dart.fss.or.kr/dsaf001/main.do", params={"rcpNo": rcp_no}, timeout=30).text,
+                 tries=4, wait=3)
+    v = re.search(r"viewDoc\([\"'](\d+)[\"'],\s*[\"'](\d+)[\"'],\s*[\"'](\d+)[\"'],\s*[\"'](\d+)[\"'],"
+                  r"\s*[\"'](\d+)[\"'],\s*[\"']([^\"']*)[\"']", main)
+    if not v:
+        return ""
+    keys = ("rcpNo", "dcmNo", "eleId", "offset", "length", "dtd")
+    doc = retry(lambda: get("https://dart.fss.or.kr/report/viewer.do", timeout=30, params=dict(zip(keys, v.groups()))).text,
+                tries=4, wait=3)
+    text = re.sub(r"<[^>]+>", " | ", doc).replace("&nbsp;", " ")
+    return re.sub(r"(\s*\|\s*)+", " | ", text)
+
+
 def _tag(block, name):
     m = re.search(rf"<{name}>(.*?)</{name}>", block, re.S)
     if not m:
