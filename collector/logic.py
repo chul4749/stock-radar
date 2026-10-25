@@ -1389,6 +1389,72 @@ def manager_moves(etfs, known=None):
     return {"buys": sorted(buys, key=key), "sells": sorted(sells, key=key)}
 
 
+def enrich_manager_moves(moves, moves5=None, closes=None, since=None, sectors=None, trust=None, skill=None):
+    """운용사 매수·매도 종목에 확신도를 붙인다 (moves 를 고쳐서 돌려줌).
+
+    - persist: 5일 동안에도 같은 방향 (계속 사는/파는 중)
+    - big: 그 종목을 비중 3% 이상 담은 ETF가 있음
+    - since: 비교 시작일 이후 주가 등락 (이미 많이 올랐으면 늦었을 수 있음)
+    - trust5: 투신(자산운용사 전체) 5일 순매수 (억)
+    - good: 요즘(60일) 시장보다 잘한 운용사 수
+    - score: 정렬용 = 운용사 수×2 + 계속 + 비중 큼 + 잘하는 운용사
+    """
+    m5 = {}
+    for side in ("buys", "sells"):
+        for r in (moves5 or {}).get(side, []):
+            m5[(side, r["code"])] = r
+    for side in ("buys", "sells"):
+        for r in moves.get(side, []):
+            c = r["code"]
+            r["persist"] = (side, c) in m5
+            r["big"] = any(e["w"] >= 3 for e in r["etfs"])
+            if closes is not None and since and c in closes.columns and since in closes.index:
+                c0, c1 = closes[c].get(since), closes[c].iloc[-1]
+                r["since"] = r1((c1 / c0 - 1) * 100) if c0 and c0 == c0 and c1 == c1 else None
+            if sectors is not None and c in sectors:
+                r["sector"] = sectors.get(c)
+            if trust is not None:
+                r["trust5"] = r1(_money(trust, c) / EOK)
+            r["good"] = sum(1 for m in r["managers"] if (skill or {}).get(m, {}).get("x60", 0) > 0)
+            r["score"] = r["n"] * 2 + (1 if r["persist"] else 0) + (1 if r["big"] else 0) + r["good"]
+        moves[side].sort(key=lambda r: (-r["score"], -r["n"]))
+    return moves
+
+
+def manager_skill(etf_rows):
+    """운용사별 실력: 그 운용사 액티브 ETF들의 20·60일 성적에서 KODEX 200 성적을 뺀 값의 평균.
+
+    etf_rows: [{"manager", "r20", "r60", "b20", "b60"}] (b = 같은 기간 KODEX 200)
+    """
+    out = {}
+    for e in etf_rows:
+        if e.get("r60") is None or e.get("b60") is None:
+            continue
+        m = out.setdefault(e["manager"], {"x20": [], "x60": [], "n": 0})
+        m["x20"].append(e["r20"] - e["b20"])
+        m["x60"].append(e["r60"] - e["b60"])
+        m["n"] += 1
+    return {k: {"x20": r1(sum(v["x20"]) / len(v["x20"])), "x60": r1(sum(v["x60"]) / len(v["x60"])), "n": v["n"]}
+            for k, v in out.items() if v["x60"]}
+
+
+def sector_tilt(moves, sectors):
+    """운용사들이 늘리는·줄이는 업종: 업종별 (사들인 종목 수 − 판 종목 수), 운용사 수 가중."""
+    if sectors is None:
+        return []
+    acc = {}
+    for side, sign in (("buys", 1), ("sells", -1)):
+        for r in moves.get(side, []):
+            sec = sectors.get(r["code"]) if r["code"] in sectors else None
+            if not sec:
+                continue
+            a = acc.setdefault(sec, {"sector": sec, "net": 0, "buy": [], "sell": []})
+            a["net"] += sign * r["n"]
+            (a["buy"] if sign > 0 else a["sell"]).append(r["name"])
+    rows = sorted(acc.values(), key=lambda a: -a["net"])
+    return [{**a, "buy": a["buy"][:3], "sell": a["sell"][:3]} for a in rows if a["net"]]
+
+
 # ---------------------------------------------------------------- 전체 종목 검색용 요약
 
 def _bits(checks):

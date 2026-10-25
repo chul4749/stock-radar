@@ -421,3 +421,11 @@ table.fin .est { color: var(--faint); }
 details.calc { display: inline; }
 details.calc summary { display: inline; cursor: pointer; color: var(--faint); text-decoration: underline; }
 details.calc[open] { display: block; margin-top: 2px; }
+.skill { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; margin: 2px 0 6px; }
+.skill .good b, .skill .good { color: var(--calm); }
+.skill .bad { color: var(--sub); }
+.tilt { font-size: 13px; line-height: 1.7; margin-bottom: 6px; }
+.tilt small { color: var(--sub); }
+.mbadges { margin: 3px 0 1px; }
+.mbadges .tag { margin: 0 4px 2px 0; }
+.fit.mgr .mfacts { display: block; color: var(--sub); font-size: 12px; margin-top: 2px; }

@@ -101,7 +101,8 @@ const INFO = {
   score_scalp: "강도: 이 종목이 조건에 얼마나 강하게 걸렸는지 0~100점입니다. 지금까지 같은 탭에 걸린 종목들 중 어디쯤인지로 매깁니다.\n단타 계산 (100점 만점을 나눠 가짐):\n· 큰손 확인 50%: 오늘 거래 중 큰손이 산 비중 (20% 이상이면 만점)\n· 거래 증가 25%: 평소보다 거래가 몇 배 늘었나 (8배면 만점, 15배 넘게 과열되면 오히려 감점)\n· 상승폭 25%: 5~15% 오르면 만점, 상한가 근처까지 튀면 감점\n너무 과열된 종목은 다음 날 꺾이는 경우가 많아서 이렇게 만들었습니다.",
   report: "증권사 애널리스트가 이 회사를 분석해 쓴 보고서입니다. 리포트가 나온다는 건 시장의 관심이 이 회사로 오기 시작했다는 신호예요.\n· '오랜만에 다뤄짐': 석 달 넘게 리포트가 없다가 최근 2주 안에 새로 나온 경우. 아직 사람들이 많이 몰리기 전이라 가장 앞선 신호로 봅니다\n· 목표가: 애널리스트가 생각하는 적정 주가. 다만 증권사 목표가는 대체로 높게 잡히는 편이라 '지금보다 +50%'를 그대로 믿진 마세요\n· 목표가를 올렸는지 내렸는지가 숫자 자체보다 더 중요합니다\n정말 도움이 되는지는 성적표 '조건별 성적'의 리포트 줄에서 확인합니다.",
   themes: "업종·테마마다 ETF를 짝지어, '돈이 어디로 가나 → 그럼 어떤 ETF'를 보여 줍니다.\n· 큰손 5일: 그 ETF가 실제로 담은 종목(구성 상위 10개)에 기관+외국인이 5일 동안 넣은 돈\n· 넓이: 그 종목들 중 20일 평균 가격 위에 있는 비율 (한두 종목만 오르는지, 다 같이 오르는지)\n· 리포트: 그 종목들에 최근 2주 나온 증권사 리포트 수 ('오랜만'은 석 달 만에 나온 것)\n판정:\n· 돈이 먼저 들어오는 중: 큰손은 사는데 ETF 가격은 아직 평균 아래 — 미리 볼 후보 (선취매에 가까움). 단, 돈이 덩치 대비 0.1% 이상·4일 이상 고르게·여러 종목에 나눠 들어오고(한 종목이 60% 넘으면 안 됨), 가격이 더 무너지지 않을 때만 (아니면 '지켜보기')\n· 돈도 들어오고 흐름도 좋음: 이미 오르는 중\n· 과열: 20일 새 20% 넘게 올라 따라 사기 조심\n· 가격은 강한데 큰손은 파는 중: 주의\n정말 맞는지는 성적표 '테마 판정별 성적'에서 확인합니다.",
-  managers: "액티브 ETF는 펀드매니저가 직접 종목을 골라 사고파는 ETF입니다 (TIME=타임폴리오, KoAct=삼성액티브, ACE=한국투자 등).\nETF는 매일 담고 있는 종목을 공개하는데, 종목별 '담은 주식 수'는 펀드에 돈이 들어와도 그대로이고 매니저가 사고팔 때만 바뀝니다. 그래서 5일·20일 전과 비교하면 매니저가 뭘 샀고 뭘 팔았는지 보입니다.\n· 새로 담음: 전에 없던 종목을 넣음 (가장 강한 신호)\n· 늘림 / 줄임: 담은 주식 수를 10% 이상 바꿈\n· 모두 뺌: 다 팔아 버림\n여러 운용사가 같은 종목을 같이 사면 더 눈여겨볼 만합니다. 다만 매니저도 틀리고, 공개는 하루 늦게 반영될 수 있어요.",
+  mgr_skill: "운용사마다 직접 고른 액티브 ETF가 최근 60일 동안 KODEX 200(코스피 대표 200종목)보다 얼마나 더 벌었는지 평균입니다. +면 시장보다 잘 고른 곳.\n'요즘 잘하는 곳'이 산 종목을 조금 더 무겁게 봅니다. 다만 60일은 짧아서 운이 섞입니다.",
+  managers: "액티브 ETF는 펀드매니저가 직접 종목을 골라 사고파는 ETF입니다 (TIME=타임폴리오, KoAct=삼성액티브, ACE=한국투자 등).\nETF는 매일 담고 있는 종목을 공개하는데, 종목별 '담은 주식 수'는 펀드에 돈이 들어와도 그대로이고 매니저가 사고팔 때만 바뀝니다. 그래서 5일·20일 전과 비교하면 매니저가 뭘 샀고 뭘 팔았는지 보입니다.\n· 새로 담음: 전에 없던 종목을 넣음 (가장 강한 신호)\n· 늘림 / 줄임: 담은 주식 수를 10% 이상 바꿈\n· 모두 뺌: 다 팔아 버림\n여러 운용사가 같은 종목을 같이 사면 더 눈여겨볼 만합니다.\n붙는 표시:\n· 계속 사는 중: 20일 동안 샀고 최근 5일에도 또 삼 (확신이 있다는 뜻)\n· 비중 크게 담음: ETF 안에서 3% 넘게 담음\n· 그 뒤 주가: 비교 시작일 이후 주가 등락. 이미 15% 넘게 올랐으면 따라 사기엔 늦었을 수 있음\n· 투신 5일: 자산운용사 전체(펀드)가 이 종목을 최근 5일 산 금액. 같은 방향이면 더 믿을 만함\n순서는 운용사 수 → 계속 사는지 → 비중 → 잘하는 운용사 순으로 매깁니다. 매니저도 틀리고, 공개는 하루 늦게 반영될 수 있어요.",
   exit: "언제 팔지 미리 정해 두는 기준입니다. 처음 투자할 때 가장 어려운 게 '언제 파느냐'라서, 사기 전에 정해 두면 손실이 커지는 걸 막을 수 있습니다.\n· 스윙: 종가가 20일 평균 가격 아래로 마감하면 정리 (오르는 흐름이 깨짐)\n· 단타: 걸린 날의 저가를 깨고 마감하면 정리 (급등 힘이 빠짐)\n· 저평가: 최근 10일 최저가를 깨고 마감하면 정리 (아직 바닥이 아니었음)\n괄호 안 %는 지금 가격에서 그 기준까지 거리입니다. 이 기준을 실제로 지켰다면 성적이 어땠는지는 성적표의 '정리 기준을 지켰다면'에서 확인합니다.",
   earn_season: "회사들은 분기가 끝나면 정해진 기한 안에 실적을 발표합니다 (1분기 5/15, 반기 8/14, 3분기 11/14, 1년 결산 3/31까지).\n발표 전에는 결과를 모르니, 좋든 나쁘든 발표 날 주가가 크게 움직일 수 있습니다. 조건에 맞아 산 종목도 실적 한 번에 기준이 깨질 수 있어 미리 알려 드립니다.\n'발표 예고 공시'는 회사가 실적 발표 날짜를 미리 알린 경우입니다.",
   morning: "새벽에 끝난 미국 시장 결과로 오늘 아침 한국 시장 분위기를 미리 짐작해 봅니다.\n· 한국 ETF(EWY): 미국에 상장된 한국 주식 묶음이라 밤사이 외국인 시각이 가장 잘 보입니다 (가장 크게 반영)\n· 나스닥·미국 반도체: 삼성전자·SK하이닉스 같은 큰 종목과 같이 움직이는 경우가 많음\n· 공포지수(VIX)·환율: 오르면 부담\n짐작일 뿐이고, 장이 열리면 다르게 움직일 수 있습니다.",
@@ -1101,8 +1102,20 @@ try { mgrWin = localStorage.getItem("mgrWin") || "20"; } catch (e) { /* 무시 *
 
 function mgrRow(r, side) {
   const acts = r.etfs.slice(0, 4).map((e) => `${esc(e.name)} <b class="${side === "buy" ? "up" : "down"}">${ACT[e.act]}${e.chg != null && e.act !== "out" ? ` ${signed(e.chg, 0, "%")}` : ""}</b>${e.w ? ` <small>비중 ${num(e.w, 1)}%</small>` : ""}`).join("<br>");
+  const sk = (state.data.managers || {}).skill || {};
+  const badges = [];
+  if (r.persist) badges.push(`<span class="tag ${side === "buy" ? "fresh" : "known"}">${side === "buy" ? "계속 사는 중" : "계속 파는 중"}</span>`);
+  if (r.big) badges.push(`<span class="tag stay">비중 크게 담음</span>`);
+  if (side === "buy" && r.good) badges.push(`<span class="tag fresh">요즘 잘하는 곳 ${r.good}</span>`);
+  const facts = [];
+  if (r.sector) facts.push(esc(r.sector));
+  if (r.since != null) facts.push(`그 뒤 주가 <b class="${cls(r.since)}">${signed(r.since, 1, "%")}</b>${side === "buy" && r.since >= 15 ? " (이미 많이 오름)" : side === "buy" && r.since < 0 ? " (아직 안 오름)" : ""}`);
+  if (r.trust5 != null) facts.push(`투신 5일 <b class="${cls(r.trust5)}">${signed(r.trust5, 0, "억")}</b>`);
+  const mtag = (m) => `<span class="tag ${side === "buy" ? "fresh" : "known"}" title="${sk[m] ? `60일 시장보다 ${signed(sk[m].x60, 1, "%p")}` : ""}">${esc(m)}</span>`;
   return `<li><div class="row"><button type="button" class="lnk" data-stock="${r.code}"><b>${esc(r.name)}</b></button>
-    <span class="mchips">${r.managers.map((m) => `<span class="tag ${side === "buy" ? "fresh" : "known"}">${esc(m)}</span>`).join("")}</span></div>
+    <span class="mchips">${r.managers.map(mtag).join("")}</span></div>
+    ${badges.length ? `<div class="mbadges">${badges.join("")}</div>` : ""}
+    ${facts.length ? `<small class="mfacts">${facts.join(" · ")}</small>` : ""}
     ${r.mixed ? `<small class="hint">⚖ 다른 운용사는 반대로 움직임</small>` : ""}<small class="macts">${acts}${r.etfs.length > 4 ? `<br>외 ${r.etfs.length - 4}개 ETF` : ""}</small></li>`;
 }
 
@@ -1118,10 +1131,19 @@ function renderManagers() {
     const list = m == null ? `<small class="na">그때는 자료 없음 (새로 생긴 ETF)</small>`
       : m.length ? m.slice(0, 8).map((x) => `<li><button type="button" class="lnk" data-stock="${x.code}">${esc(x.name)}</button> <b class="${x.act === "new" || x.act === "add" ? "up" : "down"}">${ACT[x.act]}${x.chg != null && x.act !== "out" ? ` ${signed(x.chg, 0, "%")}` : ""}</b></li>`).join("")
       : `<small class="na">바꾼 것 없음</small>`;
-    return `<div class="hl"><b>${esc(e.name)}</b> <small>${esc(e.manager)} · ${e.n}종목</small><ul class="mlist">${list}</ul>
+    const perf = e.r60 != null && e.b60 != null ? ` · 60일 <b class="${cls(e.r60 - e.b60)}">시장보다 ${signed(e.r60 - e.b60, 1, "%p")}</b>` : "";
+    return `<div class="hl"><b>${esc(e.name)}</b> <small>${esc(e.manager)} · ${e.n}종목${perf}</small><ul class="mlist">${list}</ul>
       <details class="hold"><summary>지금 구성 상위 10·비중</summary><ol>${e.top.map(([c, n, w]) => `<li><button type="button" class="lnk" data-stock="${c}">${esc(n)}</button><span>${num(w, 1)}%</span></li>`).join("")}</ol></details></div>`;
   }).join("");
+  const sk = Object.entries(mg.skill || {}).sort((a, b) => b[1].x60 - a[1].x60);
+  const skillBox = sk.length ? `<h3 class="sub">요즘 잘하는 운용사 <small>최근 60일, KODEX 200보다</small>${infoBtn("mgr_skill")}</h3>${infoBox("mgr_skill")}
+    <div class="skill">${sk.map(([m, v]) => `<span class="${v.x60 > 0 ? "good" : "bad"}"><b>${esc(m)}</b> ${signed(v.x60, 1, "%p")}</span>`).join("")}</div>` : "";
+  const tilt = (mg.tilt || []);
+  const tiltBox = tilt.length ? `<h3 class="sub">운용사들이 늘리는·줄이는 업종 <small>20일</small></h3><div class="tilt">
+    ${tilt.slice(0, 4).filter((a) => a.net > 0).map((a) => `<div><b class="up">▲ ${esc(a.sector)}</b> <small>${a.buy.map(esc).join(", ")}</small></div>`).join("")}
+    ${tilt.slice(-4).filter((a) => a.net < 0).reverse().map((a) => `<div><b class="down">▼ ${esc(a.sector)}</b> <small>${a.sell.map(esc).join(", ")}</small></div>`).join("")}</div>` : "";
   el.innerHTML = `<p class="hint">읽는 법${infoBtn("managers")} · 액티브 ETF ${mg.etfs.length}개${since ? ` · ${ymd(since).slice(5)} 이후` : ""}</p>${infoBox("managers")}
+    ${skillBox}${tiltBox}
     <div class="seg" role="tablist">${["5", "20"].map((w) => `<button type="button" data-mgrwin="${w}" aria-selected="${w === mgrWin}">${w}일 동안</button>`).join("")}</div>
     <h3 class="sub">여러 운용사가 같이 산 종목 <small>${many.length}개</small></h3>
     ${many.length ? `<ul class="fit mgr">${many.slice(0, 12).map((r) => mgrRow(r, "buy")).join("")}</ul>` : `<p class="hint">두 곳 이상이 같이 산 종목은 없습니다.</p>`}

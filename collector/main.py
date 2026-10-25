@@ -323,7 +323,7 @@ def main(argv):
     log(f"  테마 {len(themes['themes'])}개: " + ", ".join(f"{x['name']}({x['key']})" for x in themes["themes"][:6]))
 
     t = step("운용사 방향 (액티브 ETF)")
-    managers = build_managers(base, used_days, listing, closes, errors)
+    managers = build_managers(base, used_days, listing, closes, errors, sectors=sectors, trust=quality.get("trust"))
     mg20 = managers["moves"].get("20") or {"buys": [], "sells": []}
     mg_of = {}
     for side in ("buys", "sells"):
@@ -464,7 +464,7 @@ def update_season(base, dart_days, name_to_code, errors):
     return season, store
 
 
-def build_managers(base, days, listing, closes, errors):
+def build_managers(base, days, listing, closes, errors, sectors=None, trust=None):
     """액티브 ETF마다 오늘 구성과 5·20영업일 전 구성을 비교해 운용사가 사고판 종목을 모은다 (collector/etf.py ACTIVE)."""
     windows = {"5": days[-6], "20": days[-21]} if len(days) >= 21 else {}
     known = set(listing)
@@ -481,6 +481,13 @@ def build_managers(base, days, listing, closes, errors):
             continue
         entry = {"manager": mgr, "code": code, "name": name, "n": len(now),
                  "top": [[c, n, round(w, 1)] for c, (n, _, w) in sorted(now.items(), key=lambda kv: -kv[1][2])[:10]]}
+        # 운용사 실력: 이 ETF의 20·60일 등락 (KODEX 200과 비교는 아래에서)
+        try:
+            h = sources.etf_history(code, days[-61] if len(days) >= 61 else days[0], base)["종가"]
+            entry["r20"] = logic.r1((h.iloc[-1] / h.iloc[-21] - 1) * 100) if len(h) >= 21 else None
+            entry["r60"] = logic.r1((h.iloc[-1] / h.iloc[-61] - 1) * 100) if len(h) >= 61 else None
+        except Exception:
+            entry["r20"] = entry["r60"] = None
         for w, d in windows.items():
             try:
                 before = sources.etf_pdf(code, d)
@@ -494,17 +501,30 @@ def build_managers(base, days, listing, closes, errors):
         etfs.append(entry)
     if etf.ACTIVE and fails > len(etf.ACTIVE) / 2:
         errors.append(f"액티브 ETF 구성: {fails}/{len(etf.ACTIVE)} 실패")
+    bench = safe("KODEX 200", lambda: sources.etf_history("069500", days[-61] if len(days) >= 61 else days[0], base)["종가"], errors)
+    b20 = logic.r1((bench.iloc[-1] / bench.iloc[-21] - 1) * 100) if bench is not None and len(bench) >= 21 else None
+    b60 = logic.r1((bench.iloc[-1] / bench.iloc[-61] - 1) * 100) if bench is not None and len(bench) >= 61 else None
+    for e in etfs:
+        e["b20"], e["b60"] = b20, b60
+    skill = logic.manager_skill([e for e in etfs if e.get("r20") is not None and b20 is not None])
     moves = {}
     for w in windows:
         r = logic.manager_moves(per[w], known)
-        moves[w] = {"buys": r["buys"][:30], "sells": r["sells"][:30]}
+        moves[w] = {"buys": r["buys"], "sells": r["sells"]}
+    if "5" in moves:
+        logic.enrich_manager_moves(moves["5"], None, closes, windows["5"], sectors, trust, skill)
+    if "20" in moves:
+        logic.enrich_manager_moves(moves["20"], moves.get("5"), closes, windows["20"], sectors, trust, skill)
+    tilt = logic.sector_tilt(moves.get("20") or {}, sectors)
+    for w in moves:
+        moves[w] = {"buys": moves[w]["buys"][:30], "sells": moves[w]["sells"][:30]}
     # 성적표용: 20일 동안 2곳 이상이 같이 산 종목 (그날 종가·시장과 함께)
     picks = []
     for r in (moves.get("20") or {}).get("buys", []):
         if r["n"] >= 2 and r["code"] in closes.columns and r["code"] in listing:
             picks.append({"code": r["code"], "name": r["name"], "close": float(closes[r["code"]].iloc[-1]),
                           "market": listing[r["code"]]["market"], "score": r["n"]})
-    return {"windows": windows, "etfs": etfs, "moves": moves, "picks": picks}
+    return {"windows": windows, "etfs": etfs, "moves": moves, "picks": picks, "skill": skill, "tilt": tilt, "bench": {"r20": b20, "r60": b60}}
 
 
 def build_themes(base, days, closes, flows_daily, flows_5d, listing, reports, regime, errors):

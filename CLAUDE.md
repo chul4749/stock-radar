@@ -35,6 +35,7 @@
     `logic.theme_strength`로 판정(돈이 먼저 들어오는 중·좋음·과열·큰손 매도·약함), 성적표 `themes`(`theme_scorecard`, KODEX 200 대비)로 확인
     `ACTIVE`(국내 주식형 액티브 ETF 30개): 오늘 구성과 5·20영업일 전 구성(KRX `etf_pdf`, 계약수=설정 단위당 수량이라 매니저 매매만 반영)을 비교 →
     `holdings_diff`(새로 담음·늘림·줄임·모두 뺌, 10% 이상) → `manager_moves`(종목별로 몇 곳이 같은 방향). 20일 2곳 이상 매수는 성적표 그룹 `mgr`
+    `enrich_manager_moves`(계속 사는 중·비중 3% 이상·그 뒤 주가·투신 5일·잘하는 운용사 → 정렬 점수), `manager_skill`(운용사별 액티브 ETF 60일 성적 − KODEX 200), `sector_tilt`(늘리는·줄이는 업종)
   - `morning.py` — 아침 요약: 야후 차트로 미국장 마감(EWY·나스닥·S&P·반도체·VIX·환율) → `site/data/morning.json` (`logic.morning_summary`)
   - `util.py` — KST, EOK(억), log
 - `site/` — 빌드 없는 정적 페이지 (`index.html`, `app.js`, `style.css`), 데이터는 `site/data/`
@@ -59,6 +60,7 @@
 
 ## 화면 규칙
 
+- 맨 위 '오늘의 결론'(`verdictBox`)과 카드 첫 줄(`whyLine`)은 숫자 없이 '그래서 뭘 하라는지'를 쉬운 말로. 1년 백분위는 '1년 중 높은 편'처럼 말로(`pctWord`).
 - 사용자는 한국어 사용자. 화면 문구는 쉬운 한국어로, 전문 용어에는 ⓘ 설명(`INFO`)과 한 줄 해석(`interpret`)을 붙인다.
 - 사용자 설정(탭, '설명 항상 펼치기', 관심 종목)은 `localStorage`에 저장하고, 접근은 항상 try/catch로 감싼다.
 - 모바일(390px 폭)에서 먼저 확인한다. 라이트·다크 모두 CSS 변수(`--text`, `--sub`, `--line` 등)를 쓴다.

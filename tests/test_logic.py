@@ -657,3 +657,22 @@ def test_feature_stats_marks_which_group():
     fs = logic.feature_stats([e], groups=("value",), features=logic.VALUE_FEATURES)
     assert all(f["who"] == "value" for f in fs)
     assert all(f["who"] == "flow" for f in logic.feature_stats([], groups=("swing", "scalp")))
+
+
+def test_manager_enrich_skill_and_tilt():
+    days = ["d1", "d2", "d3"]
+    closes = pd.DataFrame({"A": [100.0, 105, 110], "B": [50.0, 50, 45]}, index=days)
+    mv20 = {"buys": [{"code": "A", "name": "가", "managers": ["타임", "KB"], "etfs": [{"w": 4.0, "act": "new"}], "n": 2},
+                     {"code": "B", "name": "나", "managers": ["KB"], "etfs": [{"w": 1.0, "act": "add"}], "n": 1}],
+            "sells": [{"code": "B", "name": "나", "managers": ["삼성"], "etfs": [{"w": 1.0, "act": "cut"}], "n": 1}]}
+    mv5 = {"buys": [{"code": "A"}], "sells": []}
+    skill = logic.manager_skill([{"manager": "타임", "r20": 5, "r60": 10, "b20": 1, "b60": 2},
+                                 {"manager": "KB", "r20": 0, "r60": -5, "b20": 1, "b60": 2}])
+    assert skill["타임"]["x60"] == 8.0 and skill["KB"]["x60"] == -7.0
+    trust = pd.Series({"A": 30 * EOK})
+    out = logic.enrich_manager_moves(mv20, mv5, closes, "d1", pd.Series({"A": "IT", "B": "화학"}), trust, skill)
+    a = out["buys"][0]
+    assert a["code"] == "A" and a["persist"] and a["big"] and a["since"] == 10.0 and a["trust5"] == 30.0 and a["good"] == 1
+    assert a["score"] == 2 * 2 + 1 + 1 + 1
+    tilt = logic.sector_tilt(out, pd.Series({"A": "IT", "B": "화학"}))
+    assert tilt[0]["sector"] == "IT" and tilt[0]["net"] == 2
