@@ -89,6 +89,7 @@ const INFO = {
   inverse: "지수가 떨어지면 돈을 버는 상품(ETF)입니다. 예: 코스피가 1% 내리면 약 1% 오름.\n주의: 매일 다시 계산되는 구조라, 지수가 오르락내리락하며 제자리여도 손해가 쌓입니다. 2배 상품은 더 심합니다. 그래서 '확실히 내리는 짧은 구간'에만 맞고, 이미 많이 떨어진 뒤 따라 들어가면 반등에 크게 당하기 쉽습니다.",
   score_swing: "강도: 이 종목이 조건에 얼마나 강하게 걸렸는지 0~100점입니다. 지금까지 같은 탭에 걸린 종목들 중 어디쯤인지로 매겨서, 세 탭을 같은 눈금으로 비교할 수 있습니다.\n스윙 계산: 회사 크기에 비해 최근 5일 큰손이 얼마나 많이 샀는지 + 며칠 연속 샀는지.\n강도가 높다고 오른다는 보장은 없습니다. '어떤 종목부터 볼지' 순서로만 쓰세요.",
   score_scalp: "강도: 이 종목이 조건에 얼마나 강하게 걸렸는지 0~100점입니다. 지금까지 같은 탭에 걸린 종목들 중 어디쯤인지로 매깁니다.\n단타 계산 (100점 만점을 나눠 가짐):\n· 큰손 확인 50%: 오늘 거래 중 큰손이 산 비중 (20% 이상이면 만점)\n· 거래 증가 25%: 평소보다 거래가 몇 배 늘었나 (8배면 만점, 15배 넘게 과열되면 오히려 감점)\n· 상승폭 25%: 5~15% 오르면 만점, 상한가 근처까지 튀면 감점\n너무 과열된 종목은 다음 날 꺾이는 경우가 많아서 이렇게 만들었습니다.",
+  wake: "싼 종목도 시장이 관심을 안 주면 몇 년이고 싼 채로 남습니다 (가치 함정). 특히 한국 시장에서 흔합니다.\n그래서 '다시 주목받기 시작했나'를 따로 봅니다:\n· 큰손(기관+외국인)이 최근 5일 동안 샀나\n· 최근 3일 안에 기사·공시 같은 소식이 있나\n· 거래가 평소보다 늘었나\n· 최근 10일 바닥에서 5% 이상 올라왔나\n2개 이상이면 '움직일 계기가 생긴' 쪽입니다. 점수(강도)에는 넣지 않았고, 정말 성적이 나은지는 성적표의 '저평가 조건별 성적'에서 확인합니다.",
   score_value: "강도: 이 종목이 조건에 얼마나 강하게 걸렸는지 0~100점입니다. 지금까지 같은 탭에 걸린 종목들 중 어디쯤인지로 매깁니다.\n저평가 계산 (100점 만점을 나눠 가짐):\n· 낙폭 25%: 최근 고점보다 많이 빠졌나 (50% 빠지면 만점)\n· 싸짐 15%: 평소(1년)보다 얼마나 싸게 거래되나\n· PER 35%: 버는 돈에 비해 싼가 (PER 5 이하면 만점)\n· 이익 25%: 이익이 줄지 않고 버티거나 늘었나\n'싸면서 돈은 잘 버는 회사'가 위로 오게 했습니다.",
   futures: "외국인이 '코스피 선물'을 산 금액에서 판 금액을 뺀 값입니다.\n선물은 '앞으로 지수가 오를지 내릴지'에 거는 상품이라, 외국인의 방향 생각이 잘 드러납니다.\n· 며칠 연속 사면(+): 지수가 오를 쪽으로 보는 중\n· 며칠 연속 팔면(−): 내릴 쪽으로 보는 중\n한국 장의 방향을 먼저 알려 주는 지표로 많이 봅니다.",
   signals: "많이 떨어진 뒤 '이제 사도 될까?'를 세 단계로 확인합니다.\n1단계 투매 진정: 마구 팔던 게 잦아드는지 (신저가 종목·강제 매도 감소, 출렁임 감소)\n2단계 수급 전환: 큰손이 다시 사기 시작하는지 (외국인 선물·주식 순매수, 분위기 회복)\n3단계 추세 확인: 지수가 다시 오르는 흐름인지 (20일 평균 가격 회복)\n바닥은 아무도 정확히 못 맞힙니다. 그래서 한 번에 다 사지 말고 단계마다 나눠서(1/3 → 2/3 → 나머지) 들어가는 방법을 안내합니다.",
@@ -443,7 +444,7 @@ function renderTemp() {
 const TAB_HINT = {
   swing: "며칠~몇 주 들고 가는 후보. 최근 3일 안에 소식(기사·공시)이 있고, 큰손(기관·외국인)이 며칠째 사고 있으며, 주가가 오르는 흐름인 종목.",
   scalp: "하루~이틀 짧게 보는 후보. 오늘 소식이 나왔고, 평소보다 몇 배 많이 거래됐으며, 오늘 큰손(기관·외국인)도 산 종목.",
-  value: "많이 떨어져서 1년 중 싼 편인데, 회사가 버는 돈(이익)은 크게 줄지 않은 종목. 회사 문제가 아니라 시장이 겁먹어서 싸진 건지 살펴볼 후보.",
+  value: "많이 떨어져서 1년 중 싼 편인데, 회사가 버는 돈(이익)은 크게 줄지 않은 종목. 회사 문제가 아니라 시장이 겁먹어서 싸진 건지 살펴볼 후보. 싼 종목은 관심을 못 받으면 오래 싼 채로 남으니, 카드 아래 '주목 신호'가 2개 이상인지 함께 보세요.",
 };
 const TAB_NAME = { swing: "스윙", scalp: "단타", value: "저평가" };
 
@@ -510,6 +511,11 @@ function renderToday() {
   const fresh = ["swing", "scalp", "value"].map((g) => [g, (f[g] || []).filter((x) => x.streak_days === 1).length]).filter(([, n]) => n);
   if (["swing", "scalp", "value"].some((g) => (f[g] || []).some((x) => x.streak_days != null)))
     rows.push(["새로 걸림", fresh.length ? fresh.map(([g, n]) => `${TAB_NAME[g]} ${n}개`).join(" · ") : `<span class="na">없음 (모두 어제도 있던 종목)</span>`]);
+  const vals = state.data.filter.value || [];
+  if (vals.length && vals[0].wake) {
+    const woke = vals.filter((x) => x.wake.met >= 2);
+    rows.push(["주목받는 저평가", woke.length ? `<b>${woke.length}개</b> <small>${woke.slice(0, 3).map((x) => esc(x.name)).join(", ")}</small>` : `<span class="na">없음 (싼데 아무도 안 보는 중)</span>`]);
+  }
   if (tops.length) rows.push(["탭별 1위", `<span class="picks">${tops.map((p) => `<span>${p}</span>`).join("")}</span>`]);
   const hits = Object.keys(state.watch).filter((c) => ["swing", "scalp", "value"].some((g) => (f[g] || []).some((y) => y.code === c)));
   if (Object.keys(state.watch).length) rows.push(["관심 종목", hits.length ? `<b>${hits.map((c) => esc(state.watch[c])).join(", ")}</b> 오늘 걸림` : `<span class="na">오늘 걸린 종목 없음</span>`]);
@@ -699,10 +705,20 @@ function valueCard(x) {
       <div><small>5일 기관+외국인</small><b class="${cls(x.flow5_eok)}">${signed(x.flow5_eok, 0, "억")}</b></div>
     </div>
     <ul class="checks">${x.checks.map((c) => `<li><span>${esc(c.label)}</span><span>${esc(c.value)}</span></li>`).join("")}</ul>
+    ${wakeBlock(x.wake)}
     ${qualityRow(x)}
     ${news ? `<ul class="news">${news}</ul>` : `<p class="hint" style="margin:8px 0 0">최근 3일 관련 기사 없음</p>`}
     ${detailBtn(x)}
   </article>`;
+}
+
+// 싼 종목이 다시 주목받기 시작했나 (가치 함정 거르기용, 점수엔 안 들어감)
+function wakeBlock(w) {
+  if (!w) return "";
+  const tone = w.met >= 2 ? "good" : w.met === 1 ? "" : "bad";
+  const msg = w.met >= 2 ? "시장이 다시 보기 시작한 신호가 있음" : w.met === 1 ? "신호가 하나뿐 — 좀 더 지켜보기" : "아직 아무도 안 보는 중 — 싼 채로 오래 갈 수 있음";
+  return `<div class="wake"><div class="row"><b>주목 신호 <span class="${tone}">${w.met}/${w.total}</span>${infoBtn("wake")}</b><small>${msg}</small></div>${infoBox("wake")}
+    <ul class="checks">${w.checks.map((c) => `<li class="${c.ok ? "" : "no"}"><span>${esc(c.label)}</span><span>${esc(c.value)}</span></li>`).join("")}</ul></div>`;
 }
 
 function cardHead(x) {
@@ -843,15 +859,22 @@ function renderScore() {
     ${recent ? `<details class="rules"><summary>최근 기록 보기</summary><table class="score recent"><thead><tr><th>날짜</th><th>구분</th><th style="text-align:left">종목</th>${hs.map((h) => `<th>${h}일</th>`).join("")}</tr></thead><tbody>${recent}</tbody></table></details>` : ""}`;
 }
 
-function featureTable(fs) {
+function featureTable(all) {
+  return featureTableOf((all || []).filter((f) => !f.key.startsWith("v_")), "스윙·단타 후보") +
+    featureTableOf((all || []).filter((f) => f.key.startsWith("v_")), "저평가 후보",
+      "싼 종목 중 '주목받는 쪽'이 '아무도 안 보는 쪽'보다 실제로 나았는지 봅니다. '주목 신호 2개 이상'은 10/23 기록부터 셉니다.");
+}
+
+function featureTableOf(fs, who, note) {
   if (!fs || !fs.length) return "";
   // 값은 시장 지수 대비 초과 수익, '앞섬'은 지수보다 더 오른 비율
   const cell = (s) => (s ? `<b class="${cls(s.avg)}">${signed(s.avg, 1, "%p")}</b><br><small>앞섬 ${s.win}% · ${s.n}건</small>` : `<span class="na">–</span>`);
   // 한쪽이라도 비어 있는 조건(예: 아직 한 건도 없는 '두 관점 겹침')은 빼고 보여 준다
   const rows = fs.filter((f) => f.yes && f.no).map((f) => `<tr><th>${esc(f.label)}</th><td>${cell(f.yes)}</td><td>${cell(f.no)}</td></tr>`).join("");
-  return `<h3 class="sub">조건별 성적 <small>스윙·단타 후보, ${fs[0].horizon}일 뒤 시장 지수 대비 초과</small></h3>
+  if (!rows) return "";
+  return `<h3 class="sub">조건별 성적 <small>${who}, ${fs[0].horizon}일 뒤 시장 지수 대비 초과</small></h3>
     <div class="tile wide"><table class="score"><thead><tr><th></th><th>조건 있음</th><th>없음</th></tr></thead><tbody>${rows}</tbody></table></div>
-    <p class="hint">기록이 쌓이면 어떤 조건이 실제로 도움이 됐는지 보입니다. 건수가 적을 때는 참고만 하세요.</p>`;
+    <p class="hint">${note ? note + " " : ""}기록이 쌓이면 어떤 조건이 실제로 도움이 됐는지 보입니다. 건수가 적을 때는 참고만 하세요.</p>`;
 }
 
 /* ---------------- 업종·제외·상세 ---------------- */
@@ -1087,7 +1110,8 @@ function valueRules(v, eok) {
     <ul><li>시가총액 ${eok(v.min_cap)} 이상, 거래대금 ${eok(v.min_value)} 이상 (기사 없어도 됨)</li>
     <li>60일 최고가 대비 ${v.min_drop}% 이상 하락</li><li>PBR이 최근 1년(분기마다 1번, 4번) 중앙값의 ${Math.round(v.max_pbr_ratio * 100)}% 이하</li>
     <li>절대 수준도 싼 편: PER ${v.max_per ?? "–"} 이하, PBR ${v.max_pbr ?? "–"} 이하 (1년 내내 급등했던 종목 제외)</li>
-    <li>흑자이고, EPS가 1년 전의 ${Math.round(v.min_eps_ratio * 100)}% 이상 (KRX EPS는 결산 실적이라 늦게 바뀜)</li></ul>`;
+    <li>흑자이고, EPS가 1년 전의 ${Math.round(v.min_eps_ratio * 100)}% 이상 (KRX EPS는 결산 실적이라 늦게 바뀜)</li></ul>
+    <p>주목 신호 (걸러내는 조건 아님, 카드에 따로 표시): 큰손 5일 순매수, 최근 3일 소식, 5일 평균 거래대금이 20일 평균의 1.3배 이상, 최근 10일 최저가보다 5% 이상 위. 2개 이상이면 '다시 주목받는 중'.</p>`;
 }
 
 init();

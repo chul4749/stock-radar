@@ -475,3 +475,19 @@ def test_flow_detail_counts_streak_and_daily():
     fl = logic.flow_detail("A", daily, five, None)
     assert fl["streak"] == 2 and fl["days_pos"] == 2 and fl["inst_today"] == 5.0
     assert [x["sum"] for x in fl["daily"]] == [-1.0, 3.0, 5.0] and fl["pension_5d"] == 0.0
+
+
+def test_value_wake_counts_attention_signals():
+    col = pd.Series([100.0] * 50 + [80.0] * 9 + [86.0])
+    vals = pd.DataFrame({"A": [10.0] * 55 + [20.0] * 5})
+    w = logic.value_wake("A", col, 3e8, True, vals)
+    assert w["total"] == 4 and w["met"] == 4
+    w = logic.value_wake("A", pd.Series([100.0] * 60), -1e8, False, None)
+    assert w["total"] == 3 and w["met"] == 0
+
+
+def test_value_feature_stats_skip_unknown_days():
+    e = lambda wake, x: {"group": "value", "x5": x, "features": {"v_flow": True, "v_news": False, "v_wake2": wake}}
+    fs = logic.feature_stats([e(None, 1.0), e(True, 2.0), e(False, -1.0)], groups=("value",), features=logic.VALUE_FEATURES)
+    w2 = next(f for f in fs if f["key"] == "v_wake2")
+    assert w2["yes"]["n"] == 1 and w2["no"]["n"] == 1

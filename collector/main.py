@@ -156,7 +156,7 @@ def main(argv):
         if f is not None and len(f):
             fund_hist.append(f)
     if fund_now is not None and fund_hist:
-        value = logic.value_screen(universe, closes, fund_now, fund_hist, flows_5d, news_3d)
+        value = logic.value_screen(universe, closes, fund_now, fund_hist, flows_5d, news_3d, values=values)
     log(f"  저평가 {len(value)} (과거 스냅샷 {len(fund_hist)}개)")
     for x in value[:5]:
         log(f"   저평가 {x['name']} -{x['drop_60d']}% PBR {x['pbr']}/{x['pbr_med']}")

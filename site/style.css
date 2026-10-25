@@ -340,3 +340,10 @@ table.fin .est { color: var(--faint); }
 .gloss { margin: 4px 0 0; }
 .gloss dt { color: var(--text); font-weight: 600; margin-top: 10px; }
 .gloss dd { margin: 2px 0 0; line-height: 1.55; }
+.checks li.no::before { content: "✗"; color: var(--faint); }
+.checks li.no span:last-child { color: var(--sub); }
+.wake { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 13px; }
+.wake .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.wake .row small { color: var(--sub); }
+.wake .good { color: var(--calm); }
+.wake .bad { color: var(--fear); }

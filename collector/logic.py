@@ -586,11 +586,35 @@ def apply_forward_eps(value, profiles):
     return value
 
 
-def value_screen(universe, closes, fund_now, fund_hist, flows_5d, news_3d, rules=VALUE_RULES):
+# 싼 종목은 시장이 안 보면 몇 년이고 싼 채로 남는다(가치 함정). 그래서 '다시 주목받기 시작했나'를 따로 본다.
+WAKE_RULES = {"vol_mult": 1.3, "rebound": 5.0}
+
+
+def value_wake(code, col, flow5, has_news, values=None, rules=WAKE_RULES):
+    """저평가 후보의 주목 신호: 큰손 매수, 소식, 거래 증가, 바닥 반등. 점수엔 안 넣고 따로 보여 주며 성적표로 확인한다."""
+    low10 = col.iloc[-10:].min()
+    rebound = (col.iloc[-1] / low10 - 1) * 100 if low10 > 0 else 0.0
+    checks = [
+        {"key": "flow", "label": "큰손(기관+외국인)이 최근 5일 동안 삼", "ok": flow5 > 0, "value": f"{flow5 / EOK:+,.0f}억"},
+        {"key": "news", "label": "최근 3일 안에 기사·공시가 나옴", "ok": bool(has_news), "value": "있음" if has_news else "없음"},
+    ]
+    if values is not None and code in values.columns:
+        v = values[code]
+        avg20, avg5 = v.iloc[-21:-1].mean(), v.iloc[-5:].mean()
+        mult = avg5 / avg20 if avg20 and avg20 > 0 else 0.0
+        checks.append({"key": "volume", "label": f"거래가 살아남 (5일 평균 거래대금이 평소의 {rules['vol_mult']}배 이상)",
+                       "ok": mult >= rules["vol_mult"], "value": f"{mult:.1f}배"})
+    checks.append({"key": "rebound", "label": f"바닥에서 고개 듦 (최근 10일 최저가보다 {rules['rebound']:.0f}% 이상 위)",
+                   "ok": rebound >= rules["rebound"], "value": f"+{rebound:.1f}%"})
+    return {"met": sum(1 for c in checks if c["ok"]), "total": len(checks), "checks": checks}
+
+
+def value_screen(universe, closes, fund_now, fund_hist, flows_5d, news_3d, rules=VALUE_RULES, values=None):
     """많이 떨어졌는데 장부가치 대비 싸졌고, 이익은 크게 줄지 않은 종목.
 
     fund_now: DataFrame(index=티커, BPS/PER/PBR/EPS)
     fund_hist: [DataFrame] 1년 동안의 과거 스냅샷 (오래된 순, 첫 번째가 약 1년 전)
+    values: 거래대금 DataFrame (주목 신호의 '거래가 살아남'용, 없으면 그 항목은 빠짐)
     """
     out = []
     if fund_now is None or len(fund_now) == 0 or not fund_hist:
@@ -643,6 +667,7 @@ def value_screen(universe, closes, fund_now, fund_hist, flows_5d, news_3d, rules
             "checks": checks,
             **dict(zip(("score", "score_parts"), value_score(drop, pbr_ratio, per, eps_ratio))),
             "news": news_3d.get(code, [])[:3],
+            "wake": value_wake(code, col, f5 + i5, code in news_3d, values),
         })
     out.sort(key=lambda x: -x["score"])
     return out
@@ -1190,7 +1215,8 @@ def scorecard(history, closes, index_closes, regimes=None, opens=None, bench=Non
     score_check = {g: {h: {str(n): summarize_returns(s["rets"], s["ex"]) for n, s in by_n.items()} for h, by_n in hl.items()}
                    for g, hl in halves.items()}
     recent.sort(key=lambda e: e["date"], reverse=True)
-    return out, recent[:60], feature_stats(recent), regime_out, score_check
+    feats = feature_stats(recent) + feature_stats(recent, groups=("value",), features=VALUE_FEATURES)
+    return out, recent[:60], feats, regime_out, score_check
 
 
 def summarize_returns(rets, ex=None):
@@ -1202,6 +1228,13 @@ def summarize_returns(rets, ex=None):
 
 
 # 조건별 성적: 후보 안에서 이 조건이 있을 때와 없을 때 5일 뒤 수익률 비교
+# 저평가 후보: 주목받는 싼 종목 vs 아무도 안 보는 싼 종목 (예전 기록에도 있는 값만 써서 바로 비교되게)
+VALUE_FEATURES = {
+    "v_flow": "큰손이 5일 동안 삼",
+    "v_news": "최근 3일 기사·공시 있음",
+    "v_wake2": "주목 신호 2개 이상",
+}
+
 FEATURES = {
     "pension": "연기금 5일 순매수",
     "trust": "투신 5일 순매수",
@@ -1220,17 +1253,21 @@ def features_of(x):
         "streak3": (fl.get("streak") or 0) >= 3,
         "fratio_up": (q.get("fratio_chg") or 0) > 0,
         "overlap": bool(x.get("overlap")),
+        "v_flow": (x.get("flow5_eok") or 0) > 0,
+        "v_news": bool(x.get("news")),
+        "v_wake2": None if x.get("wake") is None else x["wake"]["met"] >= 2,
     }
 
 
-def feature_stats(entries, horizon=5):
-    """스윙·단타 후보(수급 관점)만 대상으로 조건 있음/없음 비교. 날마다 시장 움직임이 달라 시장 지수 대비 초과 수익으로 본다."""
+def feature_stats(entries, horizon=5, groups=("swing", "scalp"), features=FEATURES):
+    """조건 있음/없음 비교 (기본: 스윙·단타 후보). 날마다 시장 움직임이 달라 시장 지수 대비 초과 수익으로 본다.
+    값이 None인 기록(그 조건을 아직 저장하지 않던 날)은 양쪽 모두에서 뺀다."""
     out = []
-    pool = [e for e in entries if e["group"] in ("swing", "scalp") and e.get(f"x{horizon}") is not None
+    pool = [e for e in entries if e["group"] in groups and e.get(f"x{horizon}") is not None
             and horizon not in e.get("dup", [])]
-    for key, label in FEATURES.items():
-        yes = [e[f"x{horizon}"] for e in pool if e.get("features", {}).get(key)]
-        no = [e[f"x{horizon}"] for e in pool if not e.get("features", {}).get(key)]
+    for key, label in features.items():
+        yes = [e[f"x{horizon}"] for e in pool if e.get("features", {}).get(key) is True]
+        no = [e[f"x{horizon}"] for e in pool if e.get("features", {}).get(key) is False]
         out.append({"key": key, "label": label, "horizon": horizon,
                     "yes": summarize_returns(yes), "no": summarize_returns(no)})
     return out
