@@ -402,7 +402,8 @@ table.fin .est { color: var(--faint); }
 .lnk { border: 0; background: none; padding: 0; font: inherit; color: var(--text); cursor: pointer; text-align: left; text-decoration: underline; text-decoration-color: var(--line); text-underline-offset: 3px; }
 .fit.mgr > li { margin-bottom: 6px; }
 .fit.mgr .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
-.mchips .tag { margin: 0 0 0 4px; }
+.mchips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; min-width: 0; }
+.mchips .tag { margin: 0; }
 .fit.mgr .macts { display: block; color: var(--sub); font-size: 12px; line-height: 1.6; margin-top: 2px; }
 .fit.mgr .macts b { font-weight: 600; }
 .hold { margin-top: 6px; font-size: 12px; }
@@ -480,7 +481,9 @@ html.modal-open, html.modal-open body { overflow: hidden; overscroll-behavior: n
 .tipline { position: absolute; top: 0; bottom: 0; width: 1px; margin-left: -0.5px; background: var(--text); opacity: .6; pointer-events: none; }
 .tipbox { position: absolute; top: -4px; transform: translateY(-100%); z-index: 3; pointer-events: none; white-space: nowrap;
   background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; font-size: 11px;
-  box-shadow: 0 2px 8px rgba(0,0,0,.15); display: flex; gap: 8px; align-items: baseline; }
+  box-shadow: 0 2px 8px rgba(0,0,0,.15); display: flex; flex-wrap: wrap; gap: 0 8px; align-items: baseline;
+  max-width: 100%; box-sizing: border-box; white-space: normal; }
+.tipbox > * { white-space: nowrap; }
 .tipbox[hidden], .tipline[hidden] { display: none; }
 .tipbox span { color: var(--sub); }
 .nbars { position: relative; display: flex; gap: 2px; height: 60px; margin: 8px 0 2px; }

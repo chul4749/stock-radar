@@ -775,7 +775,7 @@ function renderRegime() {
 
 const starBtn = (x) => {
   const on = !!state.watch[x.code];
-  return `<button class="star${on ? " on" : ""}" type="button" data-code="${x.code}" data-name="${esc(x.name)}" data-price="${x.close ?? ""}" aria-pressed="${on}" aria-label="관심 종목${on ? " 해제" : "에 추가"}">${on ? "★" : "☆"}</button>`;
+  return `<button class="star${on ? " on" : ""}" type="button" data-code="${x.code}" data-name="${esc(x.name)}" data-price="${x.close ?? ""}"${x.date ? ` data-date="${x.date}"` : ""} aria-pressed="${on}" aria-label="관심 종목${on ? " 해제" : "에 추가"}">${on ? "★" : "☆"}</button>`;
 };
 
 // ★ 누른 날 가격 대비 지금(가장 최근 수집일 종가) 몇 %인지, 같은 기간 코스피와 함께
@@ -798,7 +798,7 @@ function renderWatch() {
     const perf = watchPerf(c);
     return groups.length
       ? `<li class="hit"><button class="more" type="button" data-code="${c}">${name}</button> <span class="tag both">${groups.map((g) => TAB_NAME[g]).join("·")}</span>${perf}</li>`
-      : `<li class="miss">${name} <small>조건 밖</small>${perf}</li>`;
+      : `<li class="miss"><button type="button" class="lnk" data-stock="${c}">${name}</button> <small>조건 밖</small>${perf}</li>`;
   });
   const hits = rows.filter((r) => r.startsWith('<li class="hit"')).length;
   $("#watch").innerHTML = `<div class="watch"><div class="l">관심 종목 <small>${hits ? `오늘 ${hits}개 걸림` : "오늘 걸린 종목 없음"}</small></div><ul>${rows.join("")}</ul></div>`;
@@ -814,7 +814,7 @@ document.addEventListener("click", (e) => {
   } else {
     state.watch[c] = b.dataset.name;
     const k = ((state.data.temperature || {}).index || {}).kospi;
-    if (b.dataset.price) state.watchFrom[c] = { price: Number(b.dataset.price), date: state.data.base_date, kospi: k ? k.close : null };
+    if (b.dataset.price) state.watchFrom[c] = { price: Number(b.dataset.price), date: b.dataset.date || state.data.base_date, kospi: !b.dataset.date || b.dataset.date === state.data.base_date ? (k ? k.close : null) : null };
   }
   try {
     localStorage.setItem("watch", JSON.stringify(state.watch));
@@ -1607,7 +1607,7 @@ async function openStock(code) {
     <ul class="checks">${pre.map(([ok, l]) => gate(ok, l)).join("")}${bits ? list(bits, labels) : ""}</ul></li>`;
   const trend = s.g20 == null ? "–" : s.g20 > 0 && s.g60 > 0 ? "오르는 흐름 (20·60일 평균 위)" : s.g20 < 0 && s.g60 < 0 ? "내리는 흐름 (20·60일 평균 아래)" : "섞여 있음";
   $("#detail-body").innerHTML = `<div class="hd"><a class="nm" href="https://m.stock.naver.com/domestic/stock/${code}" target="_blank" rel="noopener">${esc(s.n)}<span class="mk">${s.m === "P" ? "KOSPI" : "KOSDAQ"} ${code}${s.s ? " · " + esc(s.s) : ""}</span></a>
-      <div class="px"><b>${num(s.c)}</b><span class="${cls(s.ch)}">${signed(s.ch, 1, "%")}</span></div></div>
+      <div class="px">${starBtn({ code, name: s.n, close: s.c, date: db.date })}<b>${num(s.c)}</b><span class="${cls(s.ch)}">${signed(s.ch, 1, "%")}</span></div></div>
     <p class="hint">${ymd(db.date)} 기준 · 시총 ${eokText(s.cap)} · 거래대금 ${num(s.v)}억${tabs.length ? ` · <b>오늘 ${tabs.join("·")} 후보</b>` : ""}</p>
     ${s.x ? `<div class="earnwarn">⚠ 위험 공시·투자주의로 후보에서 뺀 종목: ${s.x.map(esc).join(", ")}</div>` : ""}
     ${s.mg ? `<p class="hint">20일 동안 운용사(액티브 ETF): ${s.mg.buy && s.mg.buy.length ? `<b class="up">산 곳 ${s.mg.buy.map(esc).join("·")}</b>` : ""}${s.mg.buy && s.mg.buy.length && s.mg.sell && s.mg.sell.length ? " · " : ""}${s.mg.sell && s.mg.sell.length ? `<b class="down">판 곳 ${s.mg.sell.map(esc).join("·")}</b>` : ""}</p>` : ""}
