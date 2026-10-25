@@ -38,6 +38,7 @@
     `ACTIVE`(국내 주식형 액티브 ETF 30개): 오늘 구성과 5·20영업일 전 구성(KRX `etf_pdf`, 계약수=설정 단위당 수량이라 매니저 매매만 반영)을 비교 →
     `holdings_diff`(새로 담음·늘림·줄임·모두 뺌, 10% 이상) → `manager_moves`(종목별로 몇 곳이 같은 방향). 20일 2곳 이상 매수는 성적표 그룹 `mgr`
     `enrich_manager_moves`(계속 사는 중·비중 3% 이상·그 뒤 주가·투신 5일·잘하는 운용사 → 정렬 점수), `manager_skill`(운용사별 액티브 ETF 60일 성적 − KODEX 200), `sector_tilt`(늘리는·줄이는 업종)
+    히트맵(`theme_heat`): 테마 × 최근 20일, 날마다 구성 종목 큰손 순매수(시총 대비 %)와 대표 ETF 등락. 화면은 '큰손 돈/ETF 가격' 전환, 빨강·파랑 + 회색 0(시총 히트맵은 대형주에 묻혀 안 씀)
   - `morning.py` — 아침 요약: 야후 차트로 미국장 마감(EWY·나스닥·S&P·반도체·VIX·환율) → `site/data/morning.json` (`logic.morning_summary`)
   - `util.py` — KST, EOK(억), log
 - `site/` — 빌드 없는 정적 페이지 (`index.html`, `app.js`, `style.css`), 데이터는 `site/data/`

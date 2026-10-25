@@ -465,3 +465,12 @@ html.modal-open, html.modal-open body { overflow: hidden; overscroll-behavior: n
 /* 격자 목록 칸이 긴 ETF 이름 같은 끊기지 않는 글자 때문에 화면 밖으로 밀리지 않게 */
 .fit { grid-template-columns: minmax(0, 1fr); }
 .fit > li, .tile, .card, .verdict, .today .tr .v { min-width: 0; overflow-wrap: anywhere; }
+/* 테마 × 날짜 히트맵 */
+.hm { display: grid; gap: 2px; margin-top: 6px; align-items: center; }
+.hm-name { font-size: 11px; color: var(--sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 4px; }
+.hm-c { height: 16px; border: 0; padding: 0; border-radius: 3px; cursor: pointer; min-width: 0; }
+.hm-c.sel { outline: 2px solid var(--text); outline-offset: 0; }
+.hm-days { display: flex; justify-content: space-between; font-size: 10px; color: var(--faint); margin-top: 2px; }
+.hm-leg { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--sub); margin-top: 6px; }
+.hm-leg i { flex: 0 0 140px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--down), var(--neutral-bg) 50%, var(--up)); }
+.hm-tip { min-height: 1.5em; }

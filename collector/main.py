@@ -327,7 +327,7 @@ def main(argv):
         temp["signals"] = logic.entry_signals(temp)
 
     t = step("업종·테마 ETF")
-    themes = build_themes(base, used_days, closes, flows_daily, flows_5d, listing, reports, temp.get("regime"), errors)
+    themes = build_themes(base, used_days, closes, flows_daily, flows_5d, listing, reports, temp.get("regime"), errors, flows_hist)
     log(f"  테마 {len(themes['themes'])}개: " + ", ".join(f"{x['name']}({x['key']})" for x in themes["themes"][:6]))
 
     t = step("급등주 복기·신호 검증")
@@ -575,7 +575,7 @@ def build_managers(base, days, listing, closes, errors, sectors=None, trust=None
     return {"windows": windows, "etfs": etfs, "moves": moves, "picks": picks, "skill": skill, "tilt": tilt, "bench": {"r20": b20, "r60": b60}}
 
 
-def build_themes(base, days, closes, flows_daily, flows_5d, listing, reports, regime, errors):
+def build_themes(base, days, closes, flows_daily, flows_5d, listing, reports, regime, errors, flows_hist=None):
     """테마마다 ETF 흐름(KRX 시세)과 ETF 구성 종목의 큰손 돈 흐름으로 판정 (collector/etf.py 표)."""
     start = days[-40] if len(days) >= 40 else days[0]
     bench = {}
@@ -586,8 +586,10 @@ def build_themes(base, days, closes, flows_daily, flows_5d, listing, reports, re
     kospi_etf = bench.get("069500")
     caps = {c: v["cap"] for c, v in listing.items()}
     out, fails, total = [], 0, 0
+    heat_src = {}   # 히트맵용: 테마별 구성 종목과 대표 ETF 일별 등락
     for name, etfs in etf.THEMES:
         rows, members = [], {}
+        main_ret = None
         for code, ename in etfs:
             total += 1
             tr = None
@@ -596,6 +598,8 @@ def build_themes(base, days, closes, flows_daily, flows_5d, listing, reports, re
                 tr = logic.etf_trend(h["종가"], kospi_etf)
                 if tr:
                     tr["value_eok"] = round(float(h["거래대금"].iloc[-1]) / EOK)
+                    if main_ret is None:
+                        main_ret = h["종가"].pct_change() * 100
             except Exception as e:
                 fails += 1
                 log(f"  ETF {ename} 시세 실패: {type(e).__name__}")
@@ -611,11 +615,13 @@ def build_themes(base, days, closes, flows_daily, flows_5d, listing, reports, re
         th = logic.theme_strength(name, rows, members, caps, closes, flows_daily, flows_5d, reports, base, regime)
         if th:
             out.append(th)
+            heat_src[name] = (list(members), main_ret)
     if total and fails > total / 2:
         errors.append(f"ETF 시세: {fails}/{total} 실패")
     order = {"early": 0, "strong": 1, "watch": 2, "hot": 3, "fading": 4, "weak": 5}
     out.sort(key=lambda x: (order[x["key"]], -x["flow_pct"]))
-    return {"themes": out, "bench": {c: logic.etf_trend(sr) for c, sr in bench.items()}}
+    heat = logic.theme_heat(heat_src, logic.net_frame(flows_hist or []), caps, days=20)
+    return {"themes": out, "bench": {c: logic.etf_trend(sr) for c, sr in bench.items()}, "heat": heat}
 
 
 def update_reports(base, errors, keep_days=150):

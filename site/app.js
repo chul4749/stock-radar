@@ -101,6 +101,7 @@ const INFO = {
   score_swing: "강도: 이 종목이 조건에 얼마나 강하게 걸렸는지 0~100점입니다. 지금까지 같은 탭에 걸린 종목들 중 어디쯤인지로 매겨서, 세 탭을 같은 눈금으로 비교할 수 있습니다.\n스윙 계산: 회사 크기에 비해 최근 5일 큰손이 얼마나 많이 샀는지 + 며칠 연속 샀는지.\n강도가 높다고 오른다는 보장은 없습니다. '어떤 종목부터 볼지' 순서로만 쓰세요.",
   score_scalp: "강도: 이 종목이 조건에 얼마나 강하게 걸렸는지 0~100점입니다. 지금까지 같은 탭에 걸린 종목들 중 어디쯤인지로 매깁니다.\n단타 계산 (100점 만점을 나눠 가짐):\n· 큰손 확인 50%: 오늘 거래 중 큰손이 산 비중 (20% 이상이면 만점)\n· 거래 증가 25%: 평소보다 거래가 몇 배 늘었나 (8배면 만점, 15배 넘게 과열되면 오히려 감점)\n· 상승폭 25%: 5~15% 오르면 만점, 상한가 근처까지 튀면 감점\n너무 과열된 종목은 다음 날 꺾이는 경우가 많아서 이렇게 만들었습니다.",
   report: "증권사 애널리스트가 이 회사를 분석해 쓴 보고서입니다. 리포트가 나온다는 건 시장의 관심이 이 회사로 오기 시작했다는 신호예요.\n· '오랜만에 다뤄짐': 석 달 넘게 리포트가 없다가 최근 2주 안에 새로 나온 경우. 아직 사람들이 많이 몰리기 전이라 가장 앞선 신호로 봅니다\n· 목표가: 애널리스트가 생각하는 적정 주가. 다만 증권사 목표가는 대체로 높게 잡히는 편이라 '지금보다 +50%'를 그대로 믿진 마세요\n· 목표가를 올렸는지 내렸는지가 숫자 자체보다 더 중요합니다\n정말 도움이 되는지는 성적표 '조건별 성적'의 리포트 줄에서 확인합니다.",
+  heat: "줄마다 테마 하나, 칸마다 하루입니다. 오른쪽 끝이 가장 최근이에요.\n· 큰손 돈: 그날 그 테마 ETF가 담은 종목들에 기관+외국인이 넣은 돈. 빨강 = 들어옴, 파랑 = 빠짐, 진할수록 많음 (테마 덩치 대비라 큰 테마·작은 테마를 같은 눈으로 봄)\n· ETF 가격: 그날 대표 ETF 등락. 빨강 = 오름, 파랑 = 내림\n읽는 법: 한 줄이 오른쪽으로 갈수록 빨개지면 돈이 그쪽으로 옮겨 가는 중이에요. '큰손 돈'은 빨간데 'ETF 가격'은 아직 파랗거나 옅으면 돈이 먼저 들어오고 가격은 아직인 곳(미리 볼 곳)입니다.",
   themes: "업종·테마마다 ETF를 짝지어, '돈이 어디로 가나 → 그럼 어떤 ETF'를 보여 줍니다.\n· 큰손 5일: 그 ETF가 실제로 담은 종목(구성 상위 10개)에 기관+외국인이 5일 동안 넣은 돈\n· 넓이: 그 종목들 중 20일 평균 가격 위에 있는 비율 (한두 종목만 오르는지, 다 같이 오르는지)\n· 리포트: 그 종목들에 최근 2주 나온 증권사 리포트 수 ('오랜만'은 석 달 만에 나온 것)\n판정:\n· 돈이 먼저 들어오는 중: 큰손은 사는데 ETF 가격은 아직 평균 아래 — 미리 볼 후보 (선취매에 가까움). 단, 돈이 덩치 대비 0.1% 이상·4일 이상 고르게·여러 종목에 나눠 들어오고(한 종목이 60% 넘으면 안 됨), 가격이 더 무너지지 않을 때만 (아니면 '지켜보기')\n· 돈도 들어오고 흐름도 좋음: 이미 오르는 중\n· 과열: 20일 새 20% 넘게 올라 따라 사기 조심\n· 가격은 강한데 큰손은 파는 중: 주의\n정말 맞는지는 성적표 '테마 판정별 성적'에서 확인합니다.",
   mgr_skill: "운용사마다 직접 고른 액티브 ETF가 최근 60일 동안 KODEX 200(코스피 대표 200종목)보다 얼마나 더 벌었는지 평균입니다. +면 시장보다 잘 고른 곳.\n'요즘 잘하는 곳'이 산 종목을 조금 더 무겁게 봅니다. 다만 60일은 짧아서 운이 섞입니다.",
   managers: "액티브 ETF는 펀드매니저가 직접 종목을 골라 사고파는 ETF입니다 (TIME=타임폴리오, KoAct=삼성액티브, ACE=한국투자 등).\nETF는 매일 담고 있는 종목을 공개하는데, 종목별 '담은 주식 수'는 펀드에 돈이 들어와도 그대로이고 매니저가 사고팔 때만 바뀝니다. 그래서 5일·20일 전과 비교하면 매니저가 뭘 샀고 뭘 팔았는지 보입니다.\n· 새로 담음: 전에 없던 종목을 넣음 (가장 강한 신호)\n· 늘림 / 줄임: 담은 주식 수를 10% 이상 바꿈\n· 모두 뺌: 다 팔아 버림\n여러 운용사가 같은 종목을 같이 사면 더 눈여겨볼 만합니다.\n붙는 표시:\n· 계속 사는 중: 20일 동안 샀고 최근 5일에도 또 삼 (확신이 있다는 뜻)\n· 비중 크게 담음: ETF 안에서 3% 넘게 담음\n· 그 뒤 주가: 비교 시작일 이후 주가 등락. 이미 15% 넘게 올랐으면 따라 사기엔 늦었을 수 있음\n· 투신 5일: 자산운용사 전체(펀드)가 이 종목을 최근 5일 산 금액. 같은 방향이면 더 믿을 만함\n순서는 운용사 수 → 계속 사는지 → 비중 → 잘하는 운용사 순으로 매깁니다. 매니저도 틀리고, 공개는 하루 늦게 반영될 수 있어요.",
@@ -1239,13 +1240,58 @@ function themeCard(t) {
     ${holdingsDetails(t.etfs)}</li>`;
 }
 
+// 테마 × 날짜 히트맵: 칸 색 = 그날 그 테마에 들어온(빨강)·빠진(파랑) 큰손 돈, 또는 대표 ETF 등락
+let heatMode = "flow";
+try { heatMode = localStorage.getItem("heatMode") || "flow"; } catch (e) { /* 무시 */ }
+
+function heatColor(v, scale) {
+  if (v == null) return "transparent";
+  const a = Math.min(1, Math.abs(v) / scale);
+  if (a < 0.04) return "var(--neutral-bg)";
+  return `color-mix(in srgb, var(${v > 0 ? "--up" : "--down"}) ${Math.round(15 + 85 * a)}%, var(--neutral-bg))`;
+}
+
+function heatmap(h) {
+  if (!h || !h.rows || !h.rows.length) return "";
+  const flow = heatMode === "flow";
+  const vals = h.rows.flatMap((r) => (flow ? r.pct : r.ret)).filter((v) => v != null).map(Math.abs).sort((a, b) => a - b);
+  // 아주 큰 하루가 나머지를 다 옅게 만들지 않게 상위 5%에서 자른다
+  const scale = Math.max(flow ? 0.02 : 1, vals[Math.floor(vals.length * 0.95)] || 1);
+  const n = h.days.length;
+  const rows = h.rows.map((r, i) => `<div class="hm-name" title="${esc(r.name)}">${esc(r.name)}</div>` +
+    (flow ? r.pct : r.ret).map((v, j) => `<button type="button" class="hm-c" data-hr="${i}" data-hd="${j}" style="background:${heatColor(v, scale)}" aria-label="${esc(r.name)} ${ymd(h.days[j])}"></button>`).join("")).join("");
+  const lab = [0, Math.floor(n / 2), n - 1].map((j) => `<span>${ymd(h.days[j]).slice(5)}</span>`).join("");
+  return `<h3 class="sub">테마별 돈 흐름 지도 <small>최근 ${n}일${infoBtn("heat")}</small></h3>${infoBox("heat")}
+    <div class="seg" role="tablist"><button type="button" data-heat="flow" aria-selected="${flow}">큰손 돈</button><button type="button" data-heat="ret" aria-selected="${!flow}">ETF 가격</button></div>
+    <div class="hm" style="grid-template-columns: minmax(64px, 84px) repeat(${n}, minmax(0, 1fr))">${rows}
+      <div></div><div class="hm-days" style="grid-column: span ${n}">${lab}</div></div>
+    <div class="hm-leg"><span>${flow ? "팖" : "내림"}</span><i></i><span>${flow ? "삼" : "오름"}</span><small>(가운데 회색 = 0)</small></div>
+    <p class="hint hm-tip" id="hm-tip">칸을 누르면 그날 값이 나와요. 위에서부터 최근 5일 돈이 많이 들어온 테마 순.</p>`;
+}
+
+document.addEventListener("click", (e) => {
+  const m = e.target.closest("button[data-heat]");
+  if (m) {
+    heatMode = m.dataset.heat;
+    try { localStorage.setItem("heatMode", heatMode); } catch (err) { /* 무시 */ }
+    renderThemes();
+    return;
+  }
+  const c = e.target.closest(".hm-c");
+  if (!c) return;
+  const h = state.data.themes.heat, r = h.rows[+c.dataset.hr], j = +c.dataset.hd;
+  document.querySelectorAll(".hm-c.sel").forEach((x) => x.classList.remove("sel"));
+  c.classList.add("sel");
+  $("#hm-tip").innerHTML = `<b>${esc(r.name)}</b> ${ymd(h.days[j]).slice(5)} · 큰손 <b class="${cls(r.eok[j])}">${signed(r.eok[j], 0, "억")}</b> <small>(덩치의 ${signed(r.pct[j], 2, "%")})</small> · ETF <b class="${cls(r.ret[j])}">${r.ret[j] == null ? "–" : signed(r.ret[j], 1, "%")}</b>`;
+});
+
 function renderThemes() {
   const th = state.data.themes, el = $("#theme-list");
   if (!th || !th.themes || !th.themes.length) { el.innerHTML = `<div class="empty">이 날짜는 테마 ETF 자료가 없습니다.</div>`; return; }
   const main = th.themes.filter((t) => ["early", "strong", "watch"].includes(t.key));
   const rest = th.themes.filter((t) => !main.includes(t));
   const b = (th.bench || {})["069500"];
-  el.innerHTML = `<p class="hint">읽는 법${infoBtn("themes")}${b ? ` · 기준: KODEX 200 20일 ${signed(b.r20, 1, "%")}` : ""}</p>${infoBox("themes")}
+  el.innerHTML = `${heatmap(th.heat)}<p class="hint">읽는 법${infoBtn("themes")}${b ? ` · 기준: KODEX 200 20일 ${signed(b.r20, 1, "%")}` : ""}</p>${infoBox("themes")}
     ${main.length ? `<ul class="fit themes">${main.map(themeCard).join("")}</ul>` : `<p class="hint">지금 돈이 들어오는 테마가 없습니다.</p>`}
     ${rest.length ? `<details class="rules"><summary>나머지 테마 ${rest.length}개 (과열·약함·큰손 매도)</summary><ul class="fit themes">${rest.map(themeCard).join("")}</ul></details>` : ""}
     <p class="hint">ETF는 여러 종목을 한 번에 사는 상품이라 한 종목 악재에 덜 흔들립니다. 레버리지·인버스는 뺐습니다. 매수 추천이 아닙니다.</p>`;

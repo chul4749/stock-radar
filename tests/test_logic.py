@@ -706,3 +706,13 @@ def test_replay_late_catch():
     netd = pd.DataFrame({"A": [0.0] * n}, index=days)
     rp = logic.replay_mover("A", "가", closes, values, netd, {"A": 1000 * EOK}, {"d35": {"A": ["단타"]}})
     assert rp["surge"] == "d34" and rp["verdict"] == "late" and rp["lead"] == -1
+
+
+def test_theme_heat_rows():
+    days = [f"d{i}" for i in range(6)]
+    net = pd.DataFrame({"A": [1, 2, 3, 4, 5, 6], "B": [-1] * 6, "C": [0] * 6}, index=days) * EOK
+    ret = pd.Series([0, 1, -1, 2, 0, 3.0], index=days)
+    h = logic.theme_heat({"가": (["A"], ret), "나": (["B", "C"], None)}, net, {"A": 100 * EOK, "B": 100 * EOK, "C": 100 * EOK}, days=5)
+    assert h["days"] == days[1:] and h["rows"][0]["name"] == "가"
+    assert h["rows"][0]["eok"] == [2, 3, 4, 5, 6] and h["rows"][0]["ret"][-1] == 3.0
+    assert h["rows"][1]["pct"][0] == -0.5 and h["rows"][1]["ret"][0] is None

@@ -1591,6 +1591,30 @@ def mover_scorecard(movers):
                                 "lead": r1(sum(v["lead"]) / len(v["lead"]))} for k, v in sig.items()), key=lambda r: -r["pct"])}
 
 
+def theme_heat(src, net, caps, days=20):
+    """테마 × 날짜 히트맵: 날마다 그 테마(ETF 구성 종목)에 들어온 큰손 돈(시총 대비 %, 억)과 대표 ETF 등락(%).
+
+    src: {테마: ([구성 종목 코드], 대표 ETF 일별 등락 Series 또는 None)}, net: 날짜×종목 큰손 순매수(원)
+    """
+    if net is None or net.empty or not src:
+        return None
+    cols = list(net.index[-days:])
+    rows = []
+    for name, (codes, ret) in src.items():
+        cs = [c for c in codes if c in net.columns and caps.get(c)]
+        if not cs:
+            continue
+        cap = sum(caps[c] for c in cs)
+        flow = [float(net.loc[d, cs].fillna(0).sum()) for d in cols]
+        rows.append({"name": name,
+                     "pct": [round(v / cap * 100, 3) for v in flow],            # 시총 대비 % (테마 크기가 달라도 비교되게)
+                     "eok": [round(v / EOK) for v in flow],
+                     "ret": [r1(ret.get(d)) if ret is not None and d in ret.index and ret.get(d) == ret.get(d) else None for d in cols]})
+    # 최근 5일 돈이 많이 들어온 테마부터
+    rows.sort(key=lambda r: -sum(r["pct"][-5:]))
+    return {"days": cols, "rows": rows}
+
+
 # ---------------------------------------------------------------- 전체 종목 검색용 요약
 
 def _bits(checks):
