@@ -588,7 +588,7 @@ def test_theme_strength_and_scorecard():
     n = 30
     days = [f"d{i:02d}" for i in range(n)]
     closes = pd.DataFrame({"A": [100.0] * n, "B": [50.0] * (n - 1) + [55.0]}, index=days)
-    fl = {"foreign": pd.Series({"A": 2 * EOK, "B": 1 * EOK}), "inst": pd.Series({"A": 0, "B": 0})}
+    fl = {"foreign": pd.Series({"A": 2 * EOK, "B": 2 * EOK}), "inst": pd.Series({"A": 0, "B": 0})}
     daily = [(d, fl) for d in days[-5:]]
     caps = {"A": 1000 * EOK, "B": 500 * EOK}
     down = pd.Series([100.0 - i * 0.5 for i in range(n)])
@@ -619,3 +619,32 @@ def test_stop_scorecard_hold_matches_scorecard():
     st, *_ = logic.scorecard(hist, cl, k, opens=op, bench=bench)
     sp = logic.stop_scorecard(hist, cl, cl * 0.98, opens=op, bench=bench, horizons=(5,), index_closes=k)
     assert sp["swing"]["5"]["hold"] == st["swing"]["5"]
+
+
+def test_holdings_diff_and_manager_moves():
+    before = {"A": ("가", 100, 10), "B": ("나", 200, 5), "C": ("다", 50, 3)}
+    now = {"A": ("가", 130, 12), "B": ("나", 200, 5), "D": ("라", 10, 2)}
+    mv = logic.holdings_diff(now, before)
+    acts = {m["code"]: m["act"] for m in mv}
+    assert acts == {"A": "add", "D": "new", "C": "out"}
+    # 설정 단위가 통째로 2배 → 같은 비율은 매매 아님, A만 더 늘림
+    unit = logic.holdings_diff({"A": ("가", 260, 12), "B": ("나", 400, 5), "C": ("다", 100, 3)}, before)
+    assert [m["code"] for m in unit] == ["A"]
+    res = logic.manager_moves([{"manager": "타임", "code": "E1", "name": "T", "moves": mv},
+                               {"manager": "삼성", "code": "E2", "name": "K", "moves": [{"code": "A", "name": "가", "act": "new", "chg": None, "w": 1}]},
+                               {"manager": "KB", "code": "E3", "name": "R", "moves": [{"code": "A", "name": "가", "act": "cut", "chg": -20, "w": 1}]}],
+                              known={"A", "C", "D"})
+    assert res["buys"][0]["code"] == "A" and res["buys"][0]["n"] == 2 and res["buys"][0]["mixed"]
+    assert {r["code"] for r in res["sells"]} == {"A", "C"}
+
+
+def test_theme_early_rejects_one_stock_inflow():
+    n = 30
+    days = [f"d{i:02d}" for i in range(n)]
+    closes = pd.DataFrame({"A": [100.0] * n, "B": [50.0] * n, "C": [30.0] * n}, index=days)
+    fl = {"foreign": pd.Series({"A": 9 * EOK, "B": 0.5 * EOK, "C": 0.5 * EOK}), "inst": pd.Series({"A": 0, "B": 0, "C": 0})}
+    caps = {"A": 1000 * EOK, "B": 500 * EOK, "C": 300 * EOK}
+    tr = logic.etf_trend(pd.Series([100.0 - i * 0.1 for i in range(n)]), pd.Series([100.0] * n))
+    th = logic.theme_strength("t", [{"code": "E", "name": "E", "trend": tr}], {"A": "가", "B": "나", "C": "다"}, caps, closes,
+                              [(d, fl) for d in days[-5:]], fl)
+    assert th["key"] == "watch" and "한 종목(가)" in th["label"]

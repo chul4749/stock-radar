@@ -33,6 +33,8 @@
     공식이나 기준을 바꾸면 화면의 '필터 기준 보기'(`renderRules`)와 ⓘ 설명(`INFO`)도 같이 고친다
   - `etf.py` — 테마 → ETF 표(`THEMES`, 레버리지·인버스 제외). 수집 때 ETF 시세(KRX `etf_history`)와 구성 상위 10종목(`etf_holdings`, KRX→네이버)을 받아
     `logic.theme_strength`로 판정(돈이 먼저 들어오는 중·좋음·과열·큰손 매도·약함), 성적표 `themes`(`theme_scorecard`, KODEX 200 대비)로 확인
+    `ACTIVE`(국내 주식형 액티브 ETF 30개): 오늘 구성과 5·20영업일 전 구성(KRX `etf_pdf`, 계약수=설정 단위당 수량이라 매니저 매매만 반영)을 비교 →
+    `holdings_diff`(새로 담음·늘림·줄임·모두 뺌, 10% 이상) → `manager_moves`(종목별로 몇 곳이 같은 방향). 20일 2곳 이상 매수는 성적표 그룹 `mgr`
   - `morning.py` — 아침 요약: 야후 차트로 미국장 마감(EWY·나스닥·S&P·반도체·VIX·환율) → `site/data/morning.json` (`logic.morning_summary`)
   - `util.py` — KST, EOK(억), log
 - `site/` — 빌드 없는 정적 페이지 (`index.html`, `app.js`, `style.css`), 데이터는 `site/data/`

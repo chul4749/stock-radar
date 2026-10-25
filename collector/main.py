@@ -306,6 +306,17 @@ def main(argv):
     themes = build_themes(base, used_days, closes, flows_daily, flows_5d, listing, reports, temp.get("regime"), errors)
     log(f"  테마 {len(themes['themes'])}개: " + ", ".join(f"{x['name']}({x['key']})" for x in themes["themes"][:6]))
 
+    t = step("운용사 방향 (액티브 ETF)")
+    managers = build_managers(base, used_days, listing, closes, errors)
+    mg20 = managers["moves"].get("20") or {"buys": [], "sells": []}
+    mg_of = {}
+    for side in ("buys", "sells"):
+        for r in mg20[side]:
+            mg_of.setdefault(r["code"], {"buy": [], "sell": []})["buy" if side == "buys" else "sell"] = r["managers"]
+    for x in scalp[:10] + swing[:10] + value[:10]:
+        x["managers"] = mg_of.get(x["code"])
+    log(f"  액티브 ETF {len(managers['etfs'])}개, 20일 매수 {len(mg20['buys'])}종목(2곳 이상 {sum(1 for r in mg20['buys'] if r['n'] >= 2)}) · 매도 {len(mg20['sells'])}종목")
+
     out = {
         "version": 1,
         "base_date": base,
@@ -328,6 +339,7 @@ def main(argv):
         },
         "sectors": sector_flow,
         "themes": themes,
+        "managers": managers,
         "errors": errors,
     }
     os.makedirs(DATA, exist_ok=True)
@@ -343,6 +355,9 @@ def main(argv):
             picked.setdefault(x["code"], []).append(g)
     idx = logic.stock_index(universe_all, {c: r for c, r in risk.items()}, closes, values, flows_daily, flows_5d,
                             news_today, news_3d, fund_now, fund_hist, sectors, picked)
+    for c, m in mg_of.items():   # 검색 화면에도 '운용사가 20일 동안 산·판' 표시
+        if c in idx["stocks"]:
+            idx["stocks"][c]["mg"] = m
     write_latest("stocks.json", base, {**idx, "date": base, "generated_at": out["generated_at"]})
     log(f"  전체 종목 요약 {len(idx['stocks'])}개")
     log(f"\n저장 {path} ({os.path.getsize(path) // 1024}KB), 오류 {errors or '없음'}")
@@ -364,6 +379,10 @@ def main(argv):
             if rec.get("backfill") or (made and (datetime.strptime(made, "%Y%m%d") - datetime.strptime(d, "%Y%m%d")).days >= 2):
                 backfill_dates.append(d)
             groups = {g: flt.get(g, []) for g in ("swing", "scalp", "value")}
+            # 운용사 여러 곳(2곳 이상)이 20일 동안 같이 산 종목도 같은 방식으로 성적을 본다
+            picks = (rec.get("managers") or {}).get("picks")
+            if picks:
+                groups["mgr"] = picks
             # 리포트 기록은 150일 치가 있으니, 리포트를 저장하기 전 날짜의 후보에도 그날 기준으로 다시 붙여 조건별 성적에 쓴다
             for x in (y for items in groups.values() for y in items):
                 if x.get("reports") is None and reports:
@@ -429,6 +448,49 @@ def update_season(base, dart_days, name_to_code, errors):
     return season, store
 
 
+def build_managers(base, days, listing, closes, errors):
+    """액티브 ETF마다 오늘 구성과 5·20영업일 전 구성을 비교해 운용사가 사고판 종목을 모은다 (collector/etf.py ACTIVE)."""
+    windows = {"5": days[-6], "20": days[-21]} if len(days) >= 21 else {}
+    known = set(listing)
+    per = {w: [] for w in windows}
+    etfs, fails = [], 0
+    for mgr, code, name in etf.ACTIVE:
+        try:
+            now = sources.etf_pdf(code, base)
+        except Exception as e:
+            fails += 1
+            log(f"  {name} 구성 실패: {type(e).__name__}")
+            continue
+        if not now:
+            continue
+        entry = {"manager": mgr, "code": code, "name": name, "n": len(now),
+                 "top": [[c, n, round(w, 1)] for c, (n, _, w) in sorted(now.items(), key=lambda kv: -kv[1][2])[:10]]}
+        for w, d in windows.items():
+            try:
+                before = sources.etf_pdf(code, d)
+            except Exception:
+                before = None
+            mv = logic.holdings_diff(now, before) if before else None
+            entry["moves_" + w] = mv[:20] if mv is not None else None   # None = 그때는 상장 전이거나 자료 없음
+            if mv is not None:
+                per[w].append({"manager": mgr, "code": code, "name": name, "moves": mv})
+            time.sleep(0.15)
+        etfs.append(entry)
+    if etf.ACTIVE and fails > len(etf.ACTIVE) / 2:
+        errors.append(f"액티브 ETF 구성: {fails}/{len(etf.ACTIVE)} 실패")
+    moves = {}
+    for w in windows:
+        r = logic.manager_moves(per[w], known)
+        moves[w] = {"buys": r["buys"][:30], "sells": r["sells"][:30]}
+    # 성적표용: 20일 동안 2곳 이상이 같이 산 종목 (그날 종가·시장과 함께)
+    picks = []
+    for r in (moves.get("20") or {}).get("buys", []):
+        if r["n"] >= 2 and r["code"] in closes.columns and r["code"] in listing:
+            picks.append({"code": r["code"], "name": r["name"], "close": float(closes[r["code"]].iloc[-1]),
+                          "market": listing[r["code"]]["market"], "score": r["n"]})
+    return {"windows": windows, "etfs": etfs, "moves": moves, "picks": picks}
+
+
 def build_themes(base, days, closes, flows_daily, flows_5d, listing, reports, regime, errors):
     """테마마다 ETF 흐름(KRX 시세)과 ETF 구성 종목의 큰손 돈 흐름으로 판정 (collector/etf.py 표)."""
     start = days[-40] if len(days) >= 40 else days[0]
@@ -460,7 +522,7 @@ def build_themes(base, days, closes, flows_daily, flows_5d, listing, reports, re
                 hold = []
             for c, n, w in hold:
                 members.setdefault(c, n)
-            rows.append({"code": code, "name": ename, "trend": tr, "top": [[c, n, round(w, 1)] for c, n, w in hold[:5]]})
+            rows.append({"code": code, "name": ename, "trend": tr, "top": [[c, n, round(w, 1)] for c, n, w in hold[:10]]})
             time.sleep(0.2)
         th = logic.theme_strength(name, rows, members, caps, closes, flows_daily, flows_5d, reports, base, regime)
         if th:

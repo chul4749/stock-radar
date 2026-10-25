@@ -1204,7 +1204,8 @@ def morning_summary(items):
 THEME_RULES = {"overheat20": 20.0, "flow_days": 3, "breadth": 60,
                # '돈이 먼저 들어오는 중'은 좁게: 시총 대비 0.1% 이상, 4일 이상 순매수, 하루에 60% 넘게 몰리지 않음,
                # 가격이 5일 새 3% 넘게 더 빠지지 않고 20일 평균에서 10% 안쪽 (떨어지는 칼날을 '선취매'로 부르지 않게)
-               "early_pct": 0.1, "early_days": 4, "early_one_day": 0.6, "early_r5": -3.0, "early_gap20": -10.0}
+               "early_pct": 0.1, "early_days": 4, "early_one_day": 0.6, "early_r5": -3.0, "early_gap20": -10.0,
+               "early_one_stock": 0.6}   # 들어온 돈의 60% 넘게가 한 종목이면 업종이 아니라 그 종목 이야기
 
 
 def etf_trend(closes, bench=None):
@@ -1262,6 +1263,10 @@ def theme_strength(name, etfs, members, caps, closes, flows_daily, flows_5d, rep
             why.append("들어온 돈이 덩치에 비해 적음")
         if sum(1 for v in daily if v > 0) < rules["early_days"] or (pos and max(daily) / pos > rules["early_one_day"]):
             why.append("돈이 하루에 몰림")
+        per = [_money(flows_5d["foreign"], c) + _money(flows_5d["inst"], c) for c in codes]
+        pos_s = sum(v for v in per if v > 0)
+        if pos_s and max(per) / pos_s > rules["early_one_stock"]:
+            why.append(f"돈이 한 종목({members[codes[per.index(max(per))]]})에 몰림")
         if tr and (tr["r5"] < rules["early_r5"] or tr["gap20"] < rules["early_gap20"]):
             why.append("가격이 아직 계속 빠지는 중")
         if why:
@@ -1316,6 +1321,72 @@ def theme_scorecard(records, horizons=(5, 20), cost=None):
                 if b0 and b1:
                     a["x"].append(r - (b1 / b0 - 1) * 100)
     return {k: {str(n): summarize_returns(v["r"], v["x"]) for n, v in by.items()} for k, by in acc.items()}
+
+
+# ---------------------------------------------------------------- 운용사 방향 (액티브 ETF 구성 변화)
+
+MOVE_RULES = {"min_change": 10.0, "unit_shift": 5.0}
+MOVE_NAME = {"new": "새로 담음", "add": "늘림", "cut": "줄임", "out": "모두 뺌"}
+
+
+def holdings_diff(now, before, rules=MOVE_RULES):
+    """액티브 ETF 구성 비교 → 종목별 움직임. now/before: {코드: (이름, 계약수, 비중)}.
+
+    설정 단위가 통째로 바뀌면(모든 종목 계약수가 같은 비율로 변함) 그 비율(가운데 값)로 나눠 운용사 매매만 남긴다.
+    """
+    if not now or not before:
+        return []
+    common = [c for c in now if c in before and before[c][1] > 0]
+    ratios = sorted(now[c][1] / before[c][1] for c in common)
+    med = 1.0
+    if ratios:
+        mid = len(ratios) // 2
+        m = ratios[mid] if len(ratios) % 2 else (ratios[mid - 1] + ratios[mid]) / 2
+        same = sum(1 for r in ratios if abs(r / m - 1) <= 0.02) / len(ratios)
+        # 대부분(60% 이상)이 같은 비율로 움직였을 때만 설정 단위가 바뀐 것으로 본다
+        if abs(m - 1) * 100 >= rules["unit_shift"] and same >= 0.6:
+            med = m
+    out = []
+    for c, (name, sh, w) in now.items():
+        if c not in before:
+            out.append({"code": c, "name": name, "act": "new", "chg": None, "w": round(w, 2)})
+            continue
+        chg = (sh / before[c][1] / med - 1) * 100
+        if chg >= rules["min_change"]:
+            out.append({"code": c, "name": name, "act": "add", "chg": round(chg), "w": round(w, 2)})
+        elif chg <= -rules["min_change"]:
+            out.append({"code": c, "name": name, "act": "cut", "chg": round(chg), "w": round(w, 2)})
+    for c, (name, sh, w) in before.items():
+        if c not in now:
+            out.append({"code": c, "name": name, "act": "out", "chg": -100, "w": round(w, 2)})
+    order = {"new": 0, "add": 1, "cut": 2, "out": 3}
+    return sorted(out, key=lambda m: (order[m["act"]], -m["w"]))
+
+
+def manager_moves(etfs, known=None):
+    """ETF별 움직임을 종목별로 모아, 몇 곳의 운용사가 같은 방향으로 움직였나.
+
+    etfs: [{"manager","code","name","moves":[...]}], known: 상장 보통주 코드 집합(있으면 그 밖은 뺌)
+    반환: buys/sells = [{code,name,managers:[...],etfs:[...],n}] (운용사 수 많은 순)
+    """
+    by = {}
+    for e in etfs:
+        for m in e.get("moves") or []:
+            if known is not None and m["code"] not in known:
+                continue
+            side = "buy" if m["act"] in ("new", "add") else "sell"
+            r = by.setdefault((side, m["code"]), {"code": m["code"], "name": m["name"], "managers": [], "etfs": []})
+            if e["manager"] not in r["managers"]:
+                r["managers"].append(e["manager"])
+            r["etfs"].append({"name": e["name"], "act": m["act"], "chg": m["chg"], "w": m["w"]})
+    buys = [r for (side, _), r in by.items() if side == "buy"]
+    sells = [r for (side, _), r in by.items() if side == "sell"]
+    both = {r["code"] for r in buys} & {r["code"] for r in sells}
+    for r in buys + sells:
+        r["n"] = len(r["managers"])
+        r["mixed"] = r["code"] in both          # 어떤 운용사는 사고 어떤 곳은 팜
+    key = lambda r: (-r["n"], -len(r["etfs"]), -max(e["w"] for e in r["etfs"]))
+    return {"buys": sorted(buys, key=key), "sells": sorted(sells, key=key)}
 
 
 # ---------------------------------------------------------------- 전체 종목 검색용 요약
