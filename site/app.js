@@ -1565,4 +1565,41 @@ function valueRules(v, eok) {
     <p>주목 신호 (걸러내는 조건 아님, 카드에 따로 표시): 큰손 5일 순매수, 최근 3일 소식, 5일 평균 거래대금이 20일 평균의 1.3배 이상, 최근 10일 최저가보다 5% 이상 위. 2개 이상이면 '다시 주목받는 중'.</p>`;
 }
 
+/* ---------------- 한두 글자 넘쳐 줄바꿈되는 글은 글자를 살짝 줄여 한 줄로 ---------------- */
+
+// 짧은 이름·라벨·표 머리 등만 대상 (긴 설명 문장은 원래대로 줄바꿈)
+const FIT_SEL = [".checks li > span:first-child", ".today .tr .k", ".today .tr .v", ".tile .l", ".tile .s", "table.score th", "table.score td",
+  ".fit .row > b", ".fit .row > span", ".fit .row > button", ".mfacts", ".card .why", ".nums small", ".nums b", ".flowtbl td",
+  ".etfs li > div", ".hold ol li", ".tnums span", ".sum .row", ".zb-lab span", ".scorerow .row span", ".hl > small",
+  ".verdict .vm", ".verdict .va", ".earnok", ".tl-lab span"].join(",");
+const FIT_MIN = 0.85;
+
+function fitOne(el) {
+  if (el.dataset.fitBase) { el.style.fontSize = ""; el.style.whiteSpace = ""; }
+  const w = el.clientWidth;
+  if (!w) return;
+  const lh = parseFloat(getComputedStyle(el).lineHeight) || parseFloat(getComputedStyle(el).fontSize) * 1.4;
+  if (el.scrollHeight < lh * 1.6) return;              // 이미 한 줄
+  el.style.whiteSpace = "nowrap";
+  const need = el.scrollWidth;
+  if (need <= w) return;
+  const ratio = w / need;
+  if (ratio < FIT_MIN) { el.style.whiteSpace = ""; return; }   // 많이 넘치면 줄바꿈 그대로
+  const fs = parseFloat(getComputedStyle(el).fontSize);
+  el.dataset.fitBase = "1";
+  el.style.fontSize = `${Math.floor(fs * ratio * 10) / 10}px`;
+}
+
+let fitTimer = null;
+function fitAll() {
+  clearTimeout(fitTimer);
+  fitTimer = setTimeout(() => document.querySelectorAll(FIT_SEL).forEach((el) => { try { fitOne(el); } catch (e) { /* 무시 */ } }), 60);
+}
+try {
+  new MutationObserver(fitAll).observe(document.querySelector("main"), { childList: true, subtree: true });
+  new MutationObserver(fitAll).observe(document.getElementById("detail"), { childList: true, subtree: true, attributes: true, attributeFilter: ["open"] });
+  window.addEventListener("resize", fitAll);
+  document.addEventListener("toggle", fitAll, true);   // details 펼칠 때
+} catch (e) { /* 오래된 브라우저 */ }
+
 init();
