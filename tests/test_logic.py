@@ -648,3 +648,10 @@ def test_theme_early_rejects_one_stock_inflow():
     th = logic.theme_strength("t", [{"code": "E", "name": "E", "trend": tr}], {"A": "가", "B": "나", "C": "다"}, caps, closes,
                               [(d, fl) for d in days[-5:]], fl)
     assert th["key"] == "watch" and "한 종목(가)" in th["label"]
+
+
+def test_feature_stats_marks_which_group():
+    e = {"group": "value", "x5": 1.0, "features": {"report": True}}
+    fs = logic.feature_stats([e], groups=("value",), features=logic.VALUE_FEATURES)
+    assert all(f["who"] == "value" for f in fs)
+    assert all(f["who"] == "flow" for f in logic.feature_stats([], groups=("swing", "scalp")))

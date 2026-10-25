@@ -1005,8 +1005,12 @@ function renderMorning() {
 }
 
 function featureTable(all) {
-  return featureTableOf((all || []).filter((f) => !f.key.startsWith("v_")), "스윙·단타 후보") +
-    featureTableOf((all || []).filter((f) => f.key.startsWith("v_")), "저평가 후보",
+  // 어느 후보 집단의 계산인지(who)로 나눈다. 리포트처럼 두 집단이 같은 조건 이름을 쓰는 경우가 있어 이름으로 나누면 섞임
+  // 예전 기록(who 없음): 저평가 줄은 첫 'v_' 줄부터 끝까지 이어서 붙어 있다
+  const firstV = (all || []).findIndex((f) => f.key.startsWith("v_"));
+  const isValue = (f, i) => (f.who ? f.who === "value" : firstV >= 0 && i >= firstV);
+  return featureTableOf((all || []).filter((f, i) => !isValue(f, i)), "스윙·단타 후보") +
+    featureTableOf((all || []).filter(isValue), "저평가 후보",
       "싼 종목 중 '주목받는 쪽'이 '아무도 안 보는 쪽'보다 실제로 나았는지 봅니다. '주목 신호 2개 이상'은 10/23 기록부터 셉니다.");
 }
 

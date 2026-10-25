@@ -1785,6 +1785,6 @@ def feature_stats(entries, horizon=5, groups=("swing", "scalp"), features=FEATUR
     for key, label in features.items():
         yes = [e[f"x{horizon}"] for e in pool if e.get("features", {}).get(key) is True]
         no = [e[f"x{horizon}"] for e in pool if e.get("features", {}).get(key) is False]
-        out.append({"key": key, "label": label, "horizon": horizon,
+        out.append({"key": key, "label": label, "horizon": horizon, "who": "value" if groups == ("value",) else "flow",
                     "yes": summarize_returns(yes), "no": summarize_returns(no)})
     return out
