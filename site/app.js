@@ -219,7 +219,7 @@ function gauge(score) {
 // 점수와 원래 숫자가 왜 다른지 VIX로 예시
 function vixEx(th) {
   const v = state.data.temperature.vix, p = th.parts.find((x) => x.key === "vix");
-  return v && p && v.pct_1y != null ? ` 예: VIX ${num(v.value, 1)}은 1년 중 ${v.pct_1y}% 위치라, 높을수록 공포이므로 100 − ${v.pct_1y} = ${p.score}점.` : "";
+  return v && p && v.pct_1y != null ? ` 예: VIX ${num(v.value, 1)}은 지난 1년 값 중 아래에서 ${v.pct_1y}% 지점이라, 높을수록 공포이므로 100 − ${v.pct_1y} = ${p.score}점.` : "";
 }
 
 function renderThermo() {
@@ -234,7 +234,7 @@ function renderThermo() {
   const parts = th.parts.map((p) => `<div class="part">
       <div class="part-hd"><span>${esc(p.name)} ${infoBtn(p.key)}${p.weight && p.weight < 1 ? ` <small class="half">반 무게</small>` : ""}</span><b style="color:${THERMO_COLOR(p.score)}">${p.score}점 <small>${THERMO_KR(p.score)}</small></b></div>
       <div class="part-bar"><i style="left:${p.score}%"></i></div>
-      <small>${esc(p.raw)}</small>${infoBox(p.key)}
+      <small>${esc(String(p.raw).replace(/1년 중 (\d+)% 위치/, (m, n) => pctWord(Number(n))))}</small>${infoBox(p.key)}
     </div>`).join("");
   $("#thermo").innerHTML = `<div class="thermo">
     <div class="th-top">
@@ -269,7 +269,7 @@ function zoneBar(zones, pos) {
   // 이름은 칸이 좁아 구간 너비에 맞추지 않고 양 끝·가운데에 나눠 둔다
   const labs = segs.filter((z) => z.name).map((z) => `<span>${esc(z.name)}</span>`).join("");
   const at = Math.max(1, Math.min(99, pos));
-  return `<div class="zb"><div class="zb-bar">${bar}<i style="left:${at.toFixed(1)}%"></i></div><div class="zb-lab">${labs}</div></div>`;
+  return `<div class="zb"><b class="zb-now" style="left:${at.toFixed(1)}%">지금</b><div class="zb-bar">${bar}<i style="left:${at.toFixed(1)}%"></i></div><div class="zb-lab">${labs}</div></div>`;
 }
 
 const PCT_ZONES = (low, high) => [[20, "var(--g4)", low], [80, "var(--g2)", "보통"], [100, "var(--g0)", high]];
@@ -690,8 +690,8 @@ function renderRegime() {
 
   const rows = ["swing", "scalp", "value"].map((g) => {
     const f = rg.fit[g], [ic, lab] = FIT_TXT[f.grade], mm = mismatch(f.grade, regimeStat(rg.key, g));
-    return `<li class="fit-${f.grade}"><div class="row"><b>${ic} ${TAB_NAME[g]}</b><span>${lab}</span></div><p>${esc(f.why)}</p>` +
-      `<small>${regimeRecord(rg.key, g)}</small>${mm ? `<p class="mm">⚠ ${mm}</p>` : ""}` +
+    return `<li class="fit-${f.grade}"><div class="row"><b>${ic} ${TAB_NAME[g]}</b><span>${lab}</span></div><p><span class="rule">원리</span>${esc(f.why)}</p>` +
+      `<small><span class="now">실제 기록</span>${regimeRecord(rg.key, g).replace(/^이 장세 기록:? ?/, "")}</small>${mm ? `<p class="mm">⚠ ${mm}</p>` : ""}` +
       (f.evidence ? `<details class="ev"><summary>왜?</summary><p>${esc(f.evidence)}</p><small>근거: ${esc(f.source)}</small></details>` : "") + `</li>`;
   }).join("");
 
@@ -829,7 +829,7 @@ function exitBlock(x) {
   }
   if (!e) return earn ? `<div class="exit">${earn}</div>` : "";
   return `<div class="exit"><div class="row"><b>정리 기준${infoBtn("exit")}</b><span><b>${num(e.stop)}원</b> 아래 마감 시 <small class="down">(${signed(e.gap, 1, "%")})</small></span></div>${infoBox("exit")}
-    <small>${esc(e.rule)} — ${esc(e.why)}. 들고 가는 기간 ${esc(e.hold)}.</small>${earn}</div>`;
+    <small><span class="rule">원칙</span>${esc(e.rule)} — ${esc(e.why)}. 들고 가는 기간 ${esc(e.hold)}.</small>${earn}</div>`;
 }
 
 // 싼 종목이 다시 주목받기 시작했나 (가치 함정 거르기용, 점수엔 안 들어감)

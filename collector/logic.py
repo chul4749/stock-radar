@@ -13,6 +13,14 @@ from .util import EOK
 # ---------------------------------------------------------------- 공통
 
 
+def pct_word(p):
+    """1년 백분위를 말로 (화면의 pctWord 와 같은 구간)."""
+    if p is None:
+        return ""
+    return "1년 중 가장 높은 쪽" if p >= 90 else "1년 중 높은 편" if p >= 70 else "1년 중 보통" if p > 30 else \
+        "1년 중 낮은 편" if p > 10 else "1년 중 가장 낮은 쪽"
+
+
 def pct_rank(values, x):
     """values 안에서 x 가 몇 % 위치인지 (0~100)."""
     vals = [v for v in values if v is not None and not math.isnan(v)]
@@ -194,10 +202,10 @@ def thermometer(t):
 
     kv = t.get("korea_vol")
     if kv and kv.get("pct_1y") is not None:
-        add("korea_vol", "국내 변동성", 100 - kv["pct_1y"], f"{kv['value']}% · 1년 중 {kv['pct_1y']}% 위치")
+        add("korea_vol", "국내 변동성", 100 - kv["pct_1y"], f"{kv['value']}% · {pct_word(kv['pct_1y'])}")
     vix = t.get("vix")
     if vix and vix.get("pct_1y") is not None:
-        add("vix", "미국 VIX", 100 - vix["pct_1y"], f"{vix['value']} · 1년 중 {vix['pct_1y']}% 위치")
+        add("vix", "미국 VIX", 100 - vix["pct_1y"], f"{vix['value']} · {pct_word(vix['pct_1y'])}")
     fg = t.get("fear_greed")
     if fg and fg.get("score") is not None:
         add("cnn", "미국 투자심리 (CNN)", fg["score"], f"{fg['score']}점")
@@ -215,11 +223,11 @@ def thermometer(t):
             f"20일 중 {fl['pos_days20']}일 외국인+기관 순매수")
     hy = t.get("hy_spread")
     if hy and hy.get("pct_1y") is not None:
-        add("credit", "자금시장 (하이일드)", 100 - hy["pct_1y"], f"{hy['value']}%p · 1년 중 {hy['pct_1y']}% 위치")
+        add("credit", "자금시장 (하이일드)", 100 - hy["pct_1y"], f"{hy['value']}%p · {pct_word(hy['pct_1y'])}")
     cb = t.get("credit_balance") or {}
     fo = cb.get("forced")
     if fo and fo.get("pct_1y") is not None:
-        add("forced", "반대매매 (강제 매도)", 100 - fo["pct_1y"], f"{fo['value']:,.0f}억 · 1년 중 {fo['pct_1y']}% 위치")
+        add("forced", "반대매매 (강제 매도)", 100 - fo["pct_1y"], f"{fo['value']:,.0f}억 · {pct_word(fo['pct_1y'])}")
     # 빚투(신용융자)는 많으면 탐욕이지만 급감도 위험 신호라 방향이 모호해 온도계에서는 뺀다 (칸으로만 보여 줌)
     if len(parts) < 3:
         return None
@@ -275,7 +283,7 @@ def summarize_temperature(t):
         wide = (hy["pct_1y"] or 0) >= 80 or (hy["change"] or 0) >= 0.5
         out.append({"key": "credit", "title": "자금시장", "level": "경색 신호" if wide else "안정",
                     "tone": "fear" if wide else "calm",
-                    "text": f"미국에서 신용 낮은 회사가 돈 빌릴 때 더 내는 이자(하이일드 스프레드) {hy['value']}%p — 1년 중 {hy['pct_1y']}% 위치. "
+                    "text": f"미국에서 신용 낮은 회사가 돈 빌릴 때 더 내는 이자(하이일드 스프레드) {hy['value']}%p — {pct_word(hy['pct_1y'])}. "
                             + ("돈 빌리기가 어려워지는 쪽이라 조심." if wide else "주가가 무서워도 돈줄이 막히는 위기로 번지진 않음.")})
     return out
 

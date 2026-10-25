@@ -186,7 +186,9 @@ dialog#detail::backdrop { background: rgba(0,0,0,.45); }
 .links { display: flex; gap: 14px; font-size: 13px; margin: 12px 0 0; }
 
 button.info { border: 0; background: none; color: var(--faint); cursor: pointer; font-size: 13px; padding: 0 2px; vertical-align: 0; }
-.exp { white-space: pre-line; line-height: 1.6; font-size: 13px; color: var(--sub); background: var(--bg); border-radius: 8px; padding: 7px 9px; margin: 6px 0 0; }
+/* 설명(원래 뜻)은 지금 상태와 헷갈리지 않게: 점선 상자 + '📖 설명' 머리말 */
+.exp { white-space: pre-line; line-height: 1.6; font-size: 13px; color: var(--sub); background: var(--bg); border: 1px dashed var(--line); border-radius: 8px; padding: 7px 9px; margin: 6px 0 0; }
+.exp::before { content: "📖 설명 — 이 지표의 원래 뜻 (지금 값이 아님)"; display: block; font-size: 11px; font-weight: 600; color: var(--faint); margin-bottom: 3px; }
 .why { font-size: 12px; color: var(--text); margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--line); }
 .thermo { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; }
 .th-top { display: flex; gap: 12px; align-items: stretch; }
@@ -429,3 +431,14 @@ details.calc[open] { display: block; margin-top: 2px; }
 .mbadges { margin: 3px 0 1px; }
 .mbadges .tag { margin: 0 4px 2px 0; }
 .fit.mgr .mfacts { display: block; color: var(--sub); font-size: 12px; margin-top: 2px; }
+
+/* 지금 상태 표시: '지금' 배지 */
+.now { display: inline-block; font-size: 10px; font-weight: 700; line-height: 1; padding: 3px 5px; margin-right: 5px; border-radius: 4px; background: var(--text); color: var(--card); vertical-align: 1px; }
+.rule { display: inline-block; font-size: 10px; font-weight: 700; line-height: 1; padding: 2px 4px; margin-right: 5px; border-radius: 4px; border: 1px solid var(--faint); color: var(--sub); vertical-align: 1px; }
+.zb { position: relative; padding-top: 17px; }
+.zb-now { position: absolute; top: 0; transform: translateX(-50%); font-size: 9px; font-weight: 700; color: var(--text); white-space: nowrap; }
+/* 지금 상태 줄(시장 온도 칸·요약·순매수 표)과 카드의 '걸린 이유'에 자동으로 머리표를 붙인다 */
+.tile .why::before, .sum .why::before, .interp::before, .card .why::before {
+  content: "지금"; display: inline-block; font-size: 10px; font-weight: 700; line-height: 1; padding: 3px 5px; margin-right: 5px;
+  border-radius: 4px; background: var(--text); color: var(--card); vertical-align: 1px; }
+.card .why::before { content: "걸린 이유"; }
