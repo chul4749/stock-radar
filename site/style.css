@@ -474,3 +474,4 @@ html.modal-open, html.modal-open body { overflow: hidden; overscroll-behavior: n
 .hm-leg { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--sub); margin-top: 6px; }
 .hm-leg i { flex: 0 0 140px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, var(--down), var(--neutral-bg) 50%, var(--up)); }
 .hm-tip { min-height: 1.5em; }
+.hm-name.one { color: var(--fear); }

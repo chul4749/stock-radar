@@ -1258,7 +1258,10 @@ function heatmap(h) {
   // 아주 큰 하루가 나머지를 다 옅게 만들지 않게 상위 5%에서 자른다
   const scale = Math.max(flow ? 0.02 : 1, vals[Math.floor(vals.length * 0.95)] || 1);
   const n = h.days.length;
-  const rows = h.rows.map((r, i) => `<div class="hm-name" title="${esc(r.name)}">${esc(r.name)}</div>` +
+  // 테마 카드에서 '돈이 한 종목에 몰림'으로 나온 테마는 지도에서도 표시 (업종 전체가 아니라 그 종목 이야기)
+  const one = {};
+  ((state.data.themes || {}).themes || []).forEach((t) => { const m = /한 종목\(([^)]+)\)/.exec(t.label || ""); if (m) one[t.name] = m[1]; });
+  const rows = h.rows.map((r, i) => `<div class="hm-name${one[r.name] ? " one" : ""}" title="${esc(r.name)}${one[r.name] ? ` — 돈이 거의 ${esc(one[r.name])} 한 종목` : ""}">${one[r.name] ? "⚠" : ""}${esc(r.name)}</div>` +
     (flow ? r.pct : r.ret).map((v, j) => `<button type="button" class="hm-c" data-hr="${i}" data-hd="${j}" style="background:${heatColor(v, scale)}" aria-label="${esc(r.name)} ${ymd(h.days[j])}"></button>`).join("")).join("");
   const lab = [0, Math.floor(n / 2), n - 1].map((j) => `<span>${ymd(h.days[j]).slice(5)}</span>`).join("");
   return `<h3 class="sub">테마별 돈 흐름 지도 <small>최근 ${n}일${infoBtn("heat")}</small></h3>${infoBox("heat")}
@@ -1266,6 +1269,7 @@ function heatmap(h) {
     <div class="hm" style="grid-template-columns: minmax(64px, 84px) repeat(${n}, minmax(0, 1fr))">${rows}
       <div></div><div class="hm-days" style="grid-column: span ${n}">${lab}</div></div>
     <div class="hm-leg"><span>${flow ? "팖" : "내림"}</span><i></i><span>${flow ? "삼" : "오름"}</span><small>(가운데 회색 = 0)</small></div>
+    ${Object.keys(one).length ? `<p class="hint">⚠ = 돈이 거의 한 종목에 몰린 테마라 업종 전체 흐름이 아님 (${Object.entries(one).map(([t, n]) => `${esc(t)}: ${esc(n)}`).join(", ")})</p>` : ""}
     <p class="hint hm-tip" id="hm-tip">칸을 누르면 그날 값이 나와요. 위에서부터 최근 5일 돈이 많이 들어온 테마 순.</p>`;
 }
 
