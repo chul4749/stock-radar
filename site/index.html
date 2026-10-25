@@ -17,11 +17,16 @@
     <select id="date" aria-label="기준일"></select>
   </div>
   <p class="meta" id="meta"></p>
+</header>
+<div class="bar">
   <div class="search">
-    <input id="q" type="search" placeholder="종목 찾기 (이름·코드) — 왜 후보에 안 걸렸는지도 보여 줘요" autocomplete="off" aria-label="종목 찾기">
+    <input id="q" type="search" placeholder="종목 찾기 (이름·코드) — 차트·재무·안 걸린 이유" autocomplete="off" aria-label="종목 찾기">
     <ul id="q-list" hidden></ul>
   </div>
-</header>
+  <nav class="jump" aria-label="바로 가기">
+    <a href="#today">오늘</a><a href="#filter">종목</a><a href="#turn">시장</a><a href="#sectors">돈 흐름</a><a href="#replay">급등 복기</a><a href="#score">성적표</a>
+  </nav>
+</div>
 
 <main>
   <section class="block" id="morning" hidden></section>
@@ -29,42 +34,6 @@
   <section class="block" id="today">
     <h2>오늘 한눈에</h2>
     <div id="today-body"></div>
-  </section>
-
-  <section class="block" id="turn">
-    <h2>장의 전환 · 사도 되는 신호</h2>
-    <div id="turn-body"></div>
-  </section>
-
-  <section class="block" id="temp">
-    <div class="h2row">
-      <h2>시장 온도</h2>
-      <label class="opt"><input type="checkbox" id="exp-all"> 설명 항상 펼치기</label>
-    </div>
-    <p class="hint">숫자의 빨강·파랑은 오름·내림일 뿐 좋고 나쁨이 아니에요. 칸마다 붙은 <b>↑ 높을수록 좋음 / ↓ 낮을수록 좋음</b>을 보세요.</p>
-    <div id="thermo"></div>
-    <div id="summary" class="summary"></div>
-    <div id="tiles" class="tiles"></div>
-  </section>
-
-  <section class="block" id="sectors">
-    <h2>업종별 돈 흐름 <small class="h2s">최근 5일 기관+외국인</small></h2>
-    <div id="sector-list"></div>
-  </section>
-
-  <section class="block" id="themes">
-    <h2>테마별 ETF <small class="h2s">돈이 어디로 가나 → 어떤 ETF로</small></h2>
-    <div id="theme-list"></div>
-  </section>
-
-  <section class="block" id="managers">
-    <h2>운용사 방향 <small class="h2s">액티브 ETF가 사고판 종목</small></h2>
-    <div id="mgr-body"></div>
-  </section>
-
-  <section class="block" id="regime">
-    <h2>지금 장세와 시나리오</h2>
-    <div id="regime-body"></div>
   </section>
 
   <section class="block" id="filter">
@@ -85,6 +54,42 @@
       <summary>필터 기준 보기</summary>
       <div id="rules"></div>
     </details>
+  </section>
+
+  <section class="block" id="turn">
+    <h2>장의 전환 · 사도 되는 신호</h2>
+    <div id="turn-body"></div>
+  </section>
+
+  <section class="block" id="temp">
+    <div class="h2row">
+      <h2>시장 온도</h2>
+      <label class="opt"><input type="checkbox" id="exp-all"> 설명 항상 펼치기</label>
+    </div>
+    <p class="hint">숫자의 빨강·파랑은 오름·내림일 뿐 좋고 나쁨이 아니에요. 칸마다 붙은 <b>↑ 높을수록 좋음 / ↓ 낮을수록 좋음</b>을 보세요.</p>
+    <div id="thermo"></div>
+    <div id="summary" class="summary"></div>
+    <div id="tiles" class="tiles"></div>
+  </section>
+
+  <section class="block" id="regime">
+    <h2>지금 장세와 시나리오</h2>
+    <div id="regime-body"></div>
+  </section>
+
+  <section class="block" id="sectors">
+    <h2>업종별 돈 흐름 <small class="h2s">최근 5일 기관+외국인</small></h2>
+    <div id="sector-list"></div>
+  </section>
+
+  <section class="block" id="themes">
+    <h2>테마별 ETF <small class="h2s">돈이 어디로 가나 → 어떤 ETF로</small></h2>
+    <div id="theme-list"></div>
+  </section>
+
+  <section class="block" id="managers">
+    <h2>운용사 방향 <small class="h2s">액티브 ETF가 사고판 종목</small></h2>
+    <div id="mgr-body"></div>
   </section>
 
   <section class="block" id="replay">

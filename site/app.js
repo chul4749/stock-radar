@@ -1166,7 +1166,8 @@ function renderReplay() {
     })() : ""}
     <p class="hint">빨강 = 평소보다 높음, 파랑 = 평소보다 낮음. 급등은 이어지거나 하루 건너 이어지는 경우가 있지만, 실제로 살 수 있는 다음 날 시가 기준으로는 남는 게 다를 수 있어 두 표를 같이 봅니다. 기간이 짧아 참고용이에요.</p>` : "";
   el.innerHTML = `<p class="hint">최근 5일 동안 크게 오른 종목(5일 +${rp.rules.r5}% 또는 하루 +${rp.rules.d1}%)을 거꾸로 따라가 봅니다. 급등 전에 어떤 신호가 며칠 먼저 있었는지, 우리가 언제 잡았는지 보여 줘요.${infoBtn("replay")}</p>${infoBox("replay")}
-    ${rp.movers.length ? `<ul class="fit movers">${rp.movers.map(moverCard).join("")}</ul>` : `<p class="hint">최근 5일 급등주가 없습니다.</p>`}${ft}${vt}`;
+    ${rp.movers.length ? `<ul class="fit movers">${rp.movers.slice(0, 4).map(moverCard).join("")}</ul>` : `<p class="hint">최근 5일 급등주가 없습니다.</p>`}
+    ${rp.movers.length > 4 ? `<details class="rules"><summary>급등주 ${rp.movers.length - 4}개 더 보기</summary><ul class="fit movers">${rp.movers.slice(4).map(moverCard).join("")}</ul></details>` : ""}${ft}${vt}`;
 }
 
 /* ---------------- 아침 요약 ---------------- */
@@ -1233,7 +1234,7 @@ let mgrWin = "20";
 try { mgrWin = localStorage.getItem("mgrWin") || "20"; } catch (e) { /* 무시 */ }
 
 function mgrRow(r, side) {
-  const acts = r.etfs.slice(0, 4).map((e) => `${esc(e.name)} <b class="${side === "buy" ? "up" : "down"}">${ACT[e.act]}${e.chg != null && e.act !== "out" ? ` ${signed(e.chg, 0, "%")}` : ""}</b>${e.w ? ` <small>비중 ${num(e.w, 1)}%</small>` : ""}`).join("<br>");
+  const acts = r.etfs.slice(0, 4).map((e) => `<span>${esc(e.name)} <b class="${side === "buy" ? "up" : "down"}">${ACT[e.act]}${e.chg != null && e.act !== "out" ? ` ${signed(e.chg, 0, "%")}` : ""}</b>${e.w ? ` · 비중 ${num(e.w, 1)}%` : ""}</span>`).join("");
   const sk = (state.data.managers || {}).skill || {};
   const badges = [];
   if (r.persist) badges.push(`<span class="tag ${side === "buy" ? "fresh" : "known"}">${side === "buy" ? "계속 사는 중" : "계속 파는 중"}</span>`);
@@ -1248,7 +1249,7 @@ function mgrRow(r, side) {
     <span class="mchips">${r.managers.map(mtag).join("")}</span></div>
     ${badges.length ? `<div class="mbadges">${badges.join("")}</div>` : ""}
     ${facts.length ? `<small class="mfacts">${facts.join(" · ")}</small>` : ""}
-    ${r.mixed ? `<small class="hint">⚖ 다른 운용사는 반대로 움직임</small>` : ""}<small class="macts">${acts}${r.etfs.length > 4 ? `<br>외 ${r.etfs.length - 4}개 ETF` : ""}</small></li>`;
+    ${r.mixed ? `<small class="hint">⚖ 다른 운용사는 반대로 움직임</small>` : ""}<div class="macts">${acts}${r.etfs.length > 4 ? `<span>외 ${r.etfs.length - 4}개 ETF</span>` : ""}</div></li>`;
 }
 
 function renderManagers() {
@@ -1278,7 +1279,8 @@ function renderManagers() {
     ${skillBox}${tiltBox}
     <div class="seg" role="tablist">${["5", "20"].map((w) => `<button type="button" data-mgrwin="${w}" aria-selected="${w === mgrWin}">${w}일 동안</button>`).join("")}</div>
     <h3 class="sub">여러 운용사가 같이 산 종목 <small>${many.length}개</small></h3>
-    ${many.length ? `<ul class="fit mgr">${many.slice(0, 12).map((r) => mgrRow(r, "buy")).join("")}</ul>` : `<p class="hint">두 곳 이상이 같이 산 종목은 없습니다.</p>`}
+    ${many.length ? `<ul class="fit mgr">${many.slice(0, 5).map((r) => mgrRow(r, "buy")).join("")}</ul>` : `<p class="hint">두 곳 이상이 같이 산 종목은 없습니다.</p>`}
+    ${many.length > 5 ? `<details class="rules"><summary>여러 곳이 같이 산 종목 ${Math.min(many.length, 30) - 5}개 더 보기</summary><ul class="fit mgr">${many.slice(5, 30).map((r) => mgrRow(r, "buy")).join("")}</ul></details>` : ""}
     ${one.length ? `<details class="rules"><summary>한 곳만 산 종목 ${one.length}개</summary><ul class="fit mgr">${one.slice(0, 20).map((r) => mgrRow(r, "buy")).join("")}</ul></details>` : ""}
     ${mv.sells.length ? `<details class="rules"><summary>운용사들이 판 종목 ${mv.sells.length}개</summary><ul class="fit mgr">${mv.sells.slice(0, 20).map((r) => mgrRow(r, "sell")).join("")}</ul></details>` : ""}
     <details class="rules"><summary>운용사·ETF별로 보기</summary>${perEtf}</details>
@@ -1369,7 +1371,8 @@ function renderThemes() {
   const rest = th.themes.filter((t) => !main.includes(t));
   const b = (th.bench || {})["069500"];
   el.innerHTML = `${heatmap(th.heat)}<p class="hint">읽는 법${infoBtn("themes")}${b ? ` · 기준: KODEX 200 20일 ${signed(b.r20, 1, "%")}` : ""}</p>${infoBox("themes")}
-    ${main.length ? `<ul class="fit themes">${main.map(themeCard).join("")}</ul>` : `<p class="hint">지금 돈이 들어오는 테마가 없습니다.</p>`}
+    ${main.length ? `<ul class="fit themes">${main.slice(0, 4).map(themeCard).join("")}</ul>` : `<p class="hint">지금 돈이 들어오는 테마가 없습니다.</p>`}
+    ${main.length > 4 ? `<details class="rules"><summary>돈이 들어오는 테마 ${main.length - 4}개 더 보기</summary><ul class="fit themes">${main.slice(4).map(themeCard).join("")}</ul></details>` : ""}
     ${rest.length ? `<details class="rules"><summary>나머지 테마 ${rest.length}개 (과열·약함·큰손 매도)</summary><ul class="fit themes">${rest.map(themeCard).join("")}</ul></details>` : ""}
     <p class="hint">ETF는 여러 종목을 한 번에 사는 상품이라 한 종목 악재에 덜 흔들립니다. 레버리지·인버스는 뺐습니다. 매수 추천이 아닙니다.</p>`;
 }
@@ -1789,3 +1792,30 @@ try {
 } catch (e) { /* 오래된 브라우저 */ }
 
 init();
+
+/* ---------------- 바로 가기 (위에 붙은 줄) ---------------- */
+
+// 지금 보고 있는 구역을 바로 가기 줄에 표시. 섹션 → 바로 가기 묶음
+const JUMP_OF = { morning: "today", today: "today", filter: "filter", turn: "turn", temp: "turn", regime: "turn",
+  sectors: "sectors", themes: "sectors", managers: "sectors", replay: "replay", score: "score", glossary: "score" };
+function updateJump() {
+  const bar = document.querySelector(".bar");
+  if (!bar) return;
+  const h = bar.getBoundingClientRect().height;
+  document.documentElement.style.setProperty("--bar-h", `${Math.ceil(h) + 4}px`);
+  let cur = "today";
+  document.querySelectorAll("main section.block").forEach((s) => {
+    if (!s.hidden && s.getBoundingClientRect().top <= h + 40) cur = JUMP_OF[s.id] || cur;
+  });
+  document.querySelectorAll(".jump a").forEach((a) => {
+    const on = a.getAttribute("href") === `#${cur}`;
+    if (on !== a.classList.contains("on")) {
+      a.classList.toggle("on", on);
+      if (on) a.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  });
+}
+let jumpRaf = 0;
+window.addEventListener("scroll", () => { cancelAnimationFrame(jumpRaf); jumpRaf = requestAnimationFrame(updateJump); }, { passive: true });
+window.addEventListener("resize", updateJump);
+updateJump();
