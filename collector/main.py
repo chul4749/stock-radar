@@ -5,6 +5,7 @@
 """
 import json
 import os
+import socket
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -42,6 +43,8 @@ def safe(name, fn, errors):
 
 
 def main(argv):
+    # 시간 제한 없이 부르는 라이브러리(pykrx 등)가 끊긴 연결에서 15분 넘게 멈추던 것 막기: 응답 없으면 60초에 실패 → 재시도
+    socket.setdefaulttimeout(60)
     errors = []
     wanted = pick_base_date(argv[1] if len(argv) > 1 else None)
 
@@ -687,22 +690,35 @@ def fetch_profiles(codes):
 CHART_DAYS, NET_DAYS = 60, 20
 
 
+SHARDS = 16
+
+
 def _shard(code):
-    return code[-1] if code[-1].isdigit() else "x"
+    """코드 글자 합 % 16 (보통주 코드는 거의 0으로 끝나 끝자리로 나누면 한 파일에 몰림). site/app.js shardOf와 같아야 함."""
+    return str(sum(map(ord, code)) % SHARDS)
+
+
+def _clear_json(d):
+    for n in os.listdir(d):
+        if n.endswith(".json"):
+            os.remove(os.path.join(d, n))
 
 
 def write_chart_shards(base, closes, net, stocks):
     """전 종목 60일 종가 + 20일 큰손 순매수(억)를 코드 끝자리로 10개(+x) 파일에 나눠 쓴다 (charts/, git 밖, 최신 기준일만)."""
     d = os.path.join(DATA, "charts")
     os.makedirs(d, exist_ok=True)
-    try:
-        with open(os.path.join(d, "0.json"), encoding="utf-8") as f:
-            if json.load(f).get("date", "") > base:
-                return
-    except (OSError, ValueError):
-        pass
+    for n in os.listdir(d):
+        try:
+            with open(os.path.join(d, n), encoding="utf-8") as f:
+                if json.load(f).get("date", "") > base:
+                    return
+        except (OSError, ValueError):
+            pass
+        break
     days = list(closes.index[-CHART_DAYS:])
     ndays = list(net.index[-NET_DAYS:]) if net is not None and not net.empty else []
+    _clear_json(d)
     shards = {}
     for c in stocks:
         if c not in closes.columns:
@@ -737,6 +753,7 @@ def save_fin_cache(cache, profiles, base):
             cache[c] = p
     d = os.path.join(DATA, "fin")
     os.makedirs(d, exist_ok=True)
+    _clear_json(d)
     shards = {}
     for c, p in cache.items():
         shards.setdefault(_shard(c), {})[c] = p

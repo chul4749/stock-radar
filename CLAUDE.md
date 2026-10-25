@@ -26,8 +26,8 @@
     최신 리포트 상세(의견·목표가·요약). 네이버 검색 상위 100(`search_rank`)은 '이미 알려짐' 주의 표시일 뿐 좋은 신호로 쓰지 않는다.
     리포트는 저평가 주목 신호 5번째(`add_report_wake`)·조건별 성적(`report`, `report_fresh`, `search_top`)에도 들어간다.
     `site/data/stocks.json`은 전체 종목 찾기용(`stock_index`): 종목마다 탭별 조건 통과 여부를 1/0 문자열로(문구는 `labels`에 한 번).
-    검색 팝업용 전 종목 60일 종가·20일 큰손 순매수는 `site/data/charts/{코드 끝자리}.json`(`write_chart_shards`, 최신 기준일만),
-    재무는 `site/data/fin/{끝자리}.json`(`fetch_profiles`: 없는 종목은 전부, 있으면 오래된 것부터 `FIN_BATCH`개, `FIN_WORKERS`개 동시·`FIN_BUDGET`초 한도).
+    검색 팝업용 전 종목 60일 종가·20일 큰손 순매수는 `site/data/charts/{코드 글자 합 % 16}.json`(`_shard` = app.js `shardOf`)(`write_chart_shards`, 최신 기준일만),
+    재무는 `site/data/fin/{같은 번호}.json`(`fetch_profiles`: 없는 종목은 전부, 있으면 오래된 것부터 `FIN_BATCH`개, `FIN_WORKERS`개 동시·`FIN_BUDGET`초 한도).
     둘 다 main에 안 넣고(.gitignore) `data-cache` 브랜치에 커밋 하나로 덮어써 보관 — collect·morning·pages 워크플로가 받아서 배포에 넣는다.
     조건 목록은 `scalp_checks`·`swing_checks`·`value_checks` 하나로 필터와 검색이 같이 쓴다.
     급등주 복기(`find_movers`·`replay_mover`, `SURGE`): 5일 +20% 또는 하루 +15% 종목을 15영업일 거슬러 큰손 순매수·거래 배수·리포트·우리 후보 여부와 '미리 잡음/당일/놓침'.
@@ -65,6 +65,7 @@
 - 신용잔고·반대매매는 금융투자협회 FreeSIS(`sources.kofia`)에서 받는다. T+1 공표라 기준일 전날 값이 최신.
 - 외국인 코스피200 선물 순매수는 다음 금융(`sources.daum_futures`), 종목 기업 정보는 네이버(`sources.naver_profile`).
 - `probe/` 시험은 `credit-probe` 워크플로에 스크립트 이름(`script`)을 넣어 돌린다 (이 컨테이너에선 증권 사이트 접속이 막힘).
+- `main()`은 `socket.setdefaulttimeout(60)`: pykrx·DART가 끊긴 연결에서 15분씩 멈추던 것을 60초 실패→재시도로.
 - 네이버·CNN은 비공식 경로라 바뀌면 빠질 수 있다. 수집 실패는 `errors`에 남기고 나머지는 계속 진행한다.
 
 ## 화면 규칙

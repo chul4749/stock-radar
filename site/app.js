@@ -1576,7 +1576,8 @@ function setupSearch() {
 // 종목 하나의 오늘 상태와 탭별 조건 ✓/✗ — 왜 후보에 안 걸렸는지
 // 전 종목 차트·재무: 코드 끝자리별 파일을 필요할 때만 받는다
 const shardCache = {};
-const shardOf = (code) => (/\d$/.test(code) ? code.slice(-1) : "x");
+// collector/main.py _shard와 같아야 함: 코드 글자 합 % 16
+const shardOf = (code) => String([...code].reduce((a, ch) => a + ch.charCodeAt(0), 0) % 16);
 const loadShard = (kind, code) => {
   const k = `${kind}/${shardOf(code)}`;
   return (shardCache[k] ||= fetch(`data/${k}.json`, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)).catch(() => null));
