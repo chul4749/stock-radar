@@ -2,3 +2,5 @@ __pycache__/
 probe/result.json
 .venv/
 probe/dump/
+site/data/charts/
+site/data/fin/

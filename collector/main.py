@@ -207,6 +207,15 @@ def main(argv):
     for x in value:
         profile(x["code"])
     logic.apply_forward_eps(value, profiles)
+    # 전 종목 재무(검색 화면용): 날마다 시총 큰 순으로 오래된 것부터 FIN_BATCH 개씩 채워 두는 캐시 (fin/, git 밖)
+    fin_cache = load_fin_cache()
+    stale = sorted((c for c in universe_all if len(c) == 6),
+                   key=lambda c: ((fin_cache.get(c) or {}).get("as_of") or "", -universe_all[c]["cap"]))
+    fresh = 0
+    for c in ([] if backfill else stale[:FIN_BATCH]):   # 예전 기준일을 다시 계산할 땐 안 받음
+        if profile(c):
+            fresh += 1
+    log(f"  전 종목 재무 캐시: 이번에 {fresh}개 받음, 모두 {len(fin_cache) + fresh}개쯤")
     overlap = logic.mark_overlap(scalp, swing, value)
     # 며칠째 걸려 있는지: 기준일 전 기록을 최근 날짜부터 거슬러 본다
     prev = []
@@ -253,6 +262,7 @@ def main(argv):
                 x["exit"] = logic.exit_level(g, closes[x["code"]], lows[x["code"]] if x["code"] in lows.columns else None)
             x["earn_season"] = logic.earnings_status(x["code"], base, season, reported)
     log(f"  기업 정보 {len(profiles) - failed}/{len(profiles)}")
+    save_fin_cache(fin_cache, profiles, base)
     if profiles and failed == len(profiles):
         errors.append("기업 정보: 전부 실패")
     sector_flow = logic.sector_flows(universe, sectors, flows_5d, closes)
@@ -384,6 +394,7 @@ def main(argv):
             picked.setdefault(x["code"], []).append(g)
     idx = logic.stock_index(universe_all, {c: r for c, r in risk.items()}, closes, values, flows_daily, flows_5d,
                             news_today, news_3d, fund_now, fund_hist, sectors, picked)
+    write_chart_shards(base, closes, logic.net_frame(flows_hist), idx["stocks"])
     for c, m in mg_of.items():   # 검색 화면에도 '운용사가 20일 동안 산·판' 표시
         if c in idx["stocks"]:
             idx["stocks"][c]["mg"] = m
@@ -642,6 +653,69 @@ def update_reports(base, errors, keep_days=150):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(store, f, ensure_ascii=False, separators=(",", ":"))
     return store
+
+
+FIN_BATCH = 250
+CHART_DAYS, NET_DAYS = 60, 20
+
+
+def _shard(code):
+    return code[-1] if code[-1].isdigit() else "x"
+
+
+def write_chart_shards(base, closes, net, stocks):
+    """전 종목 60일 종가 + 20일 큰손 순매수(억)를 코드 끝자리로 10개(+x) 파일에 나눠 쓴다 (charts/, git 밖, 최신 기준일만)."""
+    d = os.path.join(DATA, "charts")
+    os.makedirs(d, exist_ok=True)
+    try:
+        with open(os.path.join(d, "0.json"), encoding="utf-8") as f:
+            if json.load(f).get("date", "") > base:
+                return
+    except (OSError, ValueError):
+        pass
+    days = list(closes.index[-CHART_DAYS:])
+    ndays = list(net.index[-NET_DAYS:]) if net is not None and not net.empty else []
+    shards = {}
+    for c in stocks:
+        if c not in closes.columns:
+            continue
+        col = closes[c].iloc[-CHART_DAYS:]
+        rec = {"c": [None if v != v else round(float(v)) for v in col]}
+        if ndays and c in net.columns:
+            rec["n"] = [None if v != v else round(float(v) / EOK) for v in net[c].reindex(ndays)]
+        shards.setdefault(_shard(c), {})[c] = rec
+    for k, v in shards.items():
+        with open(os.path.join(d, f"{k}.json"), "w", encoding="utf-8") as f:
+            json.dump({"date": base, "days": days, "net_days": ndays, "stocks": v}, f, ensure_ascii=False, separators=(",", ":"))
+
+
+def load_fin_cache():
+    out = {}
+    d = os.path.join(DATA, "fin")
+    if os.path.isdir(d):
+        for n in os.listdir(d):
+            try:
+                with open(os.path.join(d, n), encoding="utf-8") as f:
+                    out.update(json.load(f).get("stocks") or {})
+            except (OSError, ValueError):
+                pass
+    return out
+
+
+def save_fin_cache(cache, profiles, base):
+    """이번에 받은 기업 정보(후보 + 돌아가며 받은 종목)를 재무 캐시에 합쳐 끝자리별로 나눠 쓴다."""
+    for c, p in profiles.items():
+        if p:
+            cache[c] = p
+    d = os.path.join(DATA, "fin")
+    os.makedirs(d, exist_ok=True)
+    shards = {}
+    for c, p in cache.items():
+        shards.setdefault(_shard(c), {})[c] = p
+    for k, v in shards.items():
+        with open(os.path.join(d, f"{k}.json"), "w", encoding="utf-8") as f:
+            json.dump({"date": base, "stocks": v}, f, ensure_ascii=False, separators=(",", ":"))
+    log(f"  재무 캐시 저장 {len(cache)}개")
 
 
 def write_latest(name, base, obj):

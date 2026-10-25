@@ -26,6 +26,8 @@
     최신 리포트 상세(의견·목표가·요약). 네이버 검색 상위 100(`search_rank`)은 '이미 알려짐' 주의 표시일 뿐 좋은 신호로 쓰지 않는다.
     리포트는 저평가 주목 신호 5번째(`add_report_wake`)·조건별 성적(`report`, `report_fresh`, `search_top`)에도 들어간다.
     `site/data/stocks.json`은 전체 종목 찾기용(`stock_index`): 종목마다 탭별 조건 통과 여부를 1/0 문자열로(문구는 `labels`에 한 번).
+    검색 팝업용 전 종목 60일 종가·20일 큰손 순매수는 `site/data/charts/{코드 끝자리}.json`(`write_chart_shards`, 최신 기준일만),
+    재무는 `site/data/fin/{끝자리}.json`(날마다 시총 큰 순·오래된 것부터 `FIN_BATCH`개씩 갱신). 둘 다 git 밖 — 워크플로 actions/cache로 이어 간다.
     조건 목록은 `scalp_checks`·`swing_checks`·`value_checks` 하나로 필터와 검색이 같이 쓴다.
     급등주 복기(`find_movers`·`replay_mover`, `SURGE`): 5일 +20% 또는 하루 +15% 종목을 15영업일 거슬러 큰손 순매수·거래 배수·리포트·우리 후보 여부와 '미리 잡음/당일/놓침'.
     신호 검증(`signal_validation`): 큰손 3일 연속·조용한 거래 증가·5일 순매수 덩치 0.1%↑가 뜬 뒤 5일 안 +15% 비율 vs 평소. 일별 수급은 25영업일 받음(`flows_hist`). 성적표 `movers`(`mover_scorecard`)로 누적.

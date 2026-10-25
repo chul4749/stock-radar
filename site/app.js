@@ -253,6 +253,57 @@ function renderThermo() {
 
 /* ---------------- 시장 온도 ---------------- */
 
+/* ---------------- 차트를 누르면(끌면) 그날 값 보기: 차트를 감싸고 값은 data-tip 에 ---------------- */
+
+// labels: 칸마다 이름(날짜 등), series: [[이름, 값들, 단위]], bars: 막대면 칸 가운데 기준
+function tipWrap(html, labels, series, bars = false) {
+  const data = { l: labels, s: series, b: bars ? 1 : 0 };
+  return `<div class="tipchart" data-tip='${esc(JSON.stringify(data))}'>${html}<i class="tipline" hidden></i><div class="tipbox" hidden></div></div>`;
+}
+
+function tipFmt(v, unit) {
+  if (v == null) return "–";
+  if (unit === "억") return sEok(v);
+  const d = Number.isInteger(v) || Math.abs(v) >= 1000 ? 0 : Math.abs(v) >= 100 ? 1 : 2;
+  return `${num(v, d)}${unit || ""}`;
+}
+
+function showTip(wrap, clientX) {
+  let data;
+  try { data = JSON.parse(wrap.dataset.tip); } catch (e) { return; }
+  const r = wrap.getBoundingClientRect(), n = data.l.length;
+  if (!n || !r.width) return;
+  const ratio = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+  const i = data.b ? Math.min(n - 1, Math.floor(ratio * n)) : Math.round(ratio * (n - 1));
+  const x = data.b ? ((i + 0.5) / n) * r.width : (n > 1 ? (i / (n - 1)) * r.width : r.width / 2);
+  const line = wrap.querySelector(".tipline"), box = wrap.querySelector(".tipbox");
+  line.hidden = false; line.style.left = `${x}px`;
+  box.innerHTML = `<b>${esc(data.l[i])}</b>` + data.s.map(([name, vals, unit]) => `<span>${esc(name)} <b>${tipFmt(vals[i], unit)}</b></span>`).join("");
+  box.hidden = false;
+  const bw = box.offsetWidth;
+  box.style.left = `${Math.max(0, Math.min(r.width - bw, x - bw / 2))}px`;
+}
+
+function hideTips(except) {
+  document.querySelectorAll(".tipchart").forEach((w) => {
+    if (w === except) return;
+    w.querySelectorAll(".tipline, .tipbox").forEach((el) => (el.hidden = true));
+  });
+}
+
+document.addEventListener("pointerdown", (e) => {
+  const w = e.target.closest(".tipchart");
+  hideTips(w);
+  if (w) showTip(w, e.clientX);
+});
+document.addEventListener("pointermove", (e) => {
+  const w = e.target.closest(".tipchart");
+  if (w && (e.pointerType === "mouse" || e.buttons)) showTip(w, e.clientX);
+});
+
+// 시장 온도 칸의 작은 추세선: 날짜가 없어 '며칠 전'으로
+const agoLabels = (n) => Array.from({ length: n }, (_, i) => (i === n - 1 ? "가장 최근" : `${n - 1 - i}일 전`));
+
 function spark(vals, color = "currentColor") {
   const v = (vals || []).filter((x) => x != null);
   if (v.length < 2) return "";
@@ -316,7 +367,7 @@ function tile(label, value, sub, sparkVals, opts = {}) {
   const dir = DIR[key];
   const dirChip = dir ? `<span class="dir ${dir > 0 ? "hi" : "lo"}">${dir > 0 ? "↑ 높을수록 좋음" : "↓ 낮을수록 좋음"}</span>` : "";
   return `<div class="tile${opts.wide ? " wide" : ""}"><div class="l">${label} ${key ? infoBtn(key) : ""}</div>${dirChip}<div class="v ${opts.vcls || ""}">${value}</div>` +
-    `<div class="s">${sub}</div>${sparkVals ? `<div style="color:var(--faint)">${spark(sparkVals)}</div>` : ""}${opts.extra || ""}${zb}` +
+    `<div class="s">${sub}</div>${sparkVals && sparkVals.filter((x) => x != null).length > 1 ? `<div style="color:var(--faint)">${tipWrap(spark(sparkVals), agoLabels(sparkVals.filter((x) => x != null).length), [["값", sparkVals.filter((x) => x != null), ""]])}</div>` : ""}${opts.extra || ""}${zb}` +
     `${line ? `<div class="why">${esc(line)}</div>` : ""}${key ? infoBox(key) : ""}</div>`;
 }
 
@@ -344,8 +395,9 @@ function highLowChart(b) {
   const avg = n >= 6 ? lo.slice(-6, -1).reduce((a, v) => a + v, 0) / 5 : null;
   const avgLine = avg == null ? "" : `<line x1="${((n - 6) * w) / n}" x2="${w}" y1="${(mid + y(avg)).toFixed(1)}" y2="${(mid + y(avg)).toFixed(1)}" stroke="var(--text)" stroke-width="1" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/>`;
   const d0 = b.dates && b.dates[0], d1 = b.dates && b.dates[n - 1];
-  return `<svg class="hilo" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="최근 ${n}일 신고가·신저가 종목 수">` +
-    `${rects}<line x1="0" x2="${w}" y1="${mid}" y2="${mid}" stroke="var(--line)" stroke-width="1" vector-effect="non-scaling-stroke"/>${avgLine}</svg>` +
+  const svg = `<svg class="hilo" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="최근 ${n}일 신고가·신저가 종목 수">` +
+    `${rects}<line x1="0" x2="${w}" y1="${mid}" y2="${mid}" stroke="var(--line)" stroke-width="1" vector-effect="non-scaling-stroke"/>${avgLine}</svg>`;
+  return tipWrap(svg, (b.dates || agoLabels(n)).map((d) => (/^\d{8}$/.test(d) ? ymd(d) : d)), [["신고가", hi, "개"], ["신저가", lo, "개"]], true) +
     `<div class="legend"><span><i style="background:var(--up)"></i>신고가 ${num(hi[n - 1])}</span><span><i style="background:var(--down)"></i>신저가 ${num(lo[n - 1])}</span>` +
     `${avg == null ? "" : `<span><i class="dash"></i>신저가 5일 평균</span>`}</div>` +
     (d0 && d1 ? `<div class="barlab"><span style="text-align:left">${ymd(d0)}</span><span style="text-align:right">${ymd(d1)}</span></div>` : "");
@@ -372,8 +424,9 @@ function futuresTile(f) {
   const cum = d.map((x) => (acc += x.foreign_eok || 0));
   const cmin = Math.min(0, ...cum), cmax = Math.max(0, ...cum), cy = (v) => h - 4 - ((v - cmin) / (cmax - cmin || 1)) * (h - 8);
   const line = `<polyline points="${cum.map((v, i) => `${((i + 0.5) * w / n).toFixed(1)},${cy(v).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--text)" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>`;
-  const chart = `<svg class="futchart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="최근 ${n}일 외국인 선물 순매수">` +
-    `<line x1="0" x2="${w}" y1="${mid}" y2="${mid}" stroke="var(--line)" stroke-width="1" vector-effect="non-scaling-stroke"/>${bars}${line}</svg>` +
+  const chart = tipWrap(`<svg class="futchart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="최근 ${n}일 외국인 선물 순매수">` +
+    `<line x1="0" x2="${w}" y1="${mid}" y2="${mid}" stroke="var(--line)" stroke-width="1" vector-effect="non-scaling-stroke"/>${bars}${line}</svg>`,
+    d.map((x) => ymd(x.date)), [["그날", d.map((x) => x.foreign_eok), "억"], ["20일 누적", cum, "억"]], true) +
     `<div class="legend"><span><i style="background:var(--up)"></i>순매수</span><span><i style="background:var(--down)"></i>순매도</span><span><i style="background:var(--text)"></i>20일 누적</span><span class="rng">누적 ${sEok(f.d20_eok)}</span></div>` +
     `<div class="barlab"><span style="text-align:left">${ymd(d[0].date)}</span><span style="text-align:right">${ymd(d[n - 1].date)}</span></div>`;
   const streak = f.streak ? `${f.streak > 0 ? "순매수" : "순매도"} ${Math.abs(f.streak)}일째` : "";
@@ -516,7 +569,7 @@ function bars(daily) {
     return `<div title="${ymd(d.date)} ${signed(v, 0, "억")}">${inner}</div>`;
   }).join("");
   const labs = daily.map((d) => `<span>${d.date.slice(4, 6)}/${d.date.slice(6)}</span>`).join("");
-  return `<div class="bars">${cols}</div><div class="barlab">${labs}</div>`;
+  return tipWrap(`<div class="bars">${cols}</div>`, daily.map((d) => ymd(d.date)), [["기관+외국인", daily.map((d) => d.sum), "억"]], true) + `<div class="barlab">${labs}</div>`;
 }
 
 /* ---------------- 오늘 한눈에 (페이지 맨 위 요약) ---------------- */
@@ -1347,7 +1400,8 @@ function lineChart(ch) {
     const pts = ch[k].map((v, i) => (v == null ? null : `${(i / (n - 1)) * w},${y(v)}`)).filter(Boolean).join(" ");
     return `<polyline points="${pts}" fill="none" stroke="${c}" stroke-width="${sw}" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>`;
   }).join("");
-  return `<svg class="chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="60일 주가와 이동평균">${lines}</svg>
+  return `${tipWrap(`<svg class="chart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="60일 주가와 이동평균">${lines}</svg>`,
+    ch.dates.map(ymd), [["종가", ch.close, ""], ["20일 평균", ch.ma20, ""], ["60일 평균", ch.ma60, ""]])}
     <div class="legend"><span><i style="background:var(--text)"></i>종가</span><span><i style="background:var(--up)"></i>20일 평균선</span><span><i style="background:var(--down)"></i>60일 평균선</span>
     <span class="rng">${num(min)} ~ ${num(max)}</span></div>
     <div class="barlab"><span style="text-align:left">${ymd(ch.dates[0])}</span><span style="text-align:right">${ymd(ch.dates[n - 1])}</span></div>`;
@@ -1497,10 +1551,43 @@ function setupSearch() {
 }
 
 // 종목 하나의 오늘 상태와 탭별 조건 ✓/✗ — 왜 후보에 안 걸렸는지
+// 전 종목 차트·재무: 코드 끝자리별 파일을 필요할 때만 받는다
+const shardCache = {};
+const shardOf = (code) => (/\d$/.test(code) ? code.slice(-1) : "x");
+const loadShard = (kind, code) => {
+  const k = `${kind}/${shardOf(code)}`;
+  return (shardCache[k] ||= fetch(`data/${k}.json`, { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)).catch(() => null));
+};
+
+// 60일 종가로 20·60일 평균을 계산해 상세 차트 모양(lineChart)으로
+function chartFromCloses(days, closes) {
+  const ma = (k) => closes.map((_, i) => {
+    if (i + 1 < k) return null;
+    const w = closes.slice(i + 1 - k, i + 1);
+    return w.some((v) => v == null) ? null : w.reduce((a, v) => a + v, 0) / k;
+  });
+  return { dates: days, close: closes, ma20: ma(20), ma60: ma(60) };
+}
+
+function netBars(days, vals) {
+  const max = Math.max(1, ...vals.map((v) => Math.abs(v || 0)));
+  const cols = vals.map((v) => `<div class="nb"><i style="height:${Math.max(2, (Math.abs(v || 0) / max) * 50)}%;${(v || 0) >= 0 ? "bottom:50%" : "top:50%"};background:var(--${(v || 0) >= 0 ? "up" : "down"})"></i></div>`).join("");
+  return tipWrap(`<div class="nbars">${cols}</div>`, days.map(ymd), [["기관+외국인", vals, "억"]], true) +
+    `<div class="barlab"><span style="text-align:left">${ymd(days[0]).slice(5)}</span><span style="text-align:right">${ymd(days.at(-1)).slice(5)}</span></div>`;
+}
+
 async function openStock(code) {
   const db = await loadStocks();
   const s = db && db.stocks[code];
   if (!s) return;
+  const [chs, fins] = await Promise.all([loadShard("charts", code), loadShard("fin", code)]);
+  const cx = chs && chs.stocks && chs.stocks[code], fin = fins && fins.stocks && fins.stocks[code];
+  const chartHtml = cx && cx.c.filter((v) => v != null).length > 5
+    ? `<h3 class="sub">최근 ${cx.c.length}일 주가</h3>${lineChart(chartFromCloses(chs.days.slice(-cx.c.length), cx.c))}` +
+      (cx.n && chs.net_days.length ? `<h3 class="sub">최근 ${chs.net_days.length}일 큰손(기관+외국인) 순매수</h3>${netBars(chs.net_days, cx.n)}` : "")
+    : "";
+  const finHtml = fin ? `${companyBlock({ profile: { ...fin, cap_eok: s.cap }, close: s.c })}`
+    : `<p class="hint">이 종목의 재무는 아직 모으는 중이에요 (날마다 시총 큰 순으로 채움). <a href="https://m.stock.naver.com/domestic/stock/${code}" target="_blank" rel="noopener">네이버에서 보기</a></p>`;
   const L = db.labels, R = db.rules;
   const tabs = (s.p || []).map((g) => TAB_NAME[g]);
   const gate = (ok, label) => `<li class="${ok ? "" : "no"}"><span>${esc(label)}</span><span></span></li>`;
@@ -1530,9 +1617,11 @@ async function openStock(code) {
       <div><small>PER · PBR</small><b>${s.per == null ? "–" : num(s.per, 1)} · ${s.pbr == null ? "–" : num(s.pbr, 2)}</b><small>${s.mul != null ? `거래 평소의 ${num(s.mul, 1)}배` : ""}</small></div>
     </div>
     <p class="hint">흐름: ${trend}${s.dr != null ? ` · 60일 고점보다 −${num(s.dr, 1)}%` : ""}</p>
+    ${chartHtml}
     <h3 class="sub">탭별 조건 <small>✓ 맞음 · ✗ 안 맞음</small></h3>
     <ul class="fit why">${block("swing", sw, s.sw, L.swing)}${block("scalp", sc, s.sc, L.scalp)}${block("value", va, s.va, L.value, s.vr)}</ul>
     ${tabs.length ? `<button class="more" type="button" data-code="${code}">후보 카드 자세히 보기</button>` : ""}
+    ${finHtml}
     <p class="hint">조건에 다 맞아도 매수 추천은 아닙니다. 네이버에서 더 보려면 이름을 누르세요.</p>`;
   openDialog();
   $("#detail .dlg-in").scrollTop = 0;

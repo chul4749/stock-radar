@@ -39,6 +39,14 @@ jobs:
           git add site/data/morning.json
           git diff --cached --quiet || git commit -q -m "data: 아침 요약 $(TZ=Asia/Seoul date +%F)"
           git push -q origin "$GITHUB_REF_NAME"
+      # 전 종목 차트·재무(charts/, fin/)는 git 대신 GitHub 캐시로 실행 사이를 잇는다 (저장소가 날마다 커지지 않게)
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            site/data/charts
+            site/data/fin
+          key: radar-cache-${{ github.run_id }}
+          restore-keys: radar-cache-
       - if: vars.PAGES_ENABLED == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
