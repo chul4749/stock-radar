@@ -362,7 +362,7 @@ DART_EARNINGS = ["잠정)실적", "잠정실적", "손익구조"]
 def dart_today(ymd, max_pages=15):
     """DART 오늘 공시 목록(웹). 코스피·코스닥 상장사만. 정식 OpenDART 는 키가 필요하다."""
     date_dot = f"{ymd[:4]}.{ymd[4:6]}.{ymd[6:]}"
-    out, seen = [], set()
+    out, seen, stale = [], set(), 0
     for page in range(1, max_pages + 1):
         try:
             r = retry(lambda: get("https://dart.fss.or.kr/dsac001/mainAll.do", timeout=40,
@@ -379,6 +379,10 @@ def dart_today(ymd, max_pages=15):
                 continue
             seen.add(m.group(1))
             new += 1
+            # 접수번호 앞 8자리 = 실제 접수일. 그날 목록에 옛 공시(예: 8월 반기보고서)가 다시 섞여 나오는 경우가 있어 뺀다
+            if m.group(1)[:8] != ymd:
+                stale += 1
+                continue
             market = re.search(r'class="tagCom_(\w+)"', row)
             if not market or market.group(1) not in ("kospi", "kosdaq"):
                 continue
@@ -400,6 +404,8 @@ def dart_today(ymd, max_pages=15):
         if new == 0:
             break
         time.sleep(0.5)
+    if stale:
+        log(f"  DART {ymd}: 다른 날 접수된 공시 {stale}건 제외")
     return out
 
 

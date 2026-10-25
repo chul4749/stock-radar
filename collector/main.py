@@ -386,7 +386,7 @@ def main(argv):
                 bench[mk] = oc
         stats, recent, features, by_regime, score_check = logic.scorecard(
             history, closes, kospi, regimes, opens=opens, bench=bench or None)
-        stops = logic.stop_scorecard(history, closes, lows, opens=opens, bench=bench or None)
+        stops = logic.stop_scorecard(history, closes, lows, opens=opens, bench=bench or None, index_closes=kospi)
         card = {"generated_at": out["generated_at"], "base_date": base, "days": len(history), "stops": stops,
                 "themes": logic.theme_scorecard(theme_recs),
                 "horizons": list(logic.HORIZONS), "stats": stats, "recent": recent, "features": features,

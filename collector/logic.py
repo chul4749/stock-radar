@@ -1368,7 +1368,8 @@ def stock_index(universe, excluded, closes, values, flows_daily, flows_5d, news_
         if len(closes) >= 61 and not math.isnan(ma60[code].iloc[-1]):
             m20, m60, m20p = ma20[code].iloc[-1], ma60[code].iloc[-1], ma20[code].iloc[-6]
             rise5 = (close / col.iloc[-6] - 1) * 100
-            ratio = f5 * EOK / info["cap"] * 100 if info["cap"] else 0
+            net5 = _money(flows_5d["foreign"], code) + _money(flows_5d["inst"], code)   # 반올림 전 원 단위로 (필터와 같은 값)
+            ratio = net5 / info["cap"] * 100 if info["cap"] else 0
             rec["sw"] = _bits(swing_checks(close, m20, m60, m20p, rise5, fl["days_pos"], ratio, rules))
             rec["g20"], rec["g60"] = r1((close / m20 - 1) * 100), r1((close / m60 - 1) * 100)
         if pbr_med is not None and code in fund_now.index and len(c) >= 60:
@@ -1435,7 +1436,7 @@ def report_attention(code, store, base, rules=REPORT_RULES):
 
 # 법정 마감: 분기·반기보고서는 분기 끝나고 45일, 사업보고서는 90일
 REPORT_TITLES = ("분기보고서", "반기보고서", "사업보고서", "잠정)실적", "잠정실적", "손익구조")
-NOTICE_TITLES = ("실적공시예고", "결산실적공시예고", "기업설명회")
+NOTICE_TITLES = ("실적공시예고", "결산실적공시예고")   # 기업설명회(IR)는 실적 발표 날짜라고 볼 수 없어 뺌
 
 
 def report_season(base):
@@ -1452,14 +1453,16 @@ def update_reported(store, season, items, name_to_code):
     """DART 공시 목록에서 이번 시즌 실적 발표(보고서·잠정실적)와 발표 예고를 모은다. store 는 그대로 고쳐서 돌려준다."""
     if not season:
         return store
-    if store.get("season") != season["key"]:
-        store = {"season": season["key"], "checked": [], "reported": {}, "notice": {}}
+    if store.get("season") != season["key"] or store.get("v") != 2:   # v2: 접수일 기준으로 다시 모음
+        store = {"season": season["key"], "v": 2, "checked": [], "reported": {}, "notice": {}}
     for x in items:
         code = name_to_code.get(x.get("corp"))
         t = x.get("title", "")
         if not code or "정정" in t[:8]:
             continue
-        day = x["at"][:10].replace("-", "")
+        # 날짜는 접수번호 앞 8자리(실제 접수일)를 우선 쓴다
+        rc = re.search(r"rcpNo=(\d{8})", x.get("url") or "")
+        day = rc.group(1) if rc else x["at"][:10].replace("-", "")
         if day < season["start"]:
             continue
         kind = "reported" if any(k in t for k in REPORT_TITLES) and "예고" not in t else \
@@ -1510,7 +1513,7 @@ def exit_level(group, close_s, low_s=None):
     return {"stop": round(stop), "gap": r1((stop / close - 1) * 100), "rule": rule, "why": why, "hold": hold}
 
 
-def stop_scorecard(history, closes, lows, opens=None, bench=None, horizons=(5, 20), cost=None):
+def stop_scorecard(history, closes, lows, opens=None, bench=None, horizons=(5, 20), cost=None, index_closes=None):
     """정리 기준을 지켰다면: 그냥 N일 들고 있기 vs 기준 아래로 마감한 날 종가에 팔기 (둘 다 시장 지수 대비).
 
     정리 가격은 그날까지의 종가·저가로 다시 계산한다 (예전 기록에도 같은 규칙 적용).
@@ -1528,27 +1531,31 @@ def stop_scorecard(history, closes, lows, opens=None, bench=None, horizons=(5, 2
                 code = x["code"]
                 if code not in closes.columns:
                     continue
+                # 셈 규칙(매수가·건너뛰기·같은 종목 N일 안 재등장은 한 번)은 scorecard 와 똑같이 맞춘다 → '그냥 보유'가 성적표와 같아야 함
                 ex = exit_level(g, closes[code].iloc[:i0 + 1], lows[code].iloc[:i0 + 1] if lows is not None and code in lows.columns else None)
-                if not ex:
-                    continue
-                buy = opens[code].iloc[i0 + 1] if opens is not None and code in opens.columns and i0 + 1 < len(days) else None
                 for n in horizons:
-                    if i0 + n >= len(days) or buy is None or math.isnan(buy) or not buy:
+                    if i0 + n >= len(days):
+                        continue
+                    c1 = closes[code].iloc[i0 + n]
+                    buy = opens[code].iloc[i0 + 1] if opens is not None and code in opens.columns else x["close"]
+                    if c1 is None or math.isnan(c1) or buy is None or math.isnan(buy) or not buy:
                         continue
                     if (g, code, n) in last and i0 - last[(g, code, n)] < n:
                         continue
                     last[(g, code, n)] = i0
                     path = closes[code].iloc[i0 + 1:i0 + n + 1]
-                    if path.isna().any():
-                        continue
-                    k_out = next((k for k, v in enumerate(path, 1) if v < ex["stop"]), None)
+                    # 정리 가격이 없거나 중간 종가가 빈 날은 기준 판단 없이 그냥 보유로 센다
+                    k_out = None if not ex or path.isna().any() else next((k for k, v in enumerate(path, 1) if v < ex["stop"]), None)
                     mk = bench.get(x.get("market")) if bench else None
 
                     def excess(k):
-                        r = (path.iloc[k - 1] / buy - 1) * 100 - cost
-                        if mk is None:
-                            return r, None
-                        k0, k1 = mk[0].get(days[i0 + 1]), mk[1].get(days[i0 + k])
+                        r = (closes[code].iloc[i0 + k] / buy - 1) * 100 - cost
+                        if mk is not None:
+                            k0, k1 = mk[0].get(days[i0 + 1]), mk[1].get(days[i0 + k])
+                        elif index_closes is not None:
+                            k0, k1 = index_closes.get(days[i0]), index_closes.get(days[i0 + k])
+                        else:
+                            k0 = k1 = None
                         return r, (r - (k1 / k0 - 1) * 100) if k0 and k1 else None
 
                     a = acc.setdefault(g, {}).setdefault(n, {"hold": [], "hold_x": [], "stop": [], "stop_x": [], "hit": 0})

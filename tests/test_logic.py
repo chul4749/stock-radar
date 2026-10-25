@@ -520,10 +520,14 @@ def test_report_season_and_status():
     assert s["key"] == "2026Q3" and s["due"] == "20261114"
     assert logic.report_season("20260601") is None and logic.report_season("20270210")["key"] == "2026Y"
     items = [{"corp": "가나", "title": "분기보고서 (2026.09)", "at": "2026-10-20T15:00+09:00"},
+             {"corp": "마바", "title": "반기보고서", "at": "2026-10-01T09:00+09:00",
+              "url": "https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20260814001590"},   # 10/1 목록에 섞인 8월 공시
+             {"corp": "마바", "title": "기업설명회(IR)개최(안내공시)", "at": "2026-10-02T09:00+09:00"},
              {"corp": "다라", "title": "결산실적공시예고", "at": "2026-10-21T15:00+09:00"},
              {"corp": "가나", "title": "[기재정정]분기보고서", "at": "2026-10-22T15:00+09:00"}]
-    st = logic.update_reported({}, s, items, {"가나": "A", "다라": "B"})
+    st = logic.update_reported({}, s, items, {"가나": "A", "다라": "B", "마바": "C"})
     assert st["reported"]["A"]["date"] == "20261020" and "B" in st["notice"]
+    assert "C" not in st["reported"] and "C" not in st["notice"]
     assert logic.earnings_status("A", "20261023", s, st)["state"] == "done"
     assert logic.earnings_status("A", "20261019", s, st)["state"] == "pending"
     p = logic.earnings_status("B", "20261023", s, st)
@@ -597,3 +601,21 @@ def test_theme_strength_and_scorecard():
     sc = logic.theme_scorecard([("1", rec(100, 100)), ("2", rec(101, 100)), ("3", rec(102, 100)),
                                 ("4", rec(103, 100)), ("5", rec(104, 100)), ("6", rec(110, 105))], horizons=(5,), cost=0)
     assert sc["early"]["5"]["n"] == 1 and sc["early"]["5"]["avg"] == 10.0 and sc["early"]["5"]["excess"] == 5.0
+
+
+def test_stop_scorecard_hold_matches_scorecard():
+    # 정리 가격이 없는 날(20일 평균 아래)·빈 시가·같은 종목 재등장이 섞여도 '그냥 보유'는 성적표와 같아야 한다
+    import numpy as np
+    rng = np.random.default_rng(3)
+    n = 70
+    days = [f"d{i:02d}" for i in range(n)]
+    cl = pd.DataFrame({c: 100 * np.cumprod(1 + rng.normal(0, 0.02, n)) for c in "ABCDE"}, index=days)
+    op = cl * (1 + rng.normal(0, 0.005, (n, 5)))
+    op.iloc[40, 2] = float("nan")
+    k = pd.Series(1000 * np.cumprod(1 + rng.normal(0, 0.01, n)), index=days)
+    bench = {"KOSPI": (k * 1.001, k), "KOSDAQ": (k * 0.999, k * 1.02)}
+    hist = [(days[i], {"swing": [{"code": c, "name": c, "close": cl[c].iloc[i], "market": "KOSPI" if c < "C" else "KOSDAQ"}
+                                 for c in "ABCDE" if (i + ord(c)) % 3]}) for i in range(22, 60)]
+    st, *_ = logic.scorecard(hist, cl, k, opens=op, bench=bench)
+    sp = logic.stop_scorecard(hist, cl, cl * 0.98, opens=op, bench=bench, horizons=(5,), index_closes=k)
+    assert sp["swing"]["5"]["hold"] == st["swing"]["5"]
