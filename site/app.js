@@ -106,6 +106,7 @@ const INFO = {
   mgr_skill: "운용사마다 직접 고른 액티브 ETF가 최근 60일 동안 KODEX 200(코스피 대표 200종목)보다 얼마나 더 벌었는지 평균입니다. +면 시장보다 잘 고른 곳.\n'요즘 잘하는 곳'이 산 종목을 조금 더 무겁게 봅니다. 다만 60일은 짧아서 운이 섞입니다.",
   managers: "액티브 ETF는 펀드매니저가 직접 종목을 골라 사고파는 ETF입니다 (TIME=타임폴리오, KoAct=삼성액티브, ACE=한국투자 등).\nETF는 매일 담고 있는 종목을 공개하는데, 종목별 '담은 주식 수'는 펀드에 돈이 들어와도 그대로이고 매니저가 사고팔 때만 바뀝니다. 그래서 5일·20일 전과 비교하면 매니저가 뭘 샀고 뭘 팔았는지 보입니다.\n· 새로 담음: 전에 없던 종목을 넣음 (가장 강한 신호)\n· 늘림 / 줄임: 담은 주식 수를 10% 이상 바꿈\n· 모두 뺌: 다 팔아 버림\n여러 운용사가 같은 종목을 같이 사면 더 눈여겨볼 만합니다.\n붙는 표시:\n· 계속 사는 중: 20일 동안 샀고 최근 5일에도 또 삼 (확신이 있다는 뜻)\n· 비중 크게 담음: ETF 안에서 3% 넘게 담음\n· 그 뒤 주가: 비교 시작일 이후 주가 등락. 이미 15% 넘게 올랐으면 따라 사기엔 늦었을 수 있음\n· 투신 5일: 자산운용사 전체(펀드)가 이 종목을 최근 5일 산 금액. 같은 방향이면 더 믿을 만함\n순서는 운용사 수 → 계속 사는지 → 비중 → 잘하는 운용사 순으로 매깁니다. 매니저도 틀리고, 공개는 하루 늦게 반영될 수 있어요.",
   replay: "급등한 종목을 거꾸로 따라가 '미리 알 수 있었나'를 확인합니다.\n· 미리 잡음 (성공): 급등 전날 저녁까지 우리 후보(스윙·단타·저평가)에 있었음 → 급등 날 아침에 살 수 있었음\n· 당일 마감 뒤 — 이미 늦음: 급등한 날 장 마감 뒤에야 후보에 걸림. 우리 자료는 저녁에 나오니 다음 날 아침에야 살 수 있어 이미 오른 뒤\n· 뒤늦게 잡음: 급등이 시작되고 며칠 뒤에야 걸림\n· 놓침: 후보에 안 걸림\n'N일 먼저' 신호는 급등 시작일보다 며칠 앞서 그 신호가 처음 보였는지입니다. 여러 급등주에서 같은 신호가 자주 먼저 보이면, 그 신호를 조건에 넣을 이유가 됩니다.",
+  follow: "급등한 날(하루 +15%↑ 등) 뒤 며칠이 어떻게 흘렀는지 최근 약 80영업일 실제 기록을 셉니다. 시총·거래대금 기준 이상 종목만.\n· 다음 날도 오름: 급등 다음 날 종가가 또 올랐던 비율\n· 3일 안 또 급등: 다음 3일 중 하루라도 +8% 넘게 오른 비율\n· 하루 쉬고 다시: 다음 날은 보합·하락이었다가 2~3일째 +5% 넘게 오른 비율 (하루 건너 이어지는 모양)\n'평소' 줄은 아무 날·아무 종목이나 같은 방법으로 센 값이라, 급등 줄이 평소보다 높아야 '급등은 이어지는 편'이라고 말할 수 있어요.\n아래 표는 우리 자료가 장 마감 뒤에 나오니 실제로 살 수 있는 '다음 날 시가'에 사서 3·5영업일째 종가에 판 결과입니다 (거래 비용 뺌). 이어지는 경우가 많아도 다음 날 시가가 이미 높게 시작하면 남는 게 적을 수 있어서 따로 봅니다.",
   signal_check: "거꾸로도 확인합니다: 그 신호가 뜬 종목들 중 실제로 5일 안에 +15% 넘게 오른 비율이 얼마인지, 아무 신호 없이 고른 종목(평소)보다 몇 배인지.\n급등주에만 신호가 있었던 게 아니라 평범한 종목에도 흔하게 뜨는 신호라면 '평소의 몇 배'가 1에 가까워서 쓸모가 없습니다.",
   exit: "언제 팔지 미리 정해 두는 기준입니다. 처음 투자할 때 가장 어려운 게 '언제 파느냐'라서, 사기 전에 정해 두면 손실이 커지는 걸 막을 수 있습니다.\n· 스윙: 종가가 20일 평균 가격 아래로 마감하면 정리 (오르는 흐름이 깨짐)\n· 단타: 걸린 날의 저가를 깨고 마감하면 정리 (급등 힘이 빠짐)\n· 저평가: 최근 10일 최저가를 깨고 마감하면 정리 (아직 바닥이 아니었음)\n괄호 안 %는 지금 가격에서 그 기준까지 거리입니다. 이 기준을 실제로 지켰다면 성적이 어땠는지는 성적표의 '정리 기준을 지켰다면'에서 확인합니다.",
   earn_season: "회사들은 분기가 끝나면 정해진 기한 안에 실적을 발표합니다 (1분기 5/15, 반기 8/14, 3분기 11/14, 1년 결산 3/31까지).\n발표 전에는 결과를 모르니, 좋든 나쁘든 발표 날 주가가 크게 움직일 수 있습니다. 조건에 맞아 산 종목도 실적 한 번에 기준이 깨질 수 있어 미리 알려 드립니다.\n'발표 예고 공시'는 회사가 실적 발표 날짜를 미리 알린 경우입니다.",
@@ -1145,8 +1146,19 @@ function renderReplay() {
     <tr><th>아무 신호 없이 (평소)</th><td>${num(v.base, 1)}%</td><td><small>${num(v.base_n)}건</small></td></tr>
     ${v.rows.map((r) => `<tr><th>${esc(r.label)}</th><td>${r.rate == null ? "–" : num(r.rate, 1) + "%"}<br><small>${num(r.n)}건</small></td><td><b class="${r.lift >= 1.5 ? "up" : r.lift != null && r.lift < 1 ? "down" : ""}">${r.lift == null ? "–" : r.lift + "배"}</b></td></tr>`).join("")}
     </tbody></table></div><p class="hint">'평소의 몇 배'가 1보다 크면 그 신호가 뜬 종목이 실제로 더 자주 급등했다는 뜻이에요. 기간이 짧아(약 ${v.days}일) 참고용이고, 매일 다시 계산합니다.</p>` : "";
+  const fo = rp.follow, frows = fo ? fo.rows.filter((r) => r.n) : [];
+  const fbase = frows.find((r) => r.key === "base");
+  const fcmp = (v, b, unit) => v == null ? "–" : `<b class="${b == null ? "" : v > b + 1 ? "up" : v < b - 1 ? "down" : ""}">${num(v, 1)}${unit}</b>`;
+  const ft = frows.length > 1 ? `<h3 class="sub">급등한 다음엔 어떻게 됐나 <small>${ymd(fo.from).slice(5)}~${ymd(fo.to).slice(5)} 실제 기록</small>${infoBtn("follow")}</h3>${infoBox("follow")}
+    <div class="tile wide"><table class="score"><thead><tr><th>경우</th><th>다음 날도 오름</th><th>3일 안 또 급등</th><th>하루 쉬고 다시</th></tr></thead><tbody>
+    ${frows.map((r) => `<tr${r.key === "base" ? ' class="base"' : ""}><th>${esc(r.label)}<br><small>${num(r.n)}건</small></th><td>${fcmp(r.next_up, r.key === "base" ? null : fbase.next_up, "%")}</td><td>${fcmp(r.again3, r.key === "base" ? null : fbase.again3, "%")}</td><td>${fcmp(r.rest_again, r.key === "base" ? null : fbase.rest_again, "%")}</td></tr>`).join("")}
+    </tbody></table></div>
+    <div class="tile wide"><table class="score"><thead><tr><th>다음 날 시가에 샀다면</th><th>3일 뒤 평균</th><th>3일 뒤 오른 비율</th><th>5일 뒤 평균</th></tr></thead><tbody>
+    ${frows.map((r) => `<tr><th>${esc(r.label)}</th><td>${fcmp(r.h3, r.key === "base" ? null : fbase.h3, "%")}<br><small>가운데 ${signed(r.h3_med, 1, "%")}</small></td><td>${fcmp(r.h3_win, r.key === "base" ? null : fbase.h3_win, "%")}</td><td>${fcmp(r.h5, r.key === "base" ? null : fbase.h5, "%")}</td></tr>`).join("")}
+    </tbody></table></div>
+    <p class="hint">빨강 = 평소보다 높음, 파랑 = 평소보다 낮음. 급등은 이어지거나 하루 건너 이어지는 경우가 있지만, 실제로 살 수 있는 다음 날 시가 기준으로는 남는 게 다를 수 있어 두 표를 같이 봅니다. 기간이 짧아 참고용이에요.</p>` : "";
   el.innerHTML = `<p class="hint">최근 5일 동안 크게 오른 종목(5일 +${rp.rules.r5}% 또는 하루 +${rp.rules.d1}%)을 거꾸로 따라가 봅니다. 급등 전에 어떤 신호가 며칠 먼저 있었는지, 우리가 언제 잡았는지 보여 줘요.${infoBtn("replay")}</p>${infoBox("replay")}
-    ${rp.movers.length ? `<ul class="fit movers">${rp.movers.map(moverCard).join("")}</ul>` : `<p class="hint">최근 5일 급등주가 없습니다.</p>`}${vt}`;
+    ${rp.movers.length ? `<ul class="fit movers">${rp.movers.map(moverCard).join("")}</ul>` : `<p class="hint">최근 5일 급등주가 없습니다.</p>`}${ft}${vt}`;
 }
 
 /* ---------------- 아침 요약 ---------------- */

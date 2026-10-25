@@ -150,7 +150,7 @@ footer b { color: var(--text); }
 .tag.both { background: var(--calm-bg); color: var(--calm); margin-top: 6px; }
 .tabs button { padding: 6px 11px; }
 table.score { width: 100%; border-collapse: collapse; font-size: 14px; }
-table.score th, table.score td { text-align: right; padding: 6px 2px; vertical-align: top; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+table.score th, table.score td { text-align: right; padding: 6px 2px; vertical-align: top; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; word-break: keep-all; }
 table.score tr:last-child th, table.score tr:last-child td { border-bottom: 0; }
 table.score th:first-child, table.score td:first-child { text-align: left; }
 table.score thead th { color: var(--faint); font-weight: 500; font-size: 12px; }

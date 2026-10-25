@@ -343,7 +343,7 @@ def main(argv):
     log(f"  테마 {len(themes['themes'])}개: " + ", ".join(f"{x['name']}({x['key']})" for x in themes["themes"][:6]))
 
     t = step("급등주 복기·신호 검증")
-    replay = build_replay(base, closes, values, flows_hist, listing, universe_all, {"scalp": scalp, "swing": swing, "value": value}, reports)
+    replay = build_replay(base, closes, values, flows_hist, listing, universe_all, {"scalp": scalp, "swing": swing, "value": value}, reports, opens)
     log(f"  급등주 {len(replay['movers'])}개: " + ", ".join(f"{m['name']}({m['verdict']})" for m in replay["movers"][:8]))
 
     t = step("운용사 방향 (액티브 ETF)")
@@ -493,7 +493,7 @@ def update_season(base, dart_days, name_to_code, errors):
     return season, store
 
 
-def build_replay(base, closes, values, flows_hist, listing, universe, today, reports):
+def build_replay(base, closes, values, flows_hist, listing, universe, today, reports, opens=None):
     """최근 급등주를 거슬러 보고(언제 어떤 신호가 먼저 있었나·우리가 언제 잡았나), 신호별로 급등을 앞섰는지 잰다."""
     net = logic.net_frame(flows_hist)
     caps = {c: v["cap"] for c, v in listing.items()}
@@ -522,7 +522,12 @@ def build_replay(base, closes, values, flows_hist, listing, universe, today, rep
     except Exception as e:
         log(f"  신호 검증 실패: {type(e).__name__}: {e}")
         val = None
-    return {"movers": movers, "validation": val, "rules": logic.SURGE}
+    try:
+        follow = logic.follow_through(closes, opens, elig) if opens is not None else None
+    except Exception as e:
+        log(f"  급등 뒤 흐름 실패: {type(e).__name__}: {e}")
+        follow = None
+    return {"movers": movers, "validation": val, "follow": follow, "rules": logic.SURGE}
 
 
 def build_managers(base, days, listing, closes, errors, sectors=None, trust=None):

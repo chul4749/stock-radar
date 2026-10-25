@@ -1574,6 +1574,48 @@ def signal_validation(closes, values, net, caps, eligible, rules=SURGE):
             "fwd": f, "hit": rules["hit"], "rows": rows}
 
 
+FOLLOW = {"big": 15.0, "mid": 8.0, "again": 8.0, "rebound": 5.0}
+
+
+def follow_through(closes, opens, eligible, rules=FOLLOW, cost=None):
+    """급등한 날 뒤에 어떻게 됐나 (최근 약 80영업일, 시총·거래대금 기준 이상 종목):
+    다음 날도 오름, 3일 안에 또 +8%↑ 하루, 하루 쉬고(다음 날 보합·하락) 2~3일째 +5%↑,
+    그리고 실제로 살 수 있는 '다음 날 시가'에 사서 3·5영업일째 종가에 판 수익(비용 뺌)을 평소(모든 종목·날)와 비교."""
+    cost = COST if cost is None else cost
+    cols = [c for c in closes.columns if c in eligible and c in opens.columns]
+    if not cols or len(closes.index) < 8:
+        return None
+    cl, op = closes[cols], opens[cols]
+    ret = cl.pct_change() * 100
+    r1_, r2_, r3_ = ret.shift(-1), ret.shift(-2), ret.shift(-3)
+    entry = op.shift(-1)
+    h3 = (cl.shift(-3) / entry - 1) * 100 - cost
+    h5 = (cl.shift(-5) / entry - 1) * 100 - cost
+    valid = ret.notna() & entry.notna() & h5.notna()
+    again = (r1_ >= rules["again"]) | (r2_ >= rules["again"]) | (r3_ >= rules["again"])
+    rest = (r1_ <= 0) & ((r2_ >= rules["rebound"]) | (r3_ >= rules["rebound"]))
+
+    def row(key, label, mask):
+        m = (mask & valid).values
+        n = int(m.sum())
+        if not n:
+            return {"key": key, "label": label, "n": 0}
+        pct = lambda f: round(float(f.values[m].mean() * 100), 1)
+        a3, a5 = h3.values[m], h5.values[m]
+        return {"key": key, "label": label, "n": n, "next_up": pct(r1_ > 0), "again3": pct(again), "rest_again": pct(rest),
+                "h3": r1(float(pd.Series(a3).mean())), "h3_med": r1(float(pd.Series(a3).median())), "h3_win": round(float((a3 > 0).mean() * 100), 1),
+                "h5": r1(float(pd.Series(a5).mean())), "h5_win": round(float((a5 > 0).mean() * 100), 1)}
+
+    big = ret >= rules["big"]
+    prev_big = big.shift(1, fill_value=False)
+    rows = [row("big", f"하루 +{rules['big']:g}%↑", big),
+            row("mid", f"하루 +{rules['mid']:g}~{rules['big']:g}%", (ret >= rules["mid"]) & ~big),
+            row("big2", f"+{rules['big']:g}%↑ 이틀 연속", big & prev_big),
+            row("base", "평소 (모든 종목·날)", ret.notna())]
+    days = [d for d in cl.index if valid.loc[d].any()]
+    return {"from": days[0] if days else None, "to": days[-1] if days else None, "days": len(days), "rules": rules, "cost": cost, "rows": rows}
+
+
 def mover_scorecard(movers):
     """그동안의 급등주 복기 모음: 미리 잡은·당일 잡은·놓친 비율, 신호별로 급등 전에 있었던 비율과 평균 몇 일 먼저였나."""
     if not movers:

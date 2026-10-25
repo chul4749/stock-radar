@@ -716,3 +716,19 @@ def test_theme_heat_rows():
     assert h["days"] == days[1:] and h["rows"][0]["name"] == "가"
     assert h["rows"][0]["eok"] == [2, 3, 4, 5, 6] and h["rows"][0]["ret"][-1] == 3.0
     assert h["rows"][1]["pct"][0] == -0.5 and h["rows"][1]["ret"][0] is None
+
+
+def test_follow_through():
+    days = [f"202609{i:02d}" for i in range(1, 13)]
+    # A: 3일째 +20% 급등 → 다음 날 −2%(쉼) → 그다음 +10%(또 급등·쉬고 다시) ; B: 평범하게 매일 +1%
+    a = [100, 100, 120, 117.6, 129.36, 130, 131, 132, 133, 134, 135, 136]
+    b = [100 * 1.01 ** i for i in range(12)]
+    closes = pd.DataFrame({"A": a, "B": b}, index=days)
+    opens = closes.shift(1).fillna(100)
+    out = logic.follow_through(closes, opens, {"A", "B"}, cost=0)
+    big = next(r for r in out["rows"] if r["key"] == "big")
+    assert big["n"] == 1 and big["next_up"] == 0 and big["again3"] == 100 and big["rest_again"] == 100
+    # 다음 날 시가(=급등 날 종가 120)에 사서 3일째 종가(130) → +8.3%
+    assert big["h3"] == 8.3
+    base = next(r for r in out["rows"] if r["key"] == "base")
+    assert base["n"] > big["n"]
