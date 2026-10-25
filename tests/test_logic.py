@@ -732,3 +732,19 @@ def test_follow_through():
     assert big["h3"] == 8.3
     base = next(r for r in out["rows"] if r["key"] == "base")
     assert base["n"] > big["n"]
+
+
+def test_follow_through_splits():
+    days = [f"202609{i:02d}" for i in range(1, 21)]
+    a = [100] * 10 + [120, 117.6, 129.36, 130, 131, 132, 133, 134, 135, 136]
+    closes = pd.DataFrame({"A": a, "B": [100 * 1.01 ** i for i in range(20)]}, index=days)
+    opens = closes.shift(1).fillna(100)
+    highs = closes * 1.01
+    values = pd.DataFrame(1.0, index=days, columns=["A", "B"])
+    values.loc[days[10], "A"] = 6.0   # 첫 급등 날 거래 6배
+    out = logic.follow_through(closes, opens, {"A", "B"}, cost=0, highs=highs, values=values,
+                               caps={"A": 1000 * logic.EOK, "B": 9000 * logic.EOK})
+    sp = {r["key"]: r for r in out["splits"]}
+    # A의 +20% 날과 +10% 날 둘 다 급등, 둘 다 종가가 고가 근처·소형. 두 번째는 이미 오른 뒤
+    assert sp["all"]["n"] == 2 and sp["close_high"]["n"] == 2 and sp["small"]["n"] == 2
+    assert sp["vol5"]["n"] == 1 and sp["first"]["n"] == 1 and sp["again"]["n"] == 1 and "large" not in sp

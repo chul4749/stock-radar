@@ -1577,7 +1577,7 @@ def signal_validation(closes, values, net, caps, eligible, rules=SURGE):
 FOLLOW = {"big": 15.0, "mid": 8.0, "again": 8.0, "rebound": 5.0}
 
 
-def follow_through(closes, opens, eligible, rules=FOLLOW, cost=None):
+def follow_through(closes, opens, eligible, rules=FOLLOW, cost=None, highs=None, values=None, net=None, caps=None):
     """급등한 날 뒤에 어떻게 됐나 (최근 약 80영업일, 시총·거래대금 기준 이상 종목):
     다음 날도 오름, 3일 안에 또 +8%↑ 하루, 하루 쉬고(다음 날 보합·하락) 2~3일째 +5%↑,
     그리고 실제로 살 수 있는 '다음 날 시가'에 사서 3·5영업일째 종가에 판 수익(비용 뺌)을 평소(모든 종목·날)와 비교."""
@@ -1612,8 +1612,30 @@ def follow_through(closes, opens, eligible, rules=FOLLOW, cost=None):
             row("mid", f"하루 +{rules['mid']:g}~{rules['big']:g}%", (ret >= rules["mid"]) & ~big),
             row("big2", f"+{rules['big']:g}%↑ 이틀 연속", big & prev_big),
             row("base", "평소 (모든 종목·날)", ret.notna())]
+    # 어떤 급등이 이어졌나: +8%↑ 급등 날을 그날 모양으로 나눠 본다 (필터 조건 후보를 고르는 근거)
+    surge = ret >= rules["mid"]
+    splits = [row("all", f"+{rules['mid']:g}%↑ 급등 전체", surge)]
+    if highs is not None:
+        hi = highs.reindex(index=cl.index, columns=cols)
+        near = cl >= hi * 0.97
+        splits += [row("close_high", "종가가 고가 근처 (3% 안)", surge & near), row("close_off", "고가에서 밀려 마감", surge & ~near & hi.notna())]
+    splits.append(row("limit", "상한가 근처 (+29%↑)", ret >= 29))
+    pre5 = (cl.shift(1) / cl.shift(6) - 1) * 100
+    splits += [row("first", "첫 급등 (전 5일 +10% 안)", surge & (pre5 < 10)), row("again", "이미 오른 뒤 또 급등", surge & (pre5 >= 10))]
+    if values is not None:
+        va = values.reindex(index=cl.index, columns=cols)
+        mult = va / va.shift(1).rolling(20, min_periods=10).mean()
+        splits += [row("vol5", "거래 평소의 5배↑", surge & (mult >= 5)), row("vol_low", "거래 평소의 3배 안", surge & (mult < 3))]
+    if net is not None and not net.empty:
+        nt = net.reindex(index=cl.index, columns=cols)
+        splits += [row("net_buy", "그날 큰손 순매수", surge & (nt > 0)), row("net_sell", "그날 큰손 순매도", surge & (nt < 0))]
+    if caps:
+        small = pd.Series({c: (caps.get(c) or 0) < 3000 * EOK for c in cols})
+        sm = pd.DataFrame([small.values] * len(cl.index), index=cl.index, columns=cols)
+        splits += [row("small", "시총 3천억 아래", surge & sm), row("large", "시총 3천억 이상", surge & ~sm)]
     days = [d for d in cl.index if valid.loc[d].any()]
-    return {"from": days[0] if days else None, "to": days[-1] if days else None, "days": len(days), "rules": rules, "cost": cost, "rows": rows}
+    return {"from": days[0] if days else None, "to": days[-1] if days else None, "days": len(days), "rules": rules, "cost": cost,
+            "rows": rows, "splits": [x for x in splits if x["n"]]}
 
 
 def mover_scorecard(movers):
