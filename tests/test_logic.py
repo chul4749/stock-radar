@@ -676,3 +676,23 @@ def test_manager_enrich_skill_and_tilt():
     assert a["score"] == 2 * 2 + 1 + 1 + 1
     tilt = logic.sector_tilt(out, pd.Series({"A": "IT", "B": "화학"}))
     assert tilt[0]["sector"] == "IT" and tilt[0]["net"] == 2
+
+
+def test_replay_mover_and_signal_validation():
+    n = 40
+    days = [f"d{i:02d}" for i in range(n)]
+    base = [100.0] * 30 + [100, 101, 100, 101, 100, 112, 125, 130, 131, 132]   # d35에 +12% 급등
+    closes = pd.DataFrame({"A": base, "B": [50.0] * n}, index=days)
+    values = pd.DataFrame({"A": [10 * EOK] * 31 + [25 * EOK] * 9, "B": [10 * EOK] * n}, index=days)
+    netd = pd.DataFrame({"A": [0] * 30 + [-1, 2, 2, 2, 2, 5, 5, 1, 1, 1], "B": [1, -1] * 20}, index=days) * EOK
+    caps = {"A": 1000 * EOK, "B": 1000 * EOK}
+    uni = {"A": {"cap": 1000 * EOK}, "B": {"cap": 1000 * EOK}}
+    assert logic.find_movers(closes, uni) == ["A"]
+    cand = {"d35": {"A": ["단타"]}}
+    rp = logic.replay_mover("A", "가", closes, values, netd, caps, cand)
+    assert rp["surge"] == "d35" and rp["verdict"] == "sameday"
+    keys = {e["key"]: e["lead"] for e in rp["early"]}
+    assert keys["streak3"] == 2 and keys["quiet_vol"] == 4   # d33부터 3일 연속, d31부터 조용한 거래 증가
+    v = logic.signal_validation(closes, values, netd.iloc[25:], caps, {"A", "B"})
+    row = next(r for r in v["rows"] if r["key"] == "streak3")
+    assert v["base_n"] > 0 and row["n"] >= 1 and row["rate"] > v["base"]

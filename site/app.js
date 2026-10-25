@@ -65,6 +65,7 @@ function render() {
   renderSectors();
   renderThemes();
   renderManagers();
+  renderReplay();
   renderRegime();
   renderFilter();
   renderToday();
@@ -103,6 +104,8 @@ const INFO = {
   themes: "업종·테마마다 ETF를 짝지어, '돈이 어디로 가나 → 그럼 어떤 ETF'를 보여 줍니다.\n· 큰손 5일: 그 ETF가 실제로 담은 종목(구성 상위 10개)에 기관+외국인이 5일 동안 넣은 돈\n· 넓이: 그 종목들 중 20일 평균 가격 위에 있는 비율 (한두 종목만 오르는지, 다 같이 오르는지)\n· 리포트: 그 종목들에 최근 2주 나온 증권사 리포트 수 ('오랜만'은 석 달 만에 나온 것)\n판정:\n· 돈이 먼저 들어오는 중: 큰손은 사는데 ETF 가격은 아직 평균 아래 — 미리 볼 후보 (선취매에 가까움). 단, 돈이 덩치 대비 0.1% 이상·4일 이상 고르게·여러 종목에 나눠 들어오고(한 종목이 60% 넘으면 안 됨), 가격이 더 무너지지 않을 때만 (아니면 '지켜보기')\n· 돈도 들어오고 흐름도 좋음: 이미 오르는 중\n· 과열: 20일 새 20% 넘게 올라 따라 사기 조심\n· 가격은 강한데 큰손은 파는 중: 주의\n정말 맞는지는 성적표 '테마 판정별 성적'에서 확인합니다.",
   mgr_skill: "운용사마다 직접 고른 액티브 ETF가 최근 60일 동안 KODEX 200(코스피 대표 200종목)보다 얼마나 더 벌었는지 평균입니다. +면 시장보다 잘 고른 곳.\n'요즘 잘하는 곳'이 산 종목을 조금 더 무겁게 봅니다. 다만 60일은 짧아서 운이 섞입니다.",
   managers: "액티브 ETF는 펀드매니저가 직접 종목을 골라 사고파는 ETF입니다 (TIME=타임폴리오, KoAct=삼성액티브, ACE=한국투자 등).\nETF는 매일 담고 있는 종목을 공개하는데, 종목별 '담은 주식 수'는 펀드에 돈이 들어와도 그대로이고 매니저가 사고팔 때만 바뀝니다. 그래서 5일·20일 전과 비교하면 매니저가 뭘 샀고 뭘 팔았는지 보입니다.\n· 새로 담음: 전에 없던 종목을 넣음 (가장 강한 신호)\n· 늘림 / 줄임: 담은 주식 수를 10% 이상 바꿈\n· 모두 뺌: 다 팔아 버림\n여러 운용사가 같은 종목을 같이 사면 더 눈여겨볼 만합니다.\n붙는 표시:\n· 계속 사는 중: 20일 동안 샀고 최근 5일에도 또 삼 (확신이 있다는 뜻)\n· 비중 크게 담음: ETF 안에서 3% 넘게 담음\n· 그 뒤 주가: 비교 시작일 이후 주가 등락. 이미 15% 넘게 올랐으면 따라 사기엔 늦었을 수 있음\n· 투신 5일: 자산운용사 전체(펀드)가 이 종목을 최근 5일 산 금액. 같은 방향이면 더 믿을 만함\n순서는 운용사 수 → 계속 사는지 → 비중 → 잘하는 운용사 순으로 매깁니다. 매니저도 틀리고, 공개는 하루 늦게 반영될 수 있어요.",
+  replay: "급등한 종목을 거꾸로 따라가 '미리 알 수 있었나'를 확인합니다.\n· 미리 잡음: 급등 전날 이전에 우리 후보(스윙·단타·저평가)에 있었음\n· 당일 잡음: 급등한 날 후보에 걸림 (이미 오른 뒤)\n· 놓침: 후보에 안 걸림\n'N일 먼저' 신호는 급등 시작일보다 며칠 앞서 그 신호가 처음 보였는지입니다. 여러 급등주에서 같은 신호가 자주 먼저 보이면, 그 신호를 조건에 넣을 이유가 됩니다.",
+  signal_check: "거꾸로도 확인합니다: 그 신호가 뜬 종목들 중 실제로 5일 안에 +15% 넘게 오른 비율이 얼마인지, 아무 신호 없이 고른 종목(평소)보다 몇 배인지.\n급등주에만 신호가 있었던 게 아니라 평범한 종목에도 흔하게 뜨는 신호라면 '평소의 몇 배'가 1에 가까워서 쓸모가 없습니다.",
   exit: "언제 팔지 미리 정해 두는 기준입니다. 처음 투자할 때 가장 어려운 게 '언제 파느냐'라서, 사기 전에 정해 두면 손실이 커지는 걸 막을 수 있습니다.\n· 스윙: 종가가 20일 평균 가격 아래로 마감하면 정리 (오르는 흐름이 깨짐)\n· 단타: 걸린 날의 저가를 깨고 마감하면 정리 (급등 힘이 빠짐)\n· 저평가: 최근 10일 최저가를 깨고 마감하면 정리 (아직 바닥이 아니었음)\n괄호 안 %는 지금 가격에서 그 기준까지 거리입니다. 이 기준을 실제로 지켰다면 성적이 어땠는지는 성적표의 '정리 기준을 지켰다면'에서 확인합니다.",
   earn_season: "회사들은 분기가 끝나면 정해진 기한 안에 실적을 발표합니다 (1분기 5/15, 반기 8/14, 3분기 11/14, 1년 결산 3/31까지).\n발표 전에는 결과를 모르니, 좋든 나쁘든 발표 날 주가가 크게 움직일 수 있습니다. 조건에 맞아 산 종목도 실적 한 번에 기준이 깨질 수 있어 미리 알려 드립니다.\n'발표 예고 공시'는 회사가 실적 발표 날짜를 미리 알린 경우입니다.",
   morning: "새벽에 끝난 미국 시장 결과로 오늘 아침 한국 시장 분위기를 미리 짐작해 봅니다.\n· 한국 ETF(EWY): 미국에 상장된 한국 주식 묶음이라 밤사이 외국인 시각이 가장 잘 보입니다 (가장 크게 반영)\n· 나스닥·미국 반도체: 삼성전자·SK하이닉스 같은 큰 종목과 같이 움직이는 경우가 많음\n· 공포지수(VIX)·환율: 오르면 부담\n짐작일 뿐이고, 장이 열리면 다르게 움직일 수 있습니다.",
@@ -299,6 +302,9 @@ function zoneFor(key, t) {
   }
 }
 
+// 시장에 좋은 쪽이 높은 값인지 낮은 값인지 (빨강·파랑은 오름·내림일 뿐 좋고 나쁨이 아님)
+const DIR = { vix: -1, korea_vol: -1, credit: -1, usdkrw: -1, us10y: -1, loan: -1, forced: -1, cnn: 0, kospi: 1, kosdaq: 1 };
+
 function tile(label, value, sub, sparkVals, opts = {}) {
   const key = opts.key;
   const line = key ? interpret(key, state.data.temperature) : "";
@@ -306,7 +312,9 @@ function tile(label, value, sub, sparkVals, opts = {}) {
   // 해외·협회 자료는 하루 이상 늦게 나오므로, 기준일과 다른 날짜면 언제 값인지 붙인다
   const b = state.data.base_date, baseIso = `${b.slice(0, 4)}-${b.slice(4, 6)}-${b.slice(6)}`;
   if (opts.date && opts.date !== baseIso) sub += ` · <span class="asof">${opts.date.slice(5)} 기준</span>`;
-  return `<div class="tile${opts.wide ? " wide" : ""}"><div class="l">${label} ${key ? infoBtn(key) : ""}</div><div class="v ${opts.vcls || ""}">${value}</div>` +
+  const dir = DIR[key];
+  const dirChip = dir ? `<span class="dir ${dir > 0 ? "hi" : "lo"}">${dir > 0 ? "↑ 높을수록 좋음" : "↓ 낮을수록 좋음"}</span>` : "";
+  return `<div class="tile${opts.wide ? " wide" : ""}"><div class="l">${label} ${key ? infoBtn(key) : ""}</div>${dirChip}<div class="v ${opts.vcls || ""}">${value}</div>` +
     `<div class="s">${sub}</div>${sparkVals ? `<div style="color:var(--faint)">${spark(sparkVals)}</div>` : ""}${opts.extra || ""}${zb}` +
     `${line ? `<div class="why">${esc(line)}</div>` : ""}${key ? infoBox(key) : ""}</div>`;
 }
@@ -1005,6 +1013,7 @@ function renderScore() {
     ${scoreCheckTable(sc.score_check)}
     ${stopTable(sc.stops)}
     ${themeScoreTable(sc.themes)}
+    ${moverScoreTable(sc.movers)}
     ${featureTable(sc.features)}
     ${recent ? `<details class="rules"><summary>최근 기록 보기</summary><table class="score recent"><thead><tr><th>날짜</th><th>구분</th><th style="text-align:left">종목</th>${hs.map((h) => `<th>${h}일</th>`).join("")}</tr></thead><tbody>${recent}</tbody></table></details>` : ""}`;
 }
@@ -1025,6 +1034,17 @@ function stopTable(st) {
     <p class="hint">카드의 '정리 기준'(종가가 그 가격 아래로 마감하면 그날 종가에 팔기)을 지켰을 때와 그냥 들고 있었을 때 비교입니다. '정리' %는 5일 안에 기준이 깨진 비율입니다.</p>`;
 }
 
+// 그동안 급등주를 얼마나 미리 잡았나, 급등 전에 어떤 신호가 자주 먼저 보였나
+function moverScoreTable(mv) {
+  if (!mv) return "";
+  return `<h3 class="sub">급등주 복기 성적 <small>지금까지 급등주 ${mv.n}개</small></h3>
+    <div class="tile wide"><div class="mvbar"><span style="flex:${mv.early};background:var(--calm)"></span><span style="flex:${mv.sameday};background:var(--g1)"></span><span style="flex:${mv.missed};background:var(--line)"></span></div>
+    <div class="zb-lab"><span>미리 잡음 ${mv.early}%</span><span>당일 잡음 ${mv.sameday}%</span><span>놓침 ${mv.missed}%</span></div>
+    ${mv.signals.length ? `<table class="score" style="margin-top:8px"><thead><tr><th>급등 전에 먼저 보인 신호</th><th>급등주 중</th><th>평균</th></tr></thead><tbody>
+    ${mv.signals.map((r) => `<tr><th>${esc(r.label)}</th><td>${r.pct}%</td><td>${num(r.lead, 1)}일 먼저</td></tr>`).join("")}</tbody></table>` : ""}</div>
+    <p class="hint">'미리 잡음'을 늘리는 게 목표예요. 급등주 대부분에 먼저 보인 신호가 있고, 위 '어떤 신호가 급등을 앞섰나'에서도 평소보다 자주 급등했다면 그 신호를 조건에 넣을 근거가 됩니다.</p>`;
+}
+
 // 테마 판정별로 대표 ETF를 그날 종가에 샀다면 (KODEX 200 대비)
 function themeScoreTable(ts) {
   if (!ts) return "";
@@ -1035,6 +1055,43 @@ function themeScoreTable(ts) {
   return `<h3 class="sub">테마 판정별 성적 <small>대표 ETF, KODEX 200 대비</small></h3>
     <div class="tile wide"><table class="score"><thead><tr><th></th><th>5일 뒤</th><th>20일 뒤</th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="hint">그날 종가에 테마의 첫 번째 ETF를 샀다면 KODEX 200보다 얼마나 더 벌었는지입니다. '돈이 먼저 들어오는 중'이 앞서야 이 판정이 쓸모 있습니다.</p>`;
+}
+
+/* ---------------- 급등주 복기 ---------------- */
+
+const VERDICT = { early: ["미리 잡음", "good"], sameday: ["당일 잡음", "ok"], missed: ["놓침", "bad"] };
+
+function moverCard(m) {
+  const [vlab, vcls] = VERDICT[m.verdict];
+  const maxNet = Math.max(1, ...m.timeline.map((t) => Math.abs(t.net || 0)));
+  const cells = m.timeline.map((t) => {
+    const a = t.net == null ? 0 : Math.min(1, Math.abs(t.net) / maxNet);
+    const bg = t.net == null ? "var(--neutral-bg)" : t.net > 0 ? `rgba(229,72,77,${0.15 + 0.75 * a})` : `rgba(59,130,246,${0.15 + 0.75 * a})`;
+    return `<div class="tc${t.d === m.surge ? " surge" : ""}" title="${ymd(t.d)} 등락 ${signed(t.chg, 1, "%")} · 큰손 ${t.net == null ? "–" : signed(t.net, 0, "억")} · 거래 ${num(t.mult, 1)}배${t.cand.length ? " · " + t.cand.join("·") + " 후보" : ""}">
+      <span class="tb" style="background:${bg}"></span><small class="${cls(t.chg)}">${t.chg == null ? "" : Math.round(t.chg)}</small>${t.cand.length ? `<i>●</i>` : ""}</div>`;
+  }).join("");
+  const early = m.early.length ? m.early.map((e) => `<li><b>${e.lead}일 먼저</b> ${esc(e.label)} <small>(${ymd(e.first).slice(5)})</small></li>`).join("")
+    : `<li class="na">급등 전에 미리 보인 신호가 없었음</li>`;
+  return `<li class="fit-${vcls === "good" ? "good" : vcls === "ok" ? "ok" : "bad"}"><div class="row"><button type="button" class="lnk" data-stock="${m.code}"><b>${esc(m.name)}</b></button>
+      <span><b class="up">5일 ${signed(m.r5, 1, "%")}</b> <span class="tag ${vcls === "good" ? "fresh" : vcls === "ok" ? "stay" : "known"}">${vlab}</span></span></div>
+    <small class="mfacts">급등 시작 ${ymd(m.surge).slice(5)} (${signed(m.surge_chg, 1, "%")}) · ${esc(m.how)}</small>
+    <div class="tl">${cells}</div>
+    <div class="tl-lab"><span>${ymd(m.timeline[0].d).slice(5)}</span><span>막대 색 = 큰손 순매수(빨강 삼·파랑 팖) · 숫자 = 그날 등락% · ● 우리 후보 · 테두리 = 급등 시작</span><span>${ymd(m.timeline.at(-1).d).slice(5)}</span></div>
+    <ul class="early">${early}</ul></li>`;
+}
+
+function renderReplay() {
+  const rp = state.data.replay, el = $("#replay-body");
+  if (!el) return;
+  if (!rp) { el.innerHTML = `<div class="empty">이 날짜는 복기 자료가 없습니다.</div>`; return; }
+  const v = rp.validation;
+  const vt = v ? `<h3 class="sub">어떤 신호가 급등을 앞섰나 <small>${ymd(v.from).slice(5)}~${ymd(v.to).slice(5)}, 신호 뒤 ${v.fwd}일 안에 +${v.hit}% 넘게 오른 비율</small>${infoBtn("signal_check")}</h3>${infoBox("signal_check")}
+    <div class="tile wide"><table class="score"><thead><tr><th>신호</th><th>급등 비율</th><th>평소의 몇 배</th></tr></thead><tbody>
+    <tr><th>아무 신호 없이 (평소)</th><td>${num(v.base, 1)}%</td><td><small>${num(v.base_n)}건</small></td></tr>
+    ${v.rows.map((r) => `<tr><th>${esc(r.label)}</th><td>${r.rate == null ? "–" : num(r.rate, 1) + "%"}<br><small>${num(r.n)}건</small></td><td><b class="${r.lift >= 1.5 ? "up" : r.lift != null && r.lift < 1 ? "down" : ""}">${r.lift == null ? "–" : r.lift + "배"}</b></td></tr>`).join("")}
+    </tbody></table></div><p class="hint">'평소의 몇 배'가 1보다 크면 그 신호가 뜬 종목이 실제로 더 자주 급등했다는 뜻이에요. 기간이 짧아(약 ${v.days}일) 참고용이고, 매일 다시 계산합니다.</p>` : "";
+  el.innerHTML = `<p class="hint">최근 5일 동안 크게 오른 종목(5일 +${rp.rules.r5}% 또는 하루 +${rp.rules.d1}%)을 거꾸로 따라가 봅니다. 급등 전에 어떤 신호가 며칠 먼저 있었는지, 우리가 언제 잡았는지 보여 줘요.${infoBtn("replay")}</p>${infoBox("replay")}
+    ${rp.movers.length ? `<ul class="fit movers">${rp.movers.map(moverCard).join("")}</ul>` : `<p class="hint">최근 5일 급등주가 없습니다.</p>`}${vt}`;
 }
 
 /* ---------------- 아침 요약 ---------------- */

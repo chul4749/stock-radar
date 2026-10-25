@@ -77,6 +77,14 @@ def main(argv):
         fl = {"foreign": sources.net_purchase(d, d, "외국인"), "inst": sources.net_purchase(d, d, "기관합계")}
         log(f"  {d}: 외국인 {len(fl['foreign'])} · 기관 {len(fl['inst'])}")
         flows_daily.append((d, fl))
+    # 급등주 복기·신호 검증용: 그 전 20영업일도 날마다 (총 25일)
+    flows_hist = []
+    for d in used_days[-25:-5]:
+        fl = safe(f"수급 {d}", lambda: {"foreign": sources.net_purchase(d, d, "외국인"), "inst": sources.net_purchase(d, d, "기관합계")}, errors)
+        if fl:
+            flows_hist.append((d, fl))
+    flows_hist += flows_daily
+    log(f"  복기용 일별 수급 {len(flows_hist)}일")
     flows_5d = {"foreign": sources.net_purchase(last5[0], base, "외국인"),
                 "inst": sources.net_purchase(last5[0], base, "기관합계")}
     pension_5d = safe("연기금", lambda: sources.net_purchase(last5[0], base, "연기금"), errors)
@@ -322,6 +330,10 @@ def main(argv):
     themes = build_themes(base, used_days, closes, flows_daily, flows_5d, listing, reports, temp.get("regime"), errors)
     log(f"  테마 {len(themes['themes'])}개: " + ", ".join(f"{x['name']}({x['key']})" for x in themes["themes"][:6]))
 
+    t = step("급등주 복기·신호 검증")
+    replay = build_replay(base, closes, values, flows_hist, listing, universe_all, {"scalp": scalp, "swing": swing, "value": value}, reports)
+    log(f"  급등주 {len(replay['movers'])}개: " + ", ".join(f"{m['name']}({m['verdict']})" for m in replay["movers"][:8]))
+
     t = step("운용사 방향 (액티브 ETF)")
     managers = build_managers(base, used_days, listing, closes, errors, sectors=sectors, trust=quality.get("trust"))
     mg20 = managers["moves"].get("20") or {"buys": [], "sells": []}
@@ -356,6 +368,7 @@ def main(argv):
         "sectors": sector_flow,
         "themes": themes,
         "managers": managers,
+        "replay": replay,
         "errors": errors,
     }
     os.makedirs(DATA, exist_ok=True)
@@ -382,7 +395,7 @@ def main(argv):
     kospi = safe("코스피 기간", lambda: sources.index_history("1001", used_days[0], base), errors)
     if kospi is not None:
         kospi.index = [d.strftime("%Y%m%d") for d in kospi.index]
-        history, regimes, backfill_dates, signal_levels, theme_recs = [], {}, [], {}, []
+        history, regimes, backfill_dates, signal_levels, theme_recs, mover_recs = [], {}, [], {}, [], {}
         # 장세는 그날 저장된 시장 온도 + 그날까지의 코스피로 다시 판정 (예전 기록에도 같은 규칙 적용)
         long_vals = kospi_long if kospi_long is not None else None
         long_days = [d.strftime("%Y%m%d") for d in long_vals.index] if long_vals is not None else []
@@ -410,6 +423,8 @@ def main(argv):
                 rg = logic.market_regime(upto, rec.get("temperature") or {})
                 if rg:
                     regimes[d] = rg["key"]
+            for m in (rec.get("replay") or {}).get("movers") or []:
+                mover_recs[(m["code"], m["surge"])] = m   # 같은 급등은 여러 날 나와도 한 번 (가장 나중 기록)
             sig = (rec.get("temperature") or {}).get("signals")
             if sig:
                 signal_levels[d] = sig["level"]
@@ -424,6 +439,7 @@ def main(argv):
         stops = logic.stop_scorecard(history, closes, lows, opens=opens, bench=bench or None, index_closes=kospi)
         card = {"generated_at": out["generated_at"], "base_date": base, "days": len(history), "stops": stops,
                 "themes": logic.theme_scorecard(theme_recs),
+                "movers": logic.mover_scorecard(list(mover_recs.values())),
                 "horizons": list(logic.HORIZONS), "stats": stats, "recent": recent, "features": features,
                 "by_regime": by_regime, "regimes": regimes, "score_check": score_check,
                 "method": {"entry": "다음 날 시가", "bench": "종목이 속한 시장 지수", "cost": logic.COST, "dedup": True},
@@ -462,6 +478,38 @@ def update_season(base, dart_days, name_to_code, errors):
         json.dump(store, f, ensure_ascii=False, separators=(",", ":"))
     log(f"  {season['label']} 실적 시즌: 발표 {len(store['reported'])}곳 · 예고 {len(store['notice'])}곳 (확인한 날 {len(store['checked'])}, 이번에 더 받은 날 {len(todo)})")
     return season, store
+
+
+def build_replay(base, closes, values, flows_hist, listing, universe, today, reports):
+    """최근 급등주를 거슬러 보고(언제 어떤 신호가 먼저 있었나·우리가 언제 잡았나), 신호별로 급등을 앞섰는지 잰다."""
+    net = logic.net_frame(flows_hist)
+    caps = {c: v["cap"] for c, v in listing.items()}
+    tab = {"swing": "스윙", "scalp": "단타", "value": "저평가"}
+    cand_by_day = {base: {}}
+    for g, items in today.items():
+        for x in items:
+            cand_by_day[base].setdefault(x["code"], []).append(tab[g])
+    for n in sorted(os.listdir(DATA)):
+        if n[:8].isdigit() and n.endswith(".json") and n[:8] < base and n[:8] >= closes.index[-logic.SURGE["lookback"]]:
+            with open(os.path.join(DATA, n), encoding="utf-8") as f:
+                flt = json.load(f).get("filter") or {}
+            day = cand_by_day.setdefault(n[:8], {})
+            for g in tab:
+                for x in flt.get(g) or []:
+                    day.setdefault(x["code"], []).append(tab[g])
+    movers = []
+    for c in logic.find_movers(closes, universe):
+        try:
+            movers.append(logic.replay_mover(c, listing[c]["name"], closes, values, net, caps, cand_by_day, reports))
+        except Exception as e:
+            log(f"  복기 {c} 실패: {type(e).__name__}: {e}")
+    elig = {c for c, v in universe.items() if v["cap"] >= logic.RULES["min_cap"] and v["value"] >= logic.RULES["min_value"]}
+    try:
+        val = logic.signal_validation(closes, values, net, caps, elig)
+    except Exception as e:
+        log(f"  신호 검증 실패: {type(e).__name__}: {e}")
+        val = None
+    return {"movers": movers, "validation": val, "rules": logic.SURGE}
 
 
 def build_managers(base, days, listing, closes, errors, sectors=None, trust=None):

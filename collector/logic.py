@@ -1463,6 +1463,130 @@ def sector_tilt(moves, sectors):
     return [{**a, "buy": a["buy"][:3], "sell": a["sell"][:3]} for a in rows if a["net"]]
 
 
+# ---------------------------------------------------------------- 급등주 복기·신호 검증
+
+SURGE = {"r5": 20.0, "d1": 15.0, "day": 8.0, "fwd": 5, "hit": 15.0, "lookback": 15}
+
+
+def net_frame(flows_hist):
+    """[(날짜, {"foreign": S, "inst": S})] → DataFrame(행=날짜, 열=종목) 기관+외국인 순매수(원)."""
+    if not flows_hist:
+        return pd.DataFrame()
+    return pd.DataFrame({d: fl["foreign"].add(fl["inst"], fill_value=0) for d, fl in flows_hist}).T.astype(float)
+
+
+def _signal_frames(closes, values, net, caps):
+    """날짜×종목 신호 표: 큰손 3일 연속 순매수, 조용한 거래 증가(거래 2배↑인데 등락 5% 안), 5일 큰손 순매수가 시총의 0.1%↑."""
+    ret = closes.pct_change() * 100
+    mult = values / values.rolling(20).mean().shift(1)
+    netx = net.reindex(columns=closes.columns)
+    pos = netx > 0
+    out = {
+        "streak3": (pos & pos.shift(1, fill_value=False) & pos.shift(2, fill_value=False)).reindex(closes.index, fill_value=False),
+        "quiet_vol": (mult >= 2) & (ret.abs() < 5),
+    }
+    cap = pd.Series(caps).reindex(closes.columns)
+    out["flow_big"] = (netx.rolling(5).sum().div(cap, axis=1) * 100 >= 0.1).reindex(closes.index, fill_value=False)
+    return out, ret, mult
+
+
+SIGNAL_NAMES = {"streak3": "큰손이 3일 연속 삼", "quiet_vol": "가격은 조용한데 거래만 2배↑", "flow_big": "큰손 5일 순매수가 덩치의 0.1%↑",
+                "streak3+quiet_vol": "큰손 3일 연속 + 조용한 거래 증가", "streak3+flow_big": "큰손 3일 연속 + 덩치 대비 많이"}
+
+
+def replay_mover(code, name, closes, values, net, caps, cand_by_day, reports=None, rules=SURGE):
+    """급등주 하나를 거슬러 본다: 언제 급등했고, 그 전에 어떤 신호가 몇 일 먼저 있었고, 우리가 언제 잡았나."""
+    sig, ret, mult = _signal_frames(closes[[code]], values[[code]], net[[code]] if code in net.columns else pd.DataFrame(), caps)
+    days = list(closes.index[-rules["lookback"]:])
+    r = ret[code]
+    recent = [d for d in days[-10:] if r.get(d, 0) >= rules["day"]]
+    surge = recent[0] if recent else max(days[-5:], key=lambda d: r.get(d, 0))
+    si = days.index(surge)
+    timeline = []
+    for d in days:
+        timeline.append({"d": d, "chg": r1(r.get(d)), "mult": r1(mult[code].get(d)),
+                         "net": round(float(net[code].get(d)) / EOK) if code in net.columns and d in net.index and net[code].get(d) == net[code].get(d) else None,
+                         "cand": cand_by_day.get(d, {}).get(code, [])})
+    early = []
+    for key in ("streak3", "quiet_vol", "flow_big"):
+        hit = [d for d in days[:si] if bool(sig[key][code].get(d, False))]
+        if hit:
+            early.append({"key": key, "label": SIGNAL_NAMES[key], "first": hit[0], "lead": si - days.index(hit[0])})
+    if reports:
+        rep = sorted({x["date"] for x in reports.get("items", []) if x["code"] == code and days[max(0, si - 10)] <= x["date"] < surge})
+        if rep:
+            early.append({"key": "report", "label": "증권사 리포트", "first": rep[0],
+                          "lead": si - next((i for i, d in enumerate(days) if d >= rep[0]), si)})
+    cand_days = [d for d in days if cand_by_day.get(d, {}).get(code)]
+    before = [d for d in cand_days if d < surge]
+    if before:
+        verdict, lead = "early", si - days.index(before[0])
+        how = f"{lead}일 먼저 " + "·".join(cand_by_day[before[0]][code]) + " 후보로 잡음"
+    elif surge in cand_days:
+        verdict, lead, how = "sameday", 0, "급등 당일 " + "·".join(cand_by_day[surge][code]) + " 후보로 잡음"
+    else:
+        verdict, lead, how = "missed", None, "후보에 안 걸림"
+    r5 = (closes[code].iloc[-1] / closes[code].iloc[-6] - 1) * 100
+    return {"code": code, "name": name, "r5": r1(r5), "surge": surge, "surge_chg": r1(r.get(surge)),
+            "verdict": verdict, "lead": lead, "how": how, "early": sorted(early, key=lambda e: -e["lead"]), "timeline": timeline}
+
+
+def find_movers(closes, universe, rules=SURGE, min_cap=None, top=12):
+    """최근 급등주: 5일 +20%↑ 또는 최근 5일 중 하루 +15%↑ (시총 기준 이상만)."""
+    min_cap = min_cap if min_cap is not None else RULES["min_cap"]
+    r5 = (closes.iloc[-1] / closes.iloc[-6] - 1) * 100
+    d1 = (closes.pct_change().iloc[-5:] * 100).max()
+    codes = [c for c in closes.columns if c in universe and universe[c]["cap"] >= min_cap
+             and (r5.get(c, 0) >= rules["r5"] or d1.get(c, 0) >= rules["d1"])]
+    return sorted(codes, key=lambda c: -r5.get(c, 0))[:top]
+
+
+def signal_validation(closes, values, net, caps, eligible, rules=SURGE):
+    """신호가 뜬 날(종목) 뒤 5일 안에 +15% 넘게 오른 비율 vs 전체 평균. '이 신호가 정말 급등을 앞서나'를 본다."""
+    if net is None or net.empty:
+        return None
+    cols = [c for c in closes.columns if c in eligible]
+    cl, va = closes[cols], values[cols]
+    sig, _, _ = _signal_frames(cl, va, net, caps)
+    sig["streak3+quiet_vol"] = sig["streak3"] & sig["quiet_vol"]
+    sig["streak3+flow_big"] = sig["streak3"] & sig["flow_big"]
+    f = rules["fwd"]
+    fwd_max = (cl[::-1].rolling(f, min_periods=f).max()[::-1].shift(-1) / cl - 1) * 100
+    days = [d for d in net.index if d in cl.index and cl.index.get_loc(d) + f < len(cl.index)]
+    if not days:
+        return None
+    hitf = (fwd_max.loc[days] >= rules["hit"])
+    valid = fwd_max.loc[days].notna()
+    base_n = int(valid.values.sum())
+    base = float(hitf.values[valid.values].mean() * 100) if base_n else 0.0
+    rows = []
+    for k, frame in sig.items():
+        m = frame.loc[days].fillna(False).astype(bool) & valid
+        n = int(m.values.sum())
+        rate = float(hitf.values[m.values].mean() * 100) if n else None
+        rows.append({"key": k, "label": SIGNAL_NAMES[k], "n": n, "rate": r1(rate) if rate is not None else None,
+                     "lift": round(rate / base, 1) if rate is not None and base else None})
+    return {"base": r1(base), "base_n": base_n, "days": len(days), "from": days[0], "to": days[-1],
+            "fwd": f, "hit": rules["hit"], "rows": rows}
+
+
+def mover_scorecard(movers):
+    """그동안의 급등주 복기 모음: 미리 잡은·당일 잡은·놓친 비율, 신호별로 급등 전에 있었던 비율과 평균 몇 일 먼저였나."""
+    if not movers:
+        return None
+    n = len(movers)
+    cnt = {k: sum(1 for m in movers if m["verdict"] == k) for k in ("early", "sameday", "missed")}
+    sig = {}
+    for m in movers:
+        for e in m.get("early") or []:
+            s = sig.setdefault(e["key"], {"label": e["label"], "n": 0, "lead": []})
+            s["n"] += 1
+            s["lead"].append(e["lead"])
+    return {"n": n, **{k: round(100 * v / n) for k, v in cnt.items()},
+            "signals": sorted(({"key": k, "label": v["label"], "pct": round(100 * v["n"] / n),
+                                "lead": r1(sum(v["lead"]) / len(v["lead"]))} for k, v in sig.items()), key=lambda r: -r["pct"])}
+
+
 # ---------------------------------------------------------------- 전체 종목 검색용 요약
 
 def _bits(checks):
