@@ -1523,7 +1523,7 @@ def replay_mover(code, name, closes, values, net, caps, cand_by_day, reports=Non
         verdict, lead = "early", si - days.index(before[0])
         how = f"{lead}일 먼저 " + "·".join(cand_by_day[before[0]][code]) + " 후보로 잡음"
     elif surge in cand_days:
-        verdict, lead, how = "sameday", 0, "급등 당일 " + "·".join(cand_by_day[surge][code]) + " 후보로 잡음"
+        verdict, lead, how = "sameday", 0, "급등 당일 장 마감 뒤에야 " + "·".join(cand_by_day[surge][code]) + " 후보로 잡음 (다음 날 아침엔 이미 오른 뒤)"
     elif [d for d in cand_days if d > surge]:
         first = next(d for d in cand_days if d > surge)
         verdict, lead = "late", -(days.index(first) - si)

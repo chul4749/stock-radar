@@ -456,3 +456,12 @@ ul.early .na { list-style: none; margin-left: -16px; }
 .mvbar { display: flex; height: 10px; gap: 2px; border-radius: 5px; overflow: hidden; }
 .dir { display: inline-block; font-size: 10px; padding: 1px 5px; border-radius: 4px; margin: 2px 0 0; border: 1px solid var(--line); color: var(--sub); }
 .dir.lo::before, .dir.hi::before { content: ""; }
+
+/* 팝업: 휴대폰 주소창 때문에 100vh 가 실제 보이는 높이보다 커서 위가 잘리던 것 → 실제 보이는 높이(dvh) 기준으로, 가운데 정렬 */
+dialog#detail { max-height: calc(100vh - 40px); max-height: calc(100dvh - 24px); margin: auto; inset: 0; }
+.dlg-in { max-height: calc(100vh - 40px); max-height: calc(100dvh - 24px); overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+/* 팝업이 열려 있는 동안 뒤 화면이 같이 스크롤되지 않게 */
+html.modal-open, html.modal-open body { overflow: hidden; overscroll-behavior: none; }
+/* 격자 목록 칸이 긴 ETF 이름 같은 끊기지 않는 글자 때문에 화면 밖으로 밀리지 않게 */
+.fit { grid-template-columns: minmax(0, 1fr); }
+.fit > li, .tile, .card, .verdict, .today .tr .v { min-width: 0; overflow-wrap: anywhere; }

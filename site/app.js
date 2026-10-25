@@ -104,7 +104,7 @@ const INFO = {
   themes: "업종·테마마다 ETF를 짝지어, '돈이 어디로 가나 → 그럼 어떤 ETF'를 보여 줍니다.\n· 큰손 5일: 그 ETF가 실제로 담은 종목(구성 상위 10개)에 기관+외국인이 5일 동안 넣은 돈\n· 넓이: 그 종목들 중 20일 평균 가격 위에 있는 비율 (한두 종목만 오르는지, 다 같이 오르는지)\n· 리포트: 그 종목들에 최근 2주 나온 증권사 리포트 수 ('오랜만'은 석 달 만에 나온 것)\n판정:\n· 돈이 먼저 들어오는 중: 큰손은 사는데 ETF 가격은 아직 평균 아래 — 미리 볼 후보 (선취매에 가까움). 단, 돈이 덩치 대비 0.1% 이상·4일 이상 고르게·여러 종목에 나눠 들어오고(한 종목이 60% 넘으면 안 됨), 가격이 더 무너지지 않을 때만 (아니면 '지켜보기')\n· 돈도 들어오고 흐름도 좋음: 이미 오르는 중\n· 과열: 20일 새 20% 넘게 올라 따라 사기 조심\n· 가격은 강한데 큰손은 파는 중: 주의\n정말 맞는지는 성적표 '테마 판정별 성적'에서 확인합니다.",
   mgr_skill: "운용사마다 직접 고른 액티브 ETF가 최근 60일 동안 KODEX 200(코스피 대표 200종목)보다 얼마나 더 벌었는지 평균입니다. +면 시장보다 잘 고른 곳.\n'요즘 잘하는 곳'이 산 종목을 조금 더 무겁게 봅니다. 다만 60일은 짧아서 운이 섞입니다.",
   managers: "액티브 ETF는 펀드매니저가 직접 종목을 골라 사고파는 ETF입니다 (TIME=타임폴리오, KoAct=삼성액티브, ACE=한국투자 등).\nETF는 매일 담고 있는 종목을 공개하는데, 종목별 '담은 주식 수'는 펀드에 돈이 들어와도 그대로이고 매니저가 사고팔 때만 바뀝니다. 그래서 5일·20일 전과 비교하면 매니저가 뭘 샀고 뭘 팔았는지 보입니다.\n· 새로 담음: 전에 없던 종목을 넣음 (가장 강한 신호)\n· 늘림 / 줄임: 담은 주식 수를 10% 이상 바꿈\n· 모두 뺌: 다 팔아 버림\n여러 운용사가 같은 종목을 같이 사면 더 눈여겨볼 만합니다.\n붙는 표시:\n· 계속 사는 중: 20일 동안 샀고 최근 5일에도 또 삼 (확신이 있다는 뜻)\n· 비중 크게 담음: ETF 안에서 3% 넘게 담음\n· 그 뒤 주가: 비교 시작일 이후 주가 등락. 이미 15% 넘게 올랐으면 따라 사기엔 늦었을 수 있음\n· 투신 5일: 자산운용사 전체(펀드)가 이 종목을 최근 5일 산 금액. 같은 방향이면 더 믿을 만함\n순서는 운용사 수 → 계속 사는지 → 비중 → 잘하는 운용사 순으로 매깁니다. 매니저도 틀리고, 공개는 하루 늦게 반영될 수 있어요.",
-  replay: "급등한 종목을 거꾸로 따라가 '미리 알 수 있었나'를 확인합니다.\n· 미리 잡음: 급등 전날 이전에 우리 후보(스윙·단타·저평가)에 있었음\n· 당일 잡음: 급등이 시작된 날 후보에 걸림\n· 뒤늦게 잡음: 급등이 시작되고 며칠 뒤에야 걸림 (이미 많이 오른 뒤)\n· 놓침: 후보에 안 걸림\n'N일 먼저' 신호는 급등 시작일보다 며칠 앞서 그 신호가 처음 보였는지입니다. 여러 급등주에서 같은 신호가 자주 먼저 보이면, 그 신호를 조건에 넣을 이유가 됩니다.",
+  replay: "급등한 종목을 거꾸로 따라가 '미리 알 수 있었나'를 확인합니다.\n· 미리 잡음 (성공): 급등 전날 저녁까지 우리 후보(스윙·단타·저평가)에 있었음 → 급등 날 아침에 살 수 있었음\n· 당일 마감 뒤 — 이미 늦음: 급등한 날 장 마감 뒤에야 후보에 걸림. 우리 자료는 저녁에 나오니 다음 날 아침에야 살 수 있어 이미 오른 뒤\n· 뒤늦게 잡음: 급등이 시작되고 며칠 뒤에야 걸림\n· 놓침: 후보에 안 걸림\n'N일 먼저' 신호는 급등 시작일보다 며칠 앞서 그 신호가 처음 보였는지입니다. 여러 급등주에서 같은 신호가 자주 먼저 보이면, 그 신호를 조건에 넣을 이유가 됩니다.",
   signal_check: "거꾸로도 확인합니다: 그 신호가 뜬 종목들 중 실제로 5일 안에 +15% 넘게 오른 비율이 얼마인지, 아무 신호 없이 고른 종목(평소)보다 몇 배인지.\n급등주에만 신호가 있었던 게 아니라 평범한 종목에도 흔하게 뜨는 신호라면 '평소의 몇 배'가 1에 가까워서 쓸모가 없습니다.",
   exit: "언제 팔지 미리 정해 두는 기준입니다. 처음 투자할 때 가장 어려운 게 '언제 파느냐'라서, 사기 전에 정해 두면 손실이 커지는 걸 막을 수 있습니다.\n· 스윙: 종가가 20일 평균 가격 아래로 마감하면 정리 (오르는 흐름이 깨짐)\n· 단타: 걸린 날의 저가를 깨고 마감하면 정리 (급등 힘이 빠짐)\n· 저평가: 최근 10일 최저가를 깨고 마감하면 정리 (아직 바닥이 아니었음)\n괄호 안 %는 지금 가격에서 그 기준까지 거리입니다. 이 기준을 실제로 지켰다면 성적이 어땠는지는 성적표의 '정리 기준을 지켰다면'에서 확인합니다.",
   earn_season: "회사들은 분기가 끝나면 정해진 기한 안에 실적을 발표합니다 (1분기 5/15, 반기 8/14, 3분기 11/14, 1년 결산 3/31까지).\n발표 전에는 결과를 모르니, 좋든 나쁘든 발표 날 주가가 크게 움직일 수 있습니다. 조건에 맞아 산 종목도 실적 한 번에 기준이 깨질 수 있어 미리 알려 드립니다.\n'발표 예고 공시'는 회사가 실적 발표 날짜를 미리 알린 경우입니다.",
@@ -1039,10 +1039,10 @@ function moverScoreTable(mv) {
   if (!mv) return "";
   return `<h3 class="sub">급등주 복기 성적 <small>지금까지 급등주 ${mv.n}개</small></h3>
     <div class="tile wide"><div class="mvbar"><span style="flex:${mv.early};background:var(--calm)"></span><span style="flex:${mv.sameday};background:var(--g1)"></span><span style="flex:${mv.late || 0};background:var(--g0)"></span><span style="flex:${mv.missed};background:var(--line)"></span></div>
-    <div class="zb-lab"><span>미리 ${mv.early}%</span><span>당일 ${mv.sameday}%</span><span>뒤늦게 ${mv.late || 0}%</span><span>놓침 ${mv.missed}%</span></div>
+    <div class="zb-lab"><span>미리(성공) ${mv.early}%</span><span>당일·뒤늦게 ${mv.sameday + (mv.late || 0)}%</span><span>놓침 ${mv.missed}%</span></div>
     ${mv.signals.length ? `<table class="score" style="margin-top:8px"><thead><tr><th>급등 전에 먼저 보인 신호</th><th>급등주 중</th><th>평균</th></tr></thead><tbody>
     ${mv.signals.map((r) => `<tr><th>${esc(r.label)}</th><td>${r.pct}%</td><td>${num(r.lead, 1)}일 먼저</td></tr>`).join("")}</tbody></table>` : ""}</div>
-    <p class="hint">'미리 잡음'을 늘리는 게 목표예요. 급등주 대부분에 먼저 보인 신호가 있고, 위 '어떤 신호가 급등을 앞섰나'에서도 평소보다 자주 급등했다면 그 신호를 조건에 넣을 근거가 됩니다.</p>`;
+    <p class="hint">우리 자료는 장 마감 뒤에 나오니 '미리 잡음'(급등 전날까지 후보)만 실제로 살 수 있었던 경우예요. 이걸 늘리는 게 목표예요. 급등주 대부분에 먼저 보인 신호가 있고, 위 '어떤 신호가 급등을 앞섰나'에서도 평소보다 자주 급등했다면 그 신호를 조건에 넣을 근거가 됩니다.</p>`;
 }
 
 // 테마 판정별로 대표 ETF를 그날 종가에 샀다면 (KODEX 200 대비)
@@ -1059,7 +1059,8 @@ function themeScoreTable(ts) {
 
 /* ---------------- 급등주 복기 ---------------- */
 
-const VERDICT = { early: ["미리 잡음", "good"], sameday: ["당일 잡음", "ok"], late: ["뒤늦게 잡음", "ok"], missed: ["놓침", "bad"] };
+// 자료는 장 마감 뒤에 나오므로, 급등 '전날' 저녁까지 후보였어야 다음 날 아침에 살 수 있다 → 그것만 성공
+const VERDICT = { early: ["미리 잡음", "good"], sameday: ["당일 마감 뒤 — 이미 늦음", "ok"], late: ["뒤늦게 잡음", "ok"], missed: ["놓침", "bad"] };
 
 function moverCard(m) {
   const [vlab, vcls] = VERDICT[m.verdict];
@@ -1483,9 +1484,20 @@ async function openStock(code) {
     <ul class="fit why">${block("swing", sw, s.sw, L.swing)}${block("scalp", sc, s.sc, L.scalp)}${block("value", va, s.va, L.value, s.vr)}</ul>
     ${tabs.length ? `<button class="more" type="button" data-code="${code}">후보 카드 자세히 보기</button>` : ""}
     <p class="hint">조건에 다 맞아도 매수 추천은 아닙니다. 네이버에서 더 보려면 이름을 누르세요.</p>`;
-  if (!$("#detail").open) $("#detail").showModal();
+  openDialog();
   $("#detail .dlg-in").scrollTop = 0;
 }
+
+// 팝업 열기: 뒤 화면 고정, 맨 위부터 보이게
+function openDialog() {
+  const d = $("#detail");
+  document.documentElement.classList.add("modal-open");
+  if (!d.open) d.showModal();
+  $("#detail .dlg-in").scrollTop = 0;
+}
+try {
+  $("#detail").addEventListener("close", () => document.documentElement.classList.remove("modal-open"));
+} catch (e) { /* 무시 */ }
 
 function openDetail(code) {
   const f = state.data.filter;
@@ -1511,7 +1523,7 @@ function openDetail(code) {
     <ul class="news">${newsList(x.news)}</ul>
     <p class="links"><a href="https://m.stock.naver.com/domestic/stock/${x.code}" target="_blank" rel="noopener">네이버 증권</a>
       <a href="https://dart.fss.or.kr/dsab007/main.do?option=corp&textCrpNm=${encodeURIComponent(x.name)}" target="_blank" rel="noopener">DART 공시</a></p>`;
-  if (!$("#detail").open) $("#detail").showModal();
+  openDialog();
   $("#detail .dlg-in").scrollTop = 0;
 }
 
@@ -1581,10 +1593,11 @@ function fitOne(el) {
   const lh = parseFloat(getComputedStyle(el).lineHeight) || parseFloat(getComputedStyle(el).fontSize) * 1.4;
   if (el.scrollHeight < lh * 1.6) return;              // 이미 한 줄
   el.style.whiteSpace = "nowrap";
+  el.dataset.fitBase = "1";            // 남긴 설정은 다음 번(글꼴 바뀜·화면 크기 바뀜)에 되돌리고 다시 잰다
   const need = el.scrollWidth;
   if (need <= w) return;
   const ratio = w / need;
-  if (ratio < FIT_MIN) { el.style.whiteSpace = ""; return; }   // 많이 넘치면 줄바꿈 그대로
+  if (ratio < FIT_MIN) { el.style.whiteSpace = ""; delete el.dataset.fitBase; return; }   // 많이 넘치면 줄바꿈 그대로
   const fs = parseFloat(getComputedStyle(el).fontSize);
   el.dataset.fitBase = "1";
   // 안쪽에 글자 크기가 고정된 조각(small 등)이 있으면 계산만큼 안 줄어들 수 있어, 줄인 뒤 다시 재고 안 맞으면 조금 더, 그래도 넘치면 원래대로
@@ -1605,6 +1618,8 @@ try {
   new MutationObserver(fitAll).observe(document.getElementById("detail"), { childList: true, subtree: true, attributes: true, attributeFilter: ["open"] });
   window.addEventListener("resize", fitAll);
   document.addEventListener("toggle", fitAll, true);   // details 펼칠 때
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitAll);   // 웹 글꼴이 늦게 오면 글자 폭이 바뀜
+  window.addEventListener("load", fitAll);
 } catch (e) { /* 오래된 브라우저 */ }
 
 init();
