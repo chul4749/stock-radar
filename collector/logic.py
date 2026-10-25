@@ -1199,6 +1199,111 @@ def morning_summary(items):
             "text": " · ".join(parts) + f" → 오늘 아침 {label}"}
 
 
+# ---------------------------------------------------------------- 업종·테마 ETF
+
+THEME_RULES = {"overheat20": 20.0, "flow_days": 3, "breadth": 60}
+
+
+def etf_trend(closes, bench=None):
+    """ETF 종가 Series(오래된 순) → 5·20일 등락, 20일 평균 위인지, 20일 평균이 오르는지, 시장 대비(20일)."""
+    c = closes.dropna()
+    if len(c) < 21:
+        return None
+    ma20 = c.rolling(20).mean()
+    r20 = (c.iloc[-1] / c.iloc[-21] - 1) * 100
+    out = {"close": round(float(c.iloc[-1]), 1), "r1": r1((c.iloc[-1] / c.iloc[-2] - 1) * 100),
+           "r5": r1((c.iloc[-1] / c.iloc[-6] - 1) * 100), "r20": r1(r20),
+           "above20": bool(c.iloc[-1] > ma20.iloc[-1]), "ma20_up": bool(ma20.iloc[-1] > ma20.iloc[-6]),
+           "gap20": r1((c.iloc[-1] / ma20.iloc[-1] - 1) * 100), "spark": [round(float(v), 1) for v in c.iloc[-20:]]}
+    if bench is not None and len(bench.dropna()) >= 21:
+        b = bench.dropna()
+        out["rel20"] = r1(r20 - (b.iloc[-1] / b.iloc[-21] - 1) * 100)
+    return out
+
+
+def theme_strength(name, etfs, members, caps, closes, flows_daily, flows_5d, reports=None, base=None, regime=None,
+                   rules=THEME_RULES):
+    """테마 하나: 구성 종목의 큰손 돈 흐름·넓이·리포트와 ETF 흐름으로 판정.
+
+    etfs: [{"code","name","trend"(etf_trend)}], members: {코드: 이름} (ETF 구성 상위, 중복 없이)
+    caps: {코드: 시총(원)}
+    """
+    codes = [c for c in members if c in closes.columns and caps.get(c)]
+    if not codes:
+        return None
+    cap = sum(caps[c] for c in codes)
+    net5 = sum(_money(flows_5d["foreign"], c) + _money(flows_5d["inst"], c) for c in codes)
+    daily = [sum(_money(fl["foreign"], c) + _money(fl["inst"], c) for c in codes) for _, fl in flows_daily]
+    ma20 = closes[codes].iloc[-20:].mean()
+    above = sum(1 for c in codes if closes[c].iloc[-1] > ma20[c])
+    breadth = round(100 * above / len(codes))
+    rep_n = rep_fresh = 0
+    if reports:
+        for c in codes:
+            a = report_attention(c, reports, base)
+            if a:
+                rep_n += a["n"]
+                rep_fresh += 1 if a["fresh"] else 0
+    main = next((e for e in etfs if e.get("trend")), None)
+    tr = main["trend"] if main else None
+    flow_pct = net5 / cap * 100 if cap else 0
+    money_in = net5 > 0 and sum(1 for v in daily if v > 0) >= rules["flow_days"]
+    price_ok = bool(tr and tr["above20"] and (tr.get("rel20") or 0) > 0)
+    hot = bool(tr and tr["r20"] >= rules["overheat20"])
+    if hot:
+        key, label = "hot", "과열 — 20일 새 많이 오름, 따라 사기 조심"
+    elif money_in and not (tr and tr["above20"]):
+        key, label = "early", "돈이 먼저 들어오는 중 — 가격은 아직 (미리 볼 후보)"
+    elif money_in and price_ok and breadth >= rules["breadth"]:
+        key, label = "strong", "돈도 들어오고 흐름도 좋음"
+    elif price_ok and net5 < 0:
+        key, label = "fading", "가격은 강한데 큰손은 파는 중 — 주의"
+    elif money_in:
+        key, label = "watch", "돈은 들어오는 중 — 흐름 확인 필요"
+    else:
+        key, label = "weak", "약함 — 돈이 빠지거나 흐름 약함"
+    warn = None
+    if regime and regime.get("key") in ("down", "panic") and key in ("strong", "early", "watch"):
+        warn = f"지금은 {regime.get('label')} — 업종이 강해도 같이 밀릴 수 있어 나눠서 천천히"
+    return {"name": name, "key": key, "label": label, "warn": warn,
+            "flow_eok": round(net5 / EOK), "flow_pct": round(flow_pct, 3), "flow_days": sum(1 for v in daily if v > 0),
+            "daily": [round(v / EOK) for v in daily], "breadth": breadth, "n": len(codes),
+            "reports": rep_n, "fresh": rep_fresh, "etfs": etfs,
+            "top": [{"code": c, "name": members[c], "flow_eok": round((_money(flows_5d["foreign"], c) + _money(flows_5d["inst"], c)) / EOK)}
+                    for c in sorted(codes, key=lambda c: -(_money(flows_5d["foreign"], c) + _money(flows_5d["inst"], c)))[:3]]}
+
+
+def theme_scorecard(records, horizons=(5, 20), cost=None):
+    """판정별로 대표 ETF(테마의 첫 ETF)를 그날 종가에 샀다면 N기록일 뒤 KODEX 200보다 나았나.
+
+    records: [(기준일, 그날 파일의 themes)] 날짜순. ETF 종가는 각 날짜 파일에 저장된 값을 쓴다.
+    """
+    cost = COST if cost is None else cost
+    acc = {}
+    for i, (d, th) in enumerate(records):
+        if not th:
+            continue
+        b0 = ((th.get("bench") or {}).get("069500") or {}).get("close")
+        for x in th.get("themes", []):
+            e = next((e for e in x.get("etfs", []) if e.get("trend")), None)
+            if not e:
+                continue
+            for n in horizons:
+                if i + n >= len(records) or not records[i + n][1]:
+                    continue
+                later = records[i + n][1]
+                e2 = next((y for t in later.get("themes", []) for y in t.get("etfs", []) if y["code"] == e["code"] and y.get("trend")), None)
+                if not e2:
+                    continue
+                r = (e2["trend"]["close"] / e["trend"]["close"] - 1) * 100 - cost
+                b1 = ((later.get("bench") or {}).get("069500") or {}).get("close")
+                a = acc.setdefault(x["key"], {}).setdefault(n, {"r": [], "x": []})
+                a["r"].append(r)
+                if b0 and b1:
+                    a["x"].append(r - (b1 / b0 - 1) * 100)
+    return {k: {str(n): summarize_returns(v["r"], v["x"]) for n, v in by.items()} for k, by in acc.items()}
+
+
 # ---------------------------------------------------------------- 전체 종목 검색용 요약
 
 def _bits(checks):

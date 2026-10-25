@@ -11,8 +11,8 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
-from . import logic, reindex, sources
-from .util import KST, log
+from . import etf, logic, reindex, sources
+from .util import EOK, KST, log
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "site", "data")
@@ -302,6 +302,10 @@ def main(argv):
         temp["transition"] = logic.regime_transition(temp["regime"])
         temp["signals"] = logic.entry_signals(temp)
 
+    t = step("업종·테마 ETF")
+    themes = build_themes(base, used_days, closes, flows_daily, flows_5d, listing, reports, temp.get("regime"), errors)
+    log(f"  테마 {len(themes['themes'])}개: " + ", ".join(f"{x['name']}({x['key']})" for x in themes["themes"][:6]))
+
     out = {
         "version": 1,
         "base_date": base,
@@ -323,6 +327,7 @@ def main(argv):
             "excluded": excluded,
         },
         "sectors": sector_flow,
+        "themes": themes,
         "errors": errors,
     }
     os.makedirs(DATA, exist_ok=True)
@@ -346,7 +351,7 @@ def main(argv):
     kospi = safe("코스피 기간", lambda: sources.index_history("1001", used_days[0], base), errors)
     if kospi is not None:
         kospi.index = [d.strftime("%Y%m%d") for d in kospi.index]
-        history, regimes, backfill_dates, signal_levels = [], {}, [], {}
+        history, regimes, backfill_dates, signal_levels, theme_recs = [], {}, [], {}, []
         # 장세는 그날 저장된 시장 온도 + 그날까지의 코스피로 다시 판정 (예전 기록에도 같은 규칙 적용)
         long_vals = kospi_long if kospi_long is not None else None
         long_days = [d.strftime("%Y%m%d") for d in long_vals.index] if long_vals is not None else []
@@ -364,6 +369,7 @@ def main(argv):
                 if x.get("reports") is None and reports:
                     x["reports"] = logic.report_attention(x["code"], reports, d)
             history.append((d, groups))
+            theme_recs.append((d, rec.get("themes")))
             if d in long_days:
                 upto = [float(v) for v in long_vals.values[:long_days.index(d) + 1]]
                 rg = logic.market_regime(upto, rec.get("temperature") or {})
@@ -382,6 +388,7 @@ def main(argv):
             history, closes, kospi, regimes, opens=opens, bench=bench or None)
         stops = logic.stop_scorecard(history, closes, lows, opens=opens, bench=bench or None)
         card = {"generated_at": out["generated_at"], "base_date": base, "days": len(history), "stops": stops,
+                "themes": logic.theme_scorecard(theme_recs),
                 "horizons": list(logic.HORIZONS), "stats": stats, "recent": recent, "features": features,
                 "by_regime": by_regime, "regimes": regimes, "score_check": score_check,
                 "method": {"entry": "다음 날 시가", "bench": "종목이 속한 시장 지수", "cost": logic.COST, "dedup": True},
@@ -420,6 +427,49 @@ def update_season(base, dart_days, name_to_code, errors):
         json.dump(store, f, ensure_ascii=False, separators=(",", ":"))
     log(f"  {season['label']} 실적 시즌: 발표 {len(store['reported'])}곳 · 예고 {len(store['notice'])}곳 (확인한 날 {len(store['checked'])}, 이번에 더 받은 날 {len(todo)})")
     return season, store
+
+
+def build_themes(base, days, closes, flows_daily, flows_5d, listing, reports, regime, errors):
+    """테마마다 ETF 흐름(KRX 시세)과 ETF 구성 종목의 큰손 돈 흐름으로 판정 (collector/etf.py 표)."""
+    start = days[-40] if len(days) >= 40 else days[0]
+    bench = {}
+    for code, name in etf.BENCH:
+        h = safe(f"ETF {name}", lambda: sources.etf_history(code, start, base), errors)
+        if h is not None:
+            bench[code] = h["종가"]
+    kospi_etf = bench.get("069500")
+    caps = {c: v["cap"] for c, v in listing.items()}
+    out, fails, total = [], 0, 0
+    for name, etfs in etf.THEMES:
+        rows, members = [], {}
+        for code, ename in etfs:
+            total += 1
+            tr = None
+            try:
+                h = sources.etf_history(code, start, base)
+                tr = logic.etf_trend(h["종가"], kospi_etf)
+                if tr:
+                    tr["value_eok"] = round(float(h["거래대금"].iloc[-1]) / EOK)
+            except Exception as e:
+                fails += 1
+                log(f"  ETF {ename} 시세 실패: {type(e).__name__}")
+            try:
+                hold = sources.etf_holdings(code, base)
+            except Exception as e:
+                log(f"  ETF {ename} 구성 실패: {type(e).__name__}")
+                hold = []
+            for c, n, w in hold:
+                members.setdefault(c, n)
+            rows.append({"code": code, "name": ename, "trend": tr, "top": [[c, n, round(w, 1)] for c, n, w in hold[:5]]})
+            time.sleep(0.2)
+        th = logic.theme_strength(name, rows, members, caps, closes, flows_daily, flows_5d, reports, base, regime)
+        if th:
+            out.append(th)
+    if total and fails > total / 2:
+        errors.append(f"ETF 시세: {fails}/{total} 실패")
+    order = {"early": 0, "strong": 1, "watch": 2, "hot": 3, "fading": 4, "weak": 5}
+    out.sort(key=lambda x: (order[x["key"]], -x["flow_pct"]))
+    return {"themes": out, "bench": {c: logic.etf_trend(sr) for c, sr in bench.items()}}
 
 
 def update_reports(base, errors, keep_days=150):

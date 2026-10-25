@@ -578,3 +578,22 @@ def test_stock_index_explains_why_not_picked():
     assert a["sw"] == "11111" and a["sc"] == "111" and a["nw"] == 2 and a["p"] == ["swing"] and a["sz"] == "11"
     assert b["sw"][2] == "0" and b["sz"][0] == "0" and b["x"] == ["유상증자"] and b["nw"] == 0
     assert len(idx["labels"]["swing"]) == 5 and len(idx["labels"]["value"]) == 5
+
+
+def test_theme_strength_and_scorecard():
+    n = 30
+    days = [f"d{i:02d}" for i in range(n)]
+    closes = pd.DataFrame({"A": [100.0] * n, "B": [50.0] * (n - 1) + [55.0]}, index=days)
+    fl = {"foreign": pd.Series({"A": 2 * EOK, "B": 1 * EOK}), "inst": pd.Series({"A": 0, "B": 0})}
+    daily = [(d, fl) for d in days[-5:]]
+    caps = {"A": 1000 * EOK, "B": 500 * EOK}
+    down = pd.Series([100.0 - i * 0.5 for i in range(n)])
+    tr = logic.etf_trend(down, pd.Series([100.0] * n))
+    assert tr["above20"] is False and tr["rel20"] < 0
+    th = logic.theme_strength("테마", [{"code": "E", "name": "E", "trend": tr}], {"A": "가", "B": "나"}, caps, closes,
+                              daily, fl, regime={"key": "down", "label": "하락장"})
+    assert th["key"] == "early" and th["flow_days"] == 5 and th["breadth"] == 50 and th["warn"]
+    rec = lambda c, b: {"themes": [{"key": "early", "etfs": [{"code": "E", "trend": {"close": c}}]}], "bench": {"069500": {"close": b}}}
+    sc = logic.theme_scorecard([("1", rec(100, 100)), ("2", rec(101, 100)), ("3", rec(102, 100)),
+                                ("4", rec(103, 100)), ("5", rec(104, 100)), ("6", rec(110, 105))], horizons=(5,), cost=0)
+    assert sc["early"]["5"]["n"] == 1 and sc["early"]["5"]["avg"] == 10.0 and sc["early"]["5"]["excess"] == 5.0

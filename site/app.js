@@ -63,6 +63,7 @@ function render() {
   $("#meta").textContent = `기준일 ${ymd(d.base_date)} · 업데이트 ${gen}` + (d.backfill ? " · 나중에 다시 계산한 기록" : "");
   renderTemp();
   renderSectors();
+  renderThemes();
   renderRegime();
   renderFilter();
   renderToday();
@@ -98,6 +99,7 @@ const INFO = {
   score_swing: "강도: 이 종목이 조건에 얼마나 강하게 걸렸는지 0~100점입니다. 지금까지 같은 탭에 걸린 종목들 중 어디쯤인지로 매겨서, 세 탭을 같은 눈금으로 비교할 수 있습니다.\n스윙 계산: 회사 크기에 비해 최근 5일 큰손이 얼마나 많이 샀는지 + 며칠 연속 샀는지.\n강도가 높다고 오른다는 보장은 없습니다. '어떤 종목부터 볼지' 순서로만 쓰세요.",
   score_scalp: "강도: 이 종목이 조건에 얼마나 강하게 걸렸는지 0~100점입니다. 지금까지 같은 탭에 걸린 종목들 중 어디쯤인지로 매깁니다.\n단타 계산 (100점 만점을 나눠 가짐):\n· 큰손 확인 50%: 오늘 거래 중 큰손이 산 비중 (20% 이상이면 만점)\n· 거래 증가 25%: 평소보다 거래가 몇 배 늘었나 (8배면 만점, 15배 넘게 과열되면 오히려 감점)\n· 상승폭 25%: 5~15% 오르면 만점, 상한가 근처까지 튀면 감점\n너무 과열된 종목은 다음 날 꺾이는 경우가 많아서 이렇게 만들었습니다.",
   report: "증권사 애널리스트가 이 회사를 분석해 쓴 보고서입니다. 리포트가 나온다는 건 시장의 관심이 이 회사로 오기 시작했다는 신호예요.\n· '오랜만에 다뤄짐': 석 달 넘게 리포트가 없다가 최근 2주 안에 새로 나온 경우. 아직 사람들이 많이 몰리기 전이라 가장 앞선 신호로 봅니다\n· 목표가: 애널리스트가 생각하는 적정 주가. 다만 증권사 목표가는 대체로 높게 잡히는 편이라 '지금보다 +50%'를 그대로 믿진 마세요\n· 목표가를 올렸는지 내렸는지가 숫자 자체보다 더 중요합니다\n정말 도움이 되는지는 성적표 '조건별 성적'의 리포트 줄에서 확인합니다.",
+  themes: "업종·테마마다 ETF를 짝지어, '돈이 어디로 가나 → 그럼 어떤 ETF'를 보여 줍니다.\n· 큰손 5일: 그 ETF가 실제로 담은 종목(구성 상위 10개)에 기관+외국인이 5일 동안 넣은 돈\n· 넓이: 그 종목들 중 20일 평균 가격 위에 있는 비율 (한두 종목만 오르는지, 다 같이 오르는지)\n· 리포트: 그 종목들에 최근 2주 나온 증권사 리포트 수 ('오랜만'은 석 달 만에 나온 것)\n판정:\n· 돈이 먼저 들어오는 중: 큰손은 사는데 ETF 가격은 아직 평균 아래 — 미리 볼 후보 (선취매에 가까움)\n· 돈도 들어오고 흐름도 좋음: 이미 오르는 중\n· 과열: 20일 새 20% 넘게 올라 따라 사기 조심\n· 가격은 강한데 큰손은 파는 중: 주의\n정말 맞는지는 성적표 '테마 판정별 성적'에서 확인합니다.",
   exit: "언제 팔지 미리 정해 두는 기준입니다. 처음 투자할 때 가장 어려운 게 '언제 파느냐'라서, 사기 전에 정해 두면 손실이 커지는 걸 막을 수 있습니다.\n· 스윙: 종가가 20일 평균 가격 아래로 마감하면 정리 (오르는 흐름이 깨짐)\n· 단타: 걸린 날의 저가를 깨고 마감하면 정리 (급등 힘이 빠짐)\n· 저평가: 최근 10일 최저가를 깨고 마감하면 정리 (아직 바닥이 아니었음)\n괄호 안 %는 지금 가격에서 그 기준까지 거리입니다. 이 기준을 실제로 지켰다면 성적이 어땠는지는 성적표의 '정리 기준을 지켰다면'에서 확인합니다.",
   earn_season: "회사들은 분기가 끝나면 정해진 기한 안에 실적을 발표합니다 (1분기 5/15, 반기 8/14, 3분기 11/14, 1년 결산 3/31까지).\n발표 전에는 결과를 모르니, 좋든 나쁘든 발표 날 주가가 크게 움직일 수 있습니다. 조건에 맞아 산 종목도 실적 한 번에 기준이 깨질 수 있어 미리 알려 드립니다.\n'발표 예고 공시'는 회사가 실적 발표 날짜를 미리 알린 경우입니다.",
   morning: "새벽에 끝난 미국 시장 결과로 오늘 아침 한국 시장 분위기를 미리 짐작해 봅니다.\n· 한국 ETF(EWY): 미국에 상장된 한국 주식 묶음이라 밤사이 외국인 시각이 가장 잘 보입니다 (가장 크게 반영)\n· 나스닥·미국 반도체: 삼성전자·SK하이닉스 같은 큰 종목과 같이 움직이는 경우가 많음\n· 공포지수(VIX)·환율: 오르면 부담\n짐작일 뿐이고, 장이 열리면 다르게 움직일 수 있습니다.",
@@ -528,6 +530,13 @@ function renderToday() {
     const woke = vals.filter((x) => x.wake.met >= 2);
     rows.push(["주목받는 저평가", woke.length ? `<b>${woke.length}개</b> <small>${woke.slice(0, 3).map((x) => esc(x.name)).join(", ")}</small>` : `<span class="na">없음 (싼데 아무도 안 보는 중)</span>`]);
   }
+  const ths = (state.data.themes || {}).themes || [];
+  if (ths.length) {
+    const early = ths.filter((t) => t.key === "early").map((t) => t.name), strong = ths.filter((t) => t.key === "strong").map((t) => t.name);
+    rows.push(["테마 ETF", early.length || strong.length
+      ? `${early.length ? `<b class="good">미리 볼 곳: ${early.slice(0, 3).map(esc).join("·")}</b>` : ""}${early.length && strong.length ? "<br>" : ""}${strong.length ? `오르는 중: ${strong.slice(0, 3).map(esc).join("·")}` : ""}`
+      : `<span class="na">돈이 들어오는 테마 없음</span>`]);
+  }
   if (tops.length) rows.push(["탭별 1위", `<span class="picks">${tops.map((p) => `<span>${p}</span>`).join("")}</span>`]);
   const hits = Object.keys(state.watch).filter((c) => ["swing", "scalp", "value"].some((g) => (f[g] || []).some((y) => y.code === c)));
   if (Object.keys(state.watch).length) rows.push(["관심 종목", hits.length ? `<b>${hits.map((c) => esc(state.watch[c])).join(", ")}</b> 오늘 걸림` : `<span class="na">오늘 걸린 종목 없음</span>`]);
@@ -925,6 +934,7 @@ function renderScore() {
       <thead><tr><th></th>${hs.map((h) => `<th>${h}일 뒤</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>${warn}
     ${scoreCheckTable(sc.score_check)}
     ${stopTable(sc.stops)}
+    ${themeScoreTable(sc.themes)}
     ${featureTable(sc.features)}
     ${recent ? `<details class="rules"><summary>최근 기록 보기</summary><table class="score recent"><thead><tr><th>날짜</th><th>구분</th><th style="text-align:left">종목</th>${hs.map((h) => `<th>${h}일</th>`).join("")}</tr></thead><tbody>${recent}</tbody></table></details>` : ""}`;
 }
@@ -943,6 +953,18 @@ function stopTable(st) {
   return `<h3 class="sub">정리 기준을 지켰다면 <small>5일 기준, 시장 지수 대비</small></h3>
     <div class="tile wide"><table class="score"><thead><tr><th></th><th>그냥 5일 들고 있기</th><th>기준 깨지면 팔기</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
     <p class="hint">카드의 '정리 기준'(종가가 그 가격 아래로 마감하면 그날 종가에 팔기)을 지켰을 때와 그냥 들고 있었을 때 비교입니다. '정리' %는 5일 안에 기준이 깨진 비율입니다.</p>`;
+}
+
+// 테마 판정별로 대표 ETF를 그날 종가에 샀다면 (KODEX 200 대비)
+function themeScoreTable(ts) {
+  if (!ts) return "";
+  const NAME = { early: "돈이 먼저 들어오는 중", strong: "돈도·흐름도 좋음", watch: "돈만 들어옴", hot: "과열", fading: "큰손 매도", weak: "약함" };
+  const cell = (x) => (x ? `<td><b class="${cls(x.excess)}">${signed(x.excess, 1, "%p")}</b><br><small>상승 ${x.win}% · ${x.n}건</small></td>` : `<td class="na">–</td>`);
+  const rows = Object.keys(NAME).filter((k) => ts[k]).map((k) => `<tr><th>${NAME[k]}</th>${cell(ts[k]["5"])}${cell(ts[k]["20"])}</tr>`).join("");
+  if (!rows) return `<h3 class="sub">테마 판정별 성적</h3><p class="hint">테마 ETF 기록이 5일 이상 쌓이면 나옵니다.</p>`;
+  return `<h3 class="sub">테마 판정별 성적 <small>대표 ETF, KODEX 200 대비</small></h3>
+    <div class="tile wide"><table class="score"><thead><tr><th></th><th>5일 뒤</th><th>20일 뒤</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="hint">그날 종가에 테마의 첫 번째 ETF를 샀다면 KODEX 200보다 얼마나 더 벌었는지입니다. '돈이 먼저 들어오는 중'이 앞서야 이 판정이 쓸모 있습니다.</p>`;
 }
 
 /* ---------------- 아침 요약 ---------------- */
@@ -987,6 +1009,39 @@ function featureTableOf(fs, who, note) {
 }
 
 /* ---------------- 업종·제외·상세 ---------------- */
+
+/* ---------------- 테마별 ETF ---------------- */
+
+const THEME_TONE = { early: "fit-good", strong: "fit-good", watch: "fit-ok", hot: "fit-bad", fading: "fit-bad", weak: "" };
+
+function themeCard(t) {
+  const etfs = t.etfs.map((e) => {
+    const tr = e.trend;
+    if (!tr) return `<li><span>${esc(e.name)}</span><small class="na">시세 없음</small></li>`;
+    return `<li><div><a href="https://m.stock.naver.com/domestic/stock/${e.code}" target="_blank" rel="noopener">${esc(e.name)}</a><b class="${cls(tr.r20)}">${signed(tr.r20, 1, "%")}</b></div>
+      <small>20일 등락${tr.rel20 != null ? ` · 시장보다 ${signed(tr.rel20, 1, "%p")}` : ""} · 20일 평균 ${tr.above20 ? "위" : "아래"}${tr.value_eok != null ? ` · 거래 ${num(tr.value_eok)}억` : ""}</small></li>`;
+  }).join("");
+  const top = t.top.map((m) => `${esc(m.name)} <span class="${cls(m.flow_eok)}">${signed(m.flow_eok, 0, "억")}</span>`).join(" · ");
+  return `<li class="${THEME_TONE[t.key] || ""}"><div class="row"><b>${esc(t.name)}</b><span>${esc(t.label)}</span></div>
+    <div class="tnums"><span>큰손 5일 <b class="${cls(t.flow_eok)}">${signed(t.flow_eok, 0, "억")}</b> <small>(${t.flow_days}/5일 순매수)</small></span>
+      <span>넓이 <b>${t.breadth}%</b> <small>(${t.n}종목 중 평균 위)</small></span>
+      <span>리포트 <b>${t.reports}</b>${t.fresh ? ` <small class="good">오랜만 ${t.fresh}</small>` : ""}</span></div>
+    ${t.warn ? `<p class="hint warn">⚠ ${esc(t.warn)}</p>` : ""}
+    <ul class="etfs">${etfs}</ul>
+    <small class="tm">돈 많이 들어온 구성 종목: ${top}</small></li>`;
+}
+
+function renderThemes() {
+  const th = state.data.themes, el = $("#theme-list");
+  if (!th || !th.themes || !th.themes.length) { el.innerHTML = `<div class="empty">이 날짜는 테마 ETF 자료가 없습니다.</div>`; return; }
+  const main = th.themes.filter((t) => ["early", "strong", "watch"].includes(t.key));
+  const rest = th.themes.filter((t) => !main.includes(t));
+  const b = (th.bench || {})["069500"];
+  el.innerHTML = `<p class="hint">읽는 법${infoBtn("themes")}${b ? ` · 기준: KODEX 200 20일 ${signed(b.r20, 1, "%")}` : ""}</p>${infoBox("themes")}
+    ${main.length ? `<ul class="fit themes">${main.map(themeCard).join("")}</ul>` : `<p class="hint">지금 돈이 들어오는 테마가 없습니다.</p>`}
+    ${rest.length ? `<details class="rules"><summary>나머지 테마 ${rest.length}개 (과열·약함·큰손 매도)</summary><ul class="fit themes">${rest.map(themeCard).join("")}</ul></details>` : ""}
+    <p class="hint">ETF는 여러 종목을 한 번에 사는 상품이라 한 종목 악재에 덜 흔들립니다. 레버리지·인버스는 뺐습니다. 매수 추천이 아닙니다.</p>`;
+}
 
 function renderSectors() {
   const s = state.data.sectors;
@@ -1288,6 +1343,7 @@ function renderRules() {
     <li>성적표 '정리 기준을 지켰다면'은 다음 날 시가에 사서, 5일 안에 종가가 기준 아래로 마감한 날 그 종가에 판 것으로 계산</li>
     <li>증권사 리포트: 네이버 리서치 종목분석 목록(150일 보관). 최근 2주 리포트 수, 그 전 석 달 동안 없었으면 '오랜만에 다뤄짐'. 가장 최근 리포트의 투자의견·목표가</li>
     <li>'검색 N위 · 이미 알려짐': 네이버 증권 검색 상위 100. 좋은 신호가 아니라 '이미 사람들이 몰림' 표시</li>
+    <li>테마별 ETF: collector/etf.py 표(23개 테마, ETF 51개, 레버리지·인버스 제외). 테마 강도는 ETF 구성 상위 10종목의 5일 큰손 순매수(3일 이상 순매수면 '돈이 들어옴'), 20일 평균 위 비율(60% 이상이면 넓음), ETF가 20일 평균 위·KODEX 200보다 강한지, 20일 +20% 넘으면 과열</li>
     <li>실적 시즌(1분기 4/1~5/15, 반기 7/1~8/14, 3분기 10/1~11/14, 결산 1/1~3/31)에는 DART에서 분기·반기·사업보고서나 잠정실적을 아직 안 낸 후보에 경고 표시</li></ul>`;
 }
 

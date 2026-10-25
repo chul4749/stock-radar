@@ -31,6 +31,8 @@
     성적표는 다음 날 시가 진입·N영업일째 종가 청산, 거래 비용 `COST` 차감, 종목이 속한 시장 지수 대비,
     같은 탭·같은 종목이 N일 안에 다시 걸리면 한 번만 센다. 조건별 성적도 지수 대비 초과로 비교한다.
     공식이나 기준을 바꾸면 화면의 '필터 기준 보기'(`renderRules`)와 ⓘ 설명(`INFO`)도 같이 고친다
+  - `etf.py` — 테마 → ETF 표(`THEMES`, 레버리지·인버스 제외). 수집 때 ETF 시세(KRX `etf_history`)와 구성 상위 10종목(`etf_holdings`, KRX→네이버)을 받아
+    `logic.theme_strength`로 판정(돈이 먼저 들어오는 중·좋음·과열·큰손 매도·약함), 성적표 `themes`(`theme_scorecard`, KODEX 200 대비)로 확인
   - `morning.py` — 아침 요약: 야후 차트로 미국장 마감(EWY·나스닥·S&P·반도체·VIX·환율) → `site/data/morning.json` (`logic.morning_summary`)
   - `util.py` — KST, EOK(억), log
 - `site/` — 빌드 없는 정적 페이지 (`index.html`, `app.js`, `style.css`), 데이터는 `site/data/`

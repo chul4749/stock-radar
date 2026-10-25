@@ -381,3 +381,16 @@ table.fin .est { color: var(--faint); }
 .fit.why .row small { color: var(--sub); text-align: right; }
 .fit.why .row .good { color: var(--calm); }
 .fit.why .row b { white-space: nowrap; }
+.fit.themes > li { margin-bottom: 8px; }
+.fit.themes .row span { font-size: 12px; color: var(--sub); text-align: right; }
+.fit.themes .row b { white-space: nowrap; }
+.tnums { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12px; color: var(--sub); margin: 4px 0; }
+.tnums b { color: var(--text); }
+.tnums .good { color: var(--calm); }
+.etfs { list-style: none; margin: 4px 0; padding: 0; font-size: 13px; }
+.etfs li { padding: 4px 0; border-top: 1px solid var(--line); }
+.etfs li > div { display: flex; justify-content: space-between; gap: 8px; }
+.etfs li a { color: var(--text); }
+.etfs li small { color: var(--sub); }
+.fit.themes .tm { display: block; color: var(--sub); font-size: 12px; line-height: 1.5; }
+.hint.warn { color: var(--fear); margin: 2px 0; }

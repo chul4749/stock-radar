@@ -482,3 +482,31 @@ def naver_research_detail(rid):
     text = re.sub(r"\n\s*\n+", "\n", text).strip()
     return {"opinion": c.get("opinion") or None, "goal": num(c.get("goalPrice")), "prev_goal": num(c.get("prevGoalPrice")),
             "price_then": num(c.get("priceAtWriteDate")), "summary": text[:400], "pdf": c.get("attachUrl")}
+
+
+# ---------------------------------------------------------------- ETF (KRX, 실패하면 네이버)
+
+def etf_history(code, start_ymd, end_ymd):
+    """ETF 일별 종가·거래대금. 반환: DataFrame(index=YYYYMMDD, 종가/거래대금)"""
+    from pykrx import stock
+    df = retry(lambda: stock.get_etf_ohlcv_by_date(start_ymd, end_ymd, code))
+    if df is None or len(df) == 0:
+        raise ValueError("빈 응답")
+    df.index = [d.strftime("%Y%m%d") for d in df.index]
+    return df[["종가", "거래대금"]].astype(float)
+
+
+def etf_holdings(code, ymd, top=10):
+    """ETF 구성 종목 상위 (현금 제외). 반환: [(코드, 이름, 비중%)]"""
+    try:
+        from pykrx import stock
+        df = retry(lambda: stock.get_etf_portfolio_deposit_file(code, ymd))
+        rows = [(t, str(r["구성종목명"]), float(r["비중"])) for t, r in df.iterrows()
+                if len(str(t)) == 6 and "현금" not in str(r["구성종목명"])]
+        if rows:
+            return sorted(rows, key=lambda x: -x[2])[:top]
+    except Exception as e:
+        log(f"  ETF {code} 구성(KRX) 실패: {type(e).__name__} — 네이버로")
+    d = retry(lambda: get(f"https://m.stock.naver.com/api/stock/{code}/etfAnalysis").json())
+    return [(x["itemCode"], x["itemName"], float(str(x.get("etfWeight", "0")).rstrip("%") or 0))
+            for x in d.get("etfTop10MajorConstituentAssets") or [] if len(x.get("itemCode", "")) == 6][:top]
