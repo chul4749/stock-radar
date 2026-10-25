@@ -347,7 +347,7 @@ def main(argv):
     log(f"  테마 {len(themes['themes'])}개: " + ", ".join(f"{x['name']}({x['key']})" for x in themes["themes"][:6]))
 
     t = step("급등주 복기·신호 검증")
-    replay = build_replay(base, closes, values, flows_hist, listing, universe_all, {"scalp": scalp, "swing": swing, "value": value}, reports, opens, highs)
+    replay = build_replay(base, closes, values, flows_hist, listing, universe_all, {"scalp": scalp, "swing": swing, "value": value}, reports, opens, highs, lows)
     log(f"  급등주 {len(replay['movers'])}개: " + ", ".join(f"{m['name']}({m['verdict']})" for m in replay["movers"][:8]))
 
     t = step("운용사 방향 (액티브 ETF)")
@@ -400,7 +400,7 @@ def main(argv):
             picked.setdefault(x["code"], []).append(g)
     idx = logic.stock_index(universe_all, {c: r for c, r in risk.items()}, closes, values, flows_daily, flows_5d,
                             news_today, news_3d, fund_now, fund_hist, sectors, picked)
-    write_chart_shards(base, closes, logic.net_frame(flows_hist), idx["stocks"])
+    write_chart_shards(base, closes, logic.net_frame(flows_hist), idx["stocks"], highs, lows, values)
     for c, m in mg_of.items():   # 검색 화면에도 '운용사가 20일 동안 산·판' 표시
         if c in idx["stocks"]:
             idx["stocks"][c]["mg"] = m
@@ -497,7 +497,7 @@ def update_season(base, dart_days, name_to_code, errors):
     return season, store
 
 
-def build_replay(base, closes, values, flows_hist, listing, universe, today, reports, opens=None, highs=None):
+def build_replay(base, closes, values, flows_hist, listing, universe, today, reports, opens=None, highs=None, lows=None):
     """최근 급등주를 거슬러 보고(언제 어떤 신호가 먼저 있었나·우리가 언제 잡았나), 신호별로 급등을 앞섰는지 잰다."""
     net = logic.net_frame(flows_hist)
     caps = {c: v["cap"] for c, v in listing.items()}
@@ -531,6 +531,13 @@ def build_replay(base, closes, values, flows_hist, listing, universe, today, rep
     except Exception as e:
         log(f"  급등 뒤 흐름 실패: {type(e).__name__}: {e}")
         follow = None
+    try:
+        hold = logic.hold_after_surge(closes, opens, lows, elig, values=values) if opens is not None and lows is not None else None
+    except Exception as e:
+        log(f"  급등 뒤 보유 기록 실패: {type(e).__name__}: {e}")
+        hold = None
+    if follow is not None:
+        follow["hold"] = hold
     return {"movers": movers, "validation": val, "follow": follow, "rules": logic.SURGE}
 
 
@@ -704,8 +711,8 @@ def _clear_json(d):
             os.remove(os.path.join(d, n))
 
 
-def write_chart_shards(base, closes, net, stocks):
-    """전 종목 60일 종가 + 20일 큰손 순매수(억)를 코드 끝자리로 10개(+x) 파일에 나눠 쓴다 (charts/, git 밖, 최신 기준일만)."""
+def write_chart_shards(base, closes, net, stocks, highs=None, lows=None, values=None):
+    """전 종목 60일 종가 + 20일 큰손 순매수(억) + 60일 매물대를 _shard로 16개 파일에 나눠 쓴다 (charts/, git 밖, 최신 기준일만)."""
     d = os.path.join(DATA, "charts")
     os.makedirs(d, exist_ok=True)
     for n in os.listdir(d):
@@ -727,6 +734,10 @@ def write_chart_shards(base, closes, net, stocks):
         rec = {"c": [None if v != v else round(float(v)) for v in col]}
         if ndays and c in net.columns:
             rec["n"] = [None if v != v else round(float(v) / EOK) for v in net[c].reindex(ndays)]
+        if highs is not None and lows is not None and values is not None and c in highs.columns and c in lows.columns and c in values.columns:
+            vp = logic.volume_profile(highs[c].iloc[-CHART_DAYS:], lows[c].iloc[-CHART_DAYS:], col, values[c].iloc[-CHART_DAYS:])
+            if vp:
+                rec["vp"] = vp
         shards.setdefault(_shard(c), {})[c] = rec
     for k, v in shards.items():
         with open(os.path.join(d, f"{k}.json"), "w", encoding="utf-8") as f:

@@ -1646,6 +1646,102 @@ def follow_through(closes, opens, eligible, rules=FOLLOW, cost=None, highs=None,
             "rows": rows, "splits": [x for x in splits if x["n"]]}
 
 
+HOLD = {"min": 8.0, "days": 10, "trail": 7.0}
+
+
+def hold_after_surge(closes, opens, lows, eligible, values=None, rules=HOLD):
+    """이미 들고 있던 종목이 급등한 날(+8%↑) 종가 기준으로, 그 뒤 10영업일 동안 어떻게 됐나 — '얼마나 들고 가야 하나'.
+    · after: 1·3·5·10일 뒤 종가가 급등일 종가보다 높았던 비율과 가운데 값
+    · peak: 10일 안 가장 높은 종가가 나온 날 (급등 당일·1일 뒤·2일 뒤·3~5일·6~10일) 비율
+    · giveback: 10일 안에 종가가 급등 전날 종가 아래로 (오른 걸 다 돌려줌) 내려간 비율
+    · exits: 팔기 방법별 급등일 종가 대비 수익 — 다음 날 시가·다음 날 종가·3일·5일·10일 보유,
+      '전날 저가 깨지면 그날 종가', '최고 종가에서 7% 내려오면 그날 종가' (10일째엔 무조건 팖)
+    묶음: 전체, 하루 +15%↑, 거래 평소 5배↑(뜨거운 급등), 첫 급등 + 거래 3배 안(조용한 급등)."""
+    import numpy as np
+    cols = [c for c in closes.columns if c in eligible and c in opens.columns and c in lows.columns]
+    if not cols:
+        return None
+    cl, op, lo = closes[cols], opens[cols].reindex(index=closes.index), lows[cols].reindex(index=closes.index)
+    ret = cl.pct_change() * 100
+    pre5 = (cl.shift(1) / cl.shift(6) - 1) * 100
+    groups = {"all": ret >= rules["min"], "big": ret >= 15}
+    if values is not None:
+        va = values.reindex(index=cl.index, columns=cols)
+        mult = va / va.shift(1).rolling(20, min_periods=10).mean()
+        groups["hot"] = (ret >= rules["min"]) & (mult >= 5)
+        groups["quiet"] = (ret >= rules["min"]) & (pre5 < 10) & (mult < 3)
+    C, O, L = cl.values, op.values, lo.values
+    T, K = len(cl.index), rules["days"]
+    out = {}
+    for g, mask in groups.items():
+        ev = [(t, j) for t, j in zip(*np.nonzero(mask.values)) if 1 <= t and t + K < T]
+        recs = []
+        for t, j in ev:
+            c0, prev = C[t, j], C[t - 1, j]
+            fut = C[t + 1:t + K + 1, j]
+            if not (c0 > 0) or np.isnan(fut).any() or np.isnan(O[t + 1, j]):
+                continue
+            r = lambda x: (x / c0 - 1) * 100
+            # 전날 저가 깨지면 그날 종가에 팖
+            trail_low = fut[-1]
+            for k in range(1, K + 1):
+                if C[t + k, j] < L[t + k - 1, j]:
+                    trail_low = C[t + k, j]
+                    break
+            # 최고 종가에서 7% 내려오면 그날 종가에 팖
+            peak, trail_pk = c0, fut[-1]
+            for k in range(1, K + 1):
+                peak = max(peak, C[t + k, j])
+                if C[t + k, j] <= peak * (1 - rules["trail"] / 100):
+                    trail_pk = C[t + k, j]
+                    break
+            pk = int(np.argmax(np.concatenate([[c0], fut])))
+            recs.append({"a1": r(fut[0]), "a3": r(fut[2]), "a5": r(fut[4]), "a10": r(fut[-1]), "pk": pk,
+                         "gb": bool(fut.min() < prev), "open1": r(O[t + 1, j]),
+                         "trail_low": r(trail_low), "trail_pk": r(trail_pk)})
+        if not recs:
+            continue
+        df = pd.DataFrame(recs)
+        stat = lambda s: {"avg": r1(s.mean()), "med": r1(s.median()), "up": round(float((s > 0).mean() * 100), 1)}
+        pkb = df["pk"]
+        out[g] = {"n": len(df),
+                  "after": {k: stat(df[k]) for k in ("a1", "a3", "a5", "a10")},
+                  "peak": {"d0": round(float((pkb == 0).mean() * 100), 1), "d1": round(float((pkb == 1).mean() * 100), 1),
+                           "d2": round(float((pkb == 2).mean() * 100), 1), "d3_5": round(float(((pkb >= 3) & (pkb <= 5)).mean() * 100), 1),
+                           "d6_10": round(float((pkb >= 6).mean() * 100), 1)},
+                  "giveback": round(float(df["gb"].mean() * 100), 1),
+                  "exits": {k: stat(df[k]) for k in ("open1", "a1", "a3", "a5", "a10", "trail_low", "trail_pk")}}
+    return {"rules": rules, "groups": out} if out else None
+
+
+def volume_profile(high, low, close, value, bins=20):
+    """매물대: 기간 동안 거래대금을 가격대별로 나눈다 (하루 거래대금을 그날 저가~고가에 고르게 펼친 근사).
+    반환 {lo, hi, b: 칸별 비중(%), now: 현재가, below: 현재가 아래에서 거래된 비중(%), avg: 거래대금 가중 평균가, top: 가장 많이 거래된 칸}"""
+    import numpy as np
+    h, l, c, v = (np.asarray(x, dtype=float) for x in (high, low, close, value))
+    ok = ~(np.isnan(h) | np.isnan(l) | np.isnan(c) | np.isnan(v)) & (v > 0) & (h >= l) & (l > 0)
+    if ok.sum() < 10:
+        return None
+    h, l, c, v = h[ok], l[ok], c[ok], v[ok]
+    lo, hi = float(l.min()), float(h.max())
+    if hi <= lo:
+        return None
+    edges = np.linspace(lo, hi, bins + 1)
+    acc = np.zeros(bins)
+    for hh, ll, vv in zip(h, l, v):
+        if hh == ll:
+            acc[min(bins - 1, int((ll - lo) / (hi - lo) * bins))] += vv
+            continue
+        ov = np.clip(np.minimum(edges[1:], hh) - np.maximum(edges[:-1], ll), 0, None)
+        acc += vv * ov / (hh - ll)
+    tot = acc.sum()
+    now = float(c[-1])
+    below = sum(acc[i] * max(0.0, min(1.0, (now - edges[i]) / (edges[i + 1] - edges[i]))) for i in range(bins)) / tot * 100
+    avg = float((v * (h + l + c) / 3).sum() / v.sum())
+    return {"lo": round(lo), "hi": round(hi), "b": [round(float(x / tot * 100), 1) for x in acc], "now": round(now),
+            "below": round(float(below), 1), "avg": round(avg), "top": int(acc.argmax())}
+
+
 def mover_scorecard(movers):
     """그동안의 급등주 복기 모음: 미리 잡은·당일 잡은·놓친 비율, 신호별로 급등 전에 있었던 비율과 평균 몇 일 먼저였나."""
     if not movers:

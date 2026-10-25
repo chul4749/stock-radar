@@ -106,6 +106,8 @@ const INFO = {
   mgr_skill: "운용사마다 직접 고른 액티브 ETF가 최근 60일 동안 KODEX 200(코스피 대표 200종목)보다 얼마나 더 벌었는지 평균입니다. +면 시장보다 잘 고른 곳.\n'요즘 잘하는 곳'이 산 종목을 조금 더 무겁게 봅니다. 다만 60일은 짧아서 운이 섞입니다.",
   managers: "액티브 ETF는 펀드매니저가 직접 종목을 골라 사고파는 ETF입니다 (TIME=타임폴리오, KoAct=삼성액티브, ACE=한국투자 등).\nETF는 매일 담고 있는 종목을 공개하는데, 종목별 '담은 주식 수'는 펀드에 돈이 들어와도 그대로이고 매니저가 사고팔 때만 바뀝니다. 그래서 5일·20일 전과 비교하면 매니저가 뭘 샀고 뭘 팔았는지 보입니다.\n· 새로 담음: 전에 없던 종목을 넣음 (가장 강한 신호)\n· 늘림 / 줄임: 담은 주식 수를 10% 이상 바꿈\n· 모두 뺌: 다 팔아 버림\n여러 운용사가 같은 종목을 같이 사면 더 눈여겨볼 만합니다.\n붙는 표시:\n· 계속 사는 중: 20일 동안 샀고 최근 5일에도 또 삼 (확신이 있다는 뜻)\n· 비중 크게 담음: ETF 안에서 3% 넘게 담음\n· 그 뒤 주가: 비교 시작일 이후 주가 등락. 이미 15% 넘게 올랐으면 따라 사기엔 늦었을 수 있음\n· 투신 5일: 자산운용사 전체(펀드)가 이 종목을 최근 5일 산 금액. 같은 방향이면 더 믿을 만함\n순서는 운용사 수 → 계속 사는지 → 비중 → 잘하는 운용사 순으로 매깁니다. 매니저도 틀리고, 공개는 하루 늦게 반영될 수 있어요.",
   replay: "급등한 종목을 거꾸로 따라가 '미리 알 수 있었나'를 확인합니다.\n· 미리 잡음 (성공): 급등 전날 저녁까지 우리 후보(스윙·단타·저평가)에 있었음 → 급등 날 아침에 살 수 있었음\n· 당일 마감 뒤 — 이미 늦음: 급등한 날 장 마감 뒤에야 후보에 걸림. 우리 자료는 저녁에 나오니 다음 날 아침에야 살 수 있어 이미 오른 뒤\n· 뒤늦게 잡음: 급등이 시작되고 며칠 뒤에야 걸림\n· 놓침: 후보에 안 걸림\n'N일 먼저' 신호는 급등 시작일보다 며칠 앞서 그 신호가 처음 보였는지입니다. 여러 급등주에서 같은 신호가 자주 먼저 보이면, 그 신호를 조건에 넣을 이유가 됩니다.",
+  hold: "이미 들고 있던 종목이 하루에 +8% 넘게 오른 날, 그 뒤를 실제 기록으로 봅니다 (최근 약 80영업일, 시총·거래대금 기준 이상 종목).\n· 가장 높았던 날: 그 뒤 10영업일 중 종가가 가장 높았던 날이 언제였나. '급등한 날이 최고'가 많으면 그날이 꼭지인 경우가 많다는 뜻\n· 오른 걸 다 돌려줌: 10일 안에 종가가 급등 전날 종가 아래로 내려간 비율\n· 팔기 방법: 급등한 날 종가에 바로 판 것과 비교해 각 방법으로 팔았을 때 얼마나 더(덜) 받았나\n  - 전날 저가 깨지면 팖: 그날 종가가 전날 가장 낮은 가격보다 낮으면 그날 종가에 팖 (힘이 빠진 첫 신호)\n  - 최고가에서 −7%면 팖: 급등 뒤 가장 높았던 종가에서 7% 내려온 날 종가에 팖 (오르는 동안은 들고 감)\n  - 둘 다 10일째까지 안 걸리면 10일째 종가에 팖\n묶음: 거래 폭발 = 그날 거래대금이 20일 평균의 5배 넘음 (관심이 한꺼번에 몰림), 조용한 첫 급등 = 전 5일 +10% 안 + 거래 3배 안.\n원리: 사람들은 이익 난 건 빨리 팔고 손해 난 건 오래 들고 가는 경향(처분 효과)이 있어, 급등 직후엔 차익 매물이 나옵니다. 이 기록은 그 매물이 실제로 얼마나 눌렀는지 보여 줍니다.",
+  vp: "매물대 = 최근 60영업일 동안 어느 가격대에서 거래가 많았는지(거래대금)를 가로 막대로 나타낸 것. 그 가격에 산 사람이 많다는 뜻입니다.\n· 지금 가격보다 아래 매물: 그 사람들은 이익 중 → 급하게 안 팔고, 가격이 내려오면 '싸다'며 다시 사는 경향 → 받쳐 주는 가격대(지지)\n· 지금 가격보다 위 매물: 그 사람들은 손해 중 → 가격이 올라와 본전이 되면 팔고 나오려는 경향 → 누르는 가격대(저항)\n· 매물대를 뚫고 올라가면 그 위가 가벼워지고, 뚫린 매물대가 다음엔 받쳐 주는 쪽으로 바뀌는 경우가 많음\n· 평균 매수가: 거래대금으로 가중한 60일 평균 가격. 지금 가격이 이보다 위면 최근 산 사람들 대부분이 이익 중\n주의: 하루 거래를 그날 저가~고가에 고르게 펼친 근사이고, 60일보다 오래된 매물은 안 보입니다. 같은 사람이 사고팔기를 반복한 것도 다 들어가요. '왜 이 가격에서 막히나/받치나'를 이해하는 공부 자료로 보세요.",
   follow: "급등한 날(하루 +15%↑ 등) 뒤 며칠이 어떻게 흘렀는지 최근 약 80영업일 실제 기록을 셉니다. 시총·거래대금 기준 이상 종목만.\n· 다음 날도 오름: 급등 다음 날 종가가 또 올랐던 비율\n· 3일 안 또 급등: 다음 3일 중 하루라도 +8% 넘게 오른 비율\n· 하루 쉬고 다시: 다음 날은 보합·하락이었다가 2~3일째 +5% 넘게 오른 비율 (하루 건너 이어지는 모양)\n'평소' 줄은 아무 날·아무 종목이나 같은 방법으로 센 값이라, 급등 줄이 평소보다 높아야 '급등은 이어지는 편'이라고 말할 수 있어요.\n아래 표는 우리 자료가 장 마감 뒤에 나오니 실제로 살 수 있는 '다음 날 시가'에 사서 3·5영업일째 종가에 판 결과입니다 (거래 비용 뺌). 이어지는 경우가 많아도 다음 날 시가가 이미 높게 시작하면 남는 게 적을 수 있어서 따로 봅니다.",
   follow_split: "급등한 날(+8% 이상)을 그날의 모양으로 나눠, 어떤 경우가 그 뒤에 더 잘 이어졌는지 봅니다.\n· 종가가 고가 근처: 장 끝까지 힘이 남아 있었음 / 고가에서 밀림: 오르다 팔려 내려옴\n· 첫 급등 vs 이미 오른 뒤: 전 5일 동안 +10% 넘게 올라 있었는지\n· 거래 배수: 그날 거래대금이 20일 평균의 몇 배인지\n· 큰손: 그날 기관+외국인이 샀는지 팔았는지 (최근 약 25일만 있어 건수가 적음)\n· 시총: 3천억 기준 (지금 시총으로 나눔)\n건수가 적은 줄은 우연일 수 있어 참고만 하세요.",
   signal_check: "거꾸로도 확인합니다: 그 신호가 뜬 종목들 중 실제로 5일 안에 +15% 넘게 오른 비율이 얼마인지, 아무 신호 없이 고른 종목(평소)보다 몇 배인지.\n급등주에만 신호가 있었던 게 아니라 평범한 종목에도 흔하게 뜨는 신호라면 '평소의 몇 배'가 1에 가까워서 쓸모가 없습니다.",
@@ -1167,8 +1169,43 @@ function renderReplay() {
     <p class="hint">빨강 = 평소보다 높음, 파랑 = 평소보다 낮음. 급등은 이어지거나 하루 건너 이어지는 경우가 있지만, 실제로 살 수 있는 다음 날 시가 기준으로는 남는 게 다를 수 있어 두 표를 같이 봅니다. 기간이 짧아 참고용이에요.</p>` : "";
   el.innerHTML = `<p class="hint">최근 5일 동안 크게 오른 종목(5일 +${rp.rules.r5}% 또는 하루 +${rp.rules.d1}%)을 거꾸로 따라가 봅니다. 급등 전에 어떤 신호가 며칠 먼저 있었는지, 우리가 언제 잡았는지 보여 줘요.${infoBtn("replay")}</p>${infoBox("replay")}
     ${rp.movers.length ? `<ul class="fit movers">${rp.movers.slice(0, 4).map(moverCard).join("")}</ul>` : `<p class="hint">최근 5일 급등주가 없습니다.</p>`}
-    ${rp.movers.length > 4 ? `<details class="rules"><summary>급등주 ${rp.movers.length - 4}개 더 보기</summary><ul class="fit movers">${rp.movers.slice(4).map(moverCard).join("")}</ul></details>` : ""}${ft}${vt}`;
+    ${rp.movers.length > 4 ? `<details class="rules"><summary>급등주 ${rp.movers.length - 4}개 더 보기</summary><ul class="fit movers">${rp.movers.slice(4).map(moverCard).join("")}</ul></details>` : ""}${holdBlock(rp.follow && rp.follow.hold)}${ft}${vt}`;
 }
+
+/* 가진 종목이 급등했을 때: 급등일 종가 기준 그 뒤 10일 (언제 가장 높았나·팔기 방법 비교) */
+const HOLD_G = { all: "전체 +8%↑", big: "+15%↑", hot: "거래 폭발", quiet: "조용한 첫 급등" };
+const HOLD_EXIT = { open1: "다음 날 시가에 팖", a1: "다음 날 종가", a3: "3일 들고 팖", a5: "5일 들고 팖", a10: "10일 들고 팖",
+  trail_low: "전날 저가 깨지면 팖", trail_pk: "최고가에서 −7%면 팖" };
+let holdG = "all";
+try { holdG = localStorage.getItem("holdG") || "all"; } catch (e) { /* 무시 */ }
+
+function holdBlock(h) {
+  if (!h || !h.groups || !Object.keys(h.groups).length) return "";
+  if (!h.groups[holdG]) holdG = "all" in h.groups ? "all" : Object.keys(h.groups)[0];
+  const g = h.groups[holdG], pk = g.peak;
+  const sgn = (v) => `<b class="${cls(v)}">${signed(v, 1, "%")}</b>`;
+  const best = Object.entries(g.exits).sort((a, b) => b[1].avg - a[1].avg)[0][0];
+  const peakRows = [["급등 당일", pk.d0], ["1일 뒤", pk.d1], ["2일 뒤", pk.d2], ["3~5일 뒤", pk.d3_5], ["6~10일 뒤", pk.d6_10]];
+  const maxPk = Math.max(...peakRows.map((r) => r[1]));
+  return `<h3 class="sub">가진 종목이 급등했다면 — 언제 팔았나 <small>실제 기록, 급등한 날 종가 기준</small>${infoBtn("hold")}</h3>${infoBox("hold")}
+    <div class="seg" role="tablist">${Object.keys(h.groups).map((k) => `<button type="button" data-holdg="${k}" aria-selected="${k === holdG}">${HOLD_G[k] || k}</button>`).join("")}</div>
+    <p class="hint">${num(g.n)}번의 급등 · 10일 안에 오른 걸 다 돌려준(급등 전 가격 아래로) 경우 <b>${num(g.giveback, 0)}%</b></p>
+    <div class="tile wide"><div class="l">10일 안에 종가가 가장 높았던 날</div>
+      ${peakRows.map(([lab, v]) => `<div class="pkrow"><span>${lab}</span><i style="width:${Math.max(2, (v / maxPk) * 100)}%"></i><b>${num(v, 0)}%</b></div>`).join("")}
+    </div>
+    <div class="tile wide"><table class="score"><thead><tr><th>팔기 방법</th><th>평균</th><th>가운데</th><th>더 받은 비율</th></tr></thead><tbody>
+      ${Object.entries(g.exits).map(([k, v]) => `<tr${k === best ? ' class="best"' : ""}><th>${HOLD_EXIT[k] || k}${k === best ? " ✓" : ""}</th><td>${sgn(v.avg)}</td><td>${sgn(v.med)}</td><td>${num(v.up, 0)}%</td></tr>`).join("")}
+    </tbody></table></div>
+    <p class="hint">수익은 급등한 날 종가에 바로 판 것과 비교한 차이예요 (0보다 크면 더 들고 간 게 나았음). '더 받은 비율'은 그 방법이 급등일 종가보다 비싸게 판 경우의 비율. ✓는 이 기간 평균이 가장 좋았던 방법이고, 장 분위기에 따라 달라집니다. 매도 추천이 아니라 지난 기록입니다.</p>`;
+}
+
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-holdg]");
+  if (!b) return;
+  holdG = b.dataset.holdg;
+  try { localStorage.setItem("holdG", holdG); } catch (err) { /* 무시 */ }
+  renderReplay();
+});
 
 /* ---------------- 아침 요약 ---------------- */
 
@@ -1600,6 +1637,48 @@ function netBars(days, vals) {
     `<div class="barlab"><span style="text-align:left">${ymd(days[0]).slice(5)}</span><span style="text-align:right">${ymd(days.at(-1)).slice(5)}</span></div>`;
 }
 
+// 매물대: 가격대별 거래 비중 가로 막대 (위 = 비싼 가격). 지금 가격 위는 손해 중(파랑), 아래는 이익 중(빨강)
+function vpBlock(vp) {
+  if (!vp || !vp.b || !vp.b.length) return "";
+  const n = vp.b.length, step = (vp.hi - vp.lo) / n, max = Math.max(...vp.b);
+  const nowBin = Math.min(n - 1, Math.max(0, Math.floor((vp.now - vp.lo) / step)));
+  const rows = vp.b.map((w, i) => {
+    const mid = vp.lo + step * (i + 0.5), above = i > nowBin;
+    return `<div class="vprow${i === nowBin ? " vnow" : ""}${i === vp.top ? " top" : ""}"><span>${num(Math.round(mid))}</span><i style="width:${Math.max(1, (w / max) * 100)}%;background:var(--${above ? "down" : i === nowBin ? "sub" : "up"})"></i><small>${i === nowBin ? "◀ 지금" : i === vp.top ? "가장 많음" : ""}</small></div>`;
+  }).reverse().join("");
+  const topLo = Math.round(vp.lo + step * vp.top), topHi = Math.round(vp.lo + step * (vp.top + 1));
+  const avgGap = (vp.now / vp.avg - 1) * 100;
+  const read = vp.below >= 70 ? "최근 60일 동안 산 사람 대부분이 이익 중 — 위에서 누르는 본전 매물은 적은 편. 대신 이익 실현(차익) 매물이 나올 수 있음"
+    : vp.below <= 30 ? "최근 60일 동안 산 사람 대부분이 손해 중 — 오를 때마다 '본전이면 팔자' 매물이 나올 수 있음"
+    : "이익 중인 사람과 손해 중인 사람이 섞여 있음 — 위쪽 매물대에서 한 번 막히는지 볼 만함";
+  return `<h3 class="sub">매물대 <small>최근 60일 가격대별 거래</small>${infoBtn("vp")}</h3>${infoBox("vp")}
+    <div class="vp">${rows}</div>
+    <div class="barlab"><span style="text-align:left"><b style="color:var(--up)">■</b> 지금 가격 아래 = 이익 중</span><span style="text-align:right"><b style="color:var(--down)">■</b> 위 = 손해 중</span></div>
+    <p class="interp">${read}</p>
+    <ul class="plain"><li>지금 가격 아래에서 거래된 비중 <b>${num(vp.below, 0)}%</b> · 위 <b>${num(100 - vp.below, 0)}%</b></li>
+      <li>가장 많이 거래된 가격대 <b>${num(topLo)}~${num(topHi)}원</b> (지금보다 ${vp.top > nowBin ? "<b class=\"down\">위 — 누를 수 있는 쪽</b>" : vp.top < nowBin ? "<b class=\"up\">아래 — 받칠 수 있는 쪽</b>" : "같은 가격대"})</li>
+      <li>60일 평균 매수가 <b>${num(vp.avg)}원</b> — 지금 가격은 ${signed(avgGap, 1, "%")}</li></ul>`;
+}
+
+// 최근 5일 안에 +8%↑ 급등한 날이 있으면: 가진 사람용 '급등 뒤 기록' 요약
+function surgeNote(days, closes) {
+  const h = state.data && state.data.replay && state.data.replay.follow && state.data.replay.follow.hold;
+  if (!h || !h.groups || !closes || closes.length < 6) return "";
+  let hit = null;
+  for (let i = closes.length - 5; i < closes.length; i++) {
+    const r = closes[i] != null && closes[i - 1] ? (closes[i] / closes[i - 1] - 1) * 100 : null;
+    if (r != null && r >= 8 && (!hit || r > hit.r)) hit = { i, r };
+  }
+  if (!hit) return "";
+  const g = h.groups[hit.r >= 15 && h.groups.big ? "big" : "all"];
+  if (!g) return "";
+  return `<div class="tile wide surgenote"><div class="l">${ymd(days[hit.i]).slice(5)} ${signed(hit.r, 1, "%")} 급등 — 가지고 있다면 참고 <small>실제 기록 ${num(g.n)}번</small></div>
+    <ul class="plain"><li>비슷한 급등 뒤 10일 중 <b>급등한 날 종가가 가장 높았던</b> 경우 ${num(g.peak.d0, 0)}%, 1~2일 뒤가 최고 ${num(g.peak.d1 + g.peak.d2, 0)}%</li>
+    <li>3일 들고 판 평균 ${signed(g.exits.a3.avg, 1, "%")} · 전날 저가 깨지면 판 평균 ${signed(g.exits.trail_low.avg, 1, "%")} (급등일 종가 대비)</li>
+    <li>10일 안에 오른 걸 다 돌려준 경우 ${num(g.giveback, 0)}%</li></ul>
+    <p class="hint">자세히는 '급등 복기 → 가진 종목이 급등했다면'. 매도 추천이 아니라 지난 기록이에요.</p></div>`;
+}
+
 async function openStock(code) {
   const db = await loadStocks();
   const s = db && db.stocks[code];
@@ -1642,6 +1721,8 @@ async function openStock(code) {
     </div>
     <p class="hint">흐름: ${trend}${s.dr != null ? ` · 60일 고점보다 −${num(s.dr, 1)}%` : ""}</p>
     ${chartHtml}
+    ${cx ? surgeNote(chs.days.slice(-cx.c.length), cx.c) : ""}
+    ${cx && cx.vp ? vpBlock(cx.vp) : ""}
     <h3 class="sub">탭별 조건 <small>✓ 맞음 · ✗ 안 맞음</small></h3>
     <ul class="fit why">${block("swing", sw, s.sw, L.swing)}${block("scalp", sc, s.sc, L.scalp)}${block("value", va, s.va, L.value, s.vr)}</ul>
     ${tabs.length ? `<button class="more" type="button" data-code="${code}">후보 카드 자세히 보기</button>` : ""}

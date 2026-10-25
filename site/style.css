@@ -503,3 +503,19 @@ html.modal-open, html.modal-open body { overflow: hidden; overscroll-behavior: n
 .nbars::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--line); }
 .nb { position: relative; flex: 1; }
 .nb i { position: absolute; left: 0; right: 0; border-radius: 2px; }
+.pkrow { display: grid; grid-template-columns: 6.5em minmax(0, 1fr) 3em; align-items: center; gap: 6px; font-size: 12px; margin-top: 4px; }
+.pkrow span { color: var(--sub); }
+.pkrow i { display: block; height: 10px; border-radius: 3px; background: var(--sub); opacity: .55; }
+.pkrow b { text-align: right; font-weight: 600; }
+table.score tr.best th, table.score tr.best td { background: var(--neutral-bg); }
+.vp { margin: 6px 0 2px; }
+.vprow { display: grid; grid-template-columns: 5.2em minmax(0, 1fr) 4.2em; align-items: center; gap: 6px; font-size: 10px; line-height: 13px; color: var(--faint); }
+.vprow i { display: block; height: 9px; border-radius: 2px; opacity: .75; }
+.vprow.vnow span, .vprow.vnow small { color: var(--text); font-weight: 700; }
+.vprow.top i { opacity: 1; }
+.vprow.top span { color: var(--text); }
+.vprow small { font-size: 10px; white-space: nowrap; }
+.surgenote { margin-top: 8px; }
+ul.plain { list-style: none; margin: 6px 0 0; padding: 0; font-size: 13px; line-height: 1.55; }
+ul.plain li { padding: 3px 0 3px 10px; position: relative; }
+ul.plain li::before { content: "·"; position: absolute; left: 0; color: var(--faint); }

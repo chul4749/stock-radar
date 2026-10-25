@@ -750,3 +750,30 @@ def test_follow_through_splits():
     assert sp["vol5"]["n"] == 1 and sp["first"]["n"] == 1 and sp["again"]["n"] == 1 and "large" not in sp
     # 두 번째 급등(이미 오른 뒤)은 조합에서 빠지고, 첫 급등은 거래 6배라 '3배 안' 조합에도 없음
     assert "first_quiet" not in sp
+
+
+def test_hold_after_surge():
+    days = [f"2026{i:04d}" for i in range(101, 125)]
+    # 5일째 +20% 급등(100→120) 뒤: 125, 130(최고), 121, 118, ... 10일째 110 → 최고는 2일 뒤
+    a = [100] * 5 + [120, 125, 130, 121, 118, 116, 115, 114, 112, 111, 110] + [110] * 8
+    closes = pd.DataFrame({"A": a, "B": [100.0] * 24}, index=days)
+    opens = closes.shift(1).fillna(100)
+    lows = closes * 0.99
+    out = logic.hold_after_surge(closes, opens, lows, {"A", "B"})
+    g = out["groups"]["all"]
+    assert g["n"] == 1 and g["peak"]["d2"] == 100 and g["giveback"] == 0
+    assert g["after"]["a1"]["med"] == round((125 / 120 - 1) * 100, 1)
+    # 전날 저가(130*0.99=128.7) 깨진 첫날 = 121 에 팖 / 최고 130에서 7% 내려온 첫날(≤120.9) = 118 에 팖
+    assert g["exits"]["trail_low"]["med"] == round((121 / 120 - 1) * 100, 1)
+    assert g["exits"]["trail_pk"]["med"] == round((118 / 120 - 1) * 100, 1)
+
+
+def test_volume_profile():
+    # 100~110에서 9일, 마지막 날만 200~210 (거래 적음) → 현재가 205 아래에서 거래된 비중이 큼
+    h = [110] * 9 + [210] + [110] * 0
+    l = [100] * 9 + [200]
+    c = [105] * 9 + [205]
+    v = [10] * 9 + [1]
+    vp = logic.volume_profile(h + [210], l + [200], c + [205], v + [1])
+    assert vp["lo"] == 100 and vp["hi"] == 210 and vp["now"] == 205
+    assert abs(sum(vp["b"]) - 100) < 1 and vp["top"] in (0, 1) and vp["below"] > 90
