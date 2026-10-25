@@ -35,14 +35,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
-      # 전 종목 차트·재무(charts/, fin/)는 git 대신 GitHub 캐시로 실행 사이를 잇는다 (저장소가 날마다 커지지 않게)
-      - uses: actions/cache/restore@v4
-        with:
-          path: |
-            site/data/charts
-            site/data/fin
-          key: radar-cache-${{ github.run_id }}
-          restore-keys: radar-cache-
+      # 전 종목 차트·재무(charts/, fin/)는 main 대신 data-cache 브랜치에 둔다 (기록 없이 덮어써서 저장소가 커지지 않음)
+      - name: 차트·재무 받기
+        run: |
+          if git fetch -q --depth=1 origin data-cache; then
+            mkdir -p site/data && git archive FETCH_HEAD | tar -x -C site/data
+          fi
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -75,13 +73,18 @@ jobs:
           IF_MISSING: ${{ (github.event_name == 'schedule' || inputs.if_missing == '1') && '1' || '' }}
           KRX_ID: ${{ secrets.KRX_ID }}
           KRX_PW: ${{ secrets.KRX_PW }}
-      - if: always()
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            site/data/charts
-            site/data/fin
-          key: radar-cache-${{ github.run_id }}
+      # 차트·재무를 data-cache 브랜치에 저장: 커밋 하나짜리로 강제로 덮어씀 (예전 기록이 남지 않음)
+      - name: 차트·재무 저장
+        if: always()
+        run: |
+          [ -d site/data/fin ] || [ -d site/data/charts ] || exit 0
+          tmp="$RUNNER_TEMP/cache" && rm -rf "$tmp" && mkdir -p "$tmp"
+          for d in charts fin; do if [ -d "site/data/$d" ]; then cp -r "site/data/$d" "$tmp/"; fi; done
+          export GIT_INDEX_FILE="$RUNNER_TEMP/cache.idx"
+          git --work-tree="$tmp" add -A -f .
+          c=$(git -c user.name=stock-radar-bot -c user.email=41898282+github-actions[bot]@users.noreply.github.com \
+                commit-tree "$(git write-tree)" -m "차트·재무 캐시 $(date -u +%F)")
+          git push -q -f origin "$c:refs/heads/data-cache"
       - uses: actions/upload-artifact@v4
         with:
           name: site

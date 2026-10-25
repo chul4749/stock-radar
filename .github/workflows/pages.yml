@@ -25,14 +25,12 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      # 전 종목 차트·재무(charts/, fin/)는 git 대신 GitHub 캐시로 실행 사이를 잇는다 (저장소가 날마다 커지지 않게)
-      - uses: actions/cache/restore@v4
-        with:
-          path: |
-            site/data/charts
-            site/data/fin
-          key: radar-cache-${{ github.run_id }}
-          restore-keys: radar-cache-
+      # 전 종목 차트·재무(charts/, fin/)는 main 대신 data-cache 브랜치에 둔다 (기록 없이 덮어써서 저장소가 커지지 않음)
+      - name: 차트·재무 받기
+        run: |
+          if git fetch -q --depth=1 origin data-cache; then
+            mkdir -p site/data && git archive FETCH_HEAD | tar -x -C site/data
+          fi
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site/

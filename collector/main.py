@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -207,15 +208,16 @@ def main(argv):
     for x in value:
         profile(x["code"])
     logic.apply_forward_eps(value, profiles)
-    # 전 종목 재무(검색 화면용): 날마다 시총 큰 순으로 오래된 것부터 FIN_BATCH 개씩 채워 두는 캐시 (fin/, git 밖)
+    # 전 종목 재무(검색 화면용, fin/ — data-cache 브랜치에 보관): 아직 없는 종목은 전부, 이미 있으면 오래된 것부터 FIN_BATCH개.
+    # 여러 개를 동시에 받되 FIN_BUDGET초가 넘으면 남은 건 다음 날로 (예전 기준일을 다시 계산할 땐 안 받음)
     fin_cache = load_fin_cache()
-    stale = sorted((c for c in universe_all if len(c) == 6),
+    stale = sorted((c for c in universe_all if len(c) == 6 and c not in profiles),
                    key=lambda c: ((fin_cache.get(c) or {}).get("as_of") or "", -universe_all[c]["cap"]))
-    fresh = 0
-    for c in ([] if backfill else stale[:FIN_BATCH]):   # 예전 기준일을 다시 계산할 땐 안 받음
-        if profile(c):
-            fresh += 1
-    log(f"  전 종목 재무 캐시: 이번에 {fresh}개 받음, 모두 {len(fin_cache) + fresh}개쯤")
+    missing = sum(1 for c in stale if c not in fin_cache)
+    todo = [] if backfill else stale[:max(FIN_BATCH, missing)]
+    got, t0 = fetch_profiles(todo)
+    profiles.update(got)
+    log(f"  전 종목 재무: {len(got)}/{len(todo)}개 받음 ({time.time() - t0:.0f}초), 캐시에 없던 것 {missing}개")
     overlap = logic.mark_overlap(scalp, swing, value)
     # 며칠째 걸려 있는지: 기준일 전 기록을 최근 날짜부터 거슬러 본다
     prev = []
@@ -655,7 +657,27 @@ def update_reports(base, errors, keep_days=150):
     return store
 
 
-FIN_BATCH = 250
+FIN_BATCH, FIN_WORKERS, FIN_BUDGET = 300, 4, 900
+
+
+def fetch_profiles(codes):
+    """네이버 기업 정보를 FIN_WORKERS개씩 동시에 받는다. 실패는 빼고, FIN_BUDGET초가 지나면 남은 건 건너뜀."""
+    t0 = time.time()
+
+    def one(code):
+        if time.time() - t0 > FIN_BUDGET:
+            return code, None
+        try:
+            p = logic.parse_profile(*sources.naver_profile(code))
+            p["as_of"] = datetime.now(KST).strftime("%Y-%m-%d")
+            return code, p
+        except Exception:
+            return code, None
+        finally:
+            time.sleep(0.2)
+
+    with ThreadPoolExecutor(FIN_WORKERS) as ex:
+        return {c: p for c, p in ex.map(one, codes) if p}, t0
 CHART_DAYS, NET_DAYS = 60, 20
 
 
