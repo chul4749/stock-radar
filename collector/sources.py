@@ -442,3 +442,43 @@ def yahoo_daily(symbol, rng="1mo"):
         if c is not None:
             out.append((datetime.fromtimestamp(ts + off, tz=timezone.utc).strftime("%Y-%m-%d"), float(c)))
     return out
+
+
+# ---------------------------------------------------------------- 증권사 리포트·검색 상위 (네이버 모바일, 비공식)
+
+def naver_research(since_ymd, max_pages=40):
+    """네이버 리서치 '종목분석' 리포트 목록, since_ymd 이후 것만. 최신순 목록을 거슬러 내려간다."""
+    out = []
+    since = f"{since_ymd[:4]}-{since_ymd[4:6]}-{since_ymd[6:]}"
+    for page in range(1, max_pages + 1):
+        rows = retry(lambda: get("https://m.stock.naver.com/api/research/company",
+                                 params={"page": page, "pageSize": 100}).json(), tries=3, wait=5)
+        if not rows:
+            break
+        for x in rows:
+            if x.get("writeDate", "") >= since and x.get("itemCode"):
+                out.append({"id": x["researchId"], "code": x["itemCode"], "date": x["writeDate"].replace("-", ""),
+                            "title": x.get("title", ""), "broker": x.get("brokerName", ""),
+                            "reads": int(str(x.get("readCount") or 0).replace(",", "") or 0)})
+        if rows[-1].get("writeDate", "") < since:
+            break
+        time.sleep(0.3)
+    return out
+
+
+def naver_search_top(size=100):
+    """네이버 증권 검색 상위 종목 코드 (1위부터)."""
+    d = retry(lambda: get("https://m.stock.naver.com/api/stocks/searchTop", params={"page": 1, "pageSize": size}).json())
+    return [s["itemCode"] for s in d.get("stocks", []) if s.get("itemCode")]
+
+
+def naver_research_detail(rid):
+    """리포트 하나의 투자의견·목표가·직전 목표가·작성일 주가·요약 본문."""
+    d = retry(lambda: get(f"https://m.stock.naver.com/api/research/company/{rid}").json())
+    c = d.get("researchContent") or {}
+    num = lambda v: float(str(v).replace(",", "")) if v not in (None, "", "0", 0) else None
+    text = re.sub(r"<br\s*/?>|</p>", "\n", c.get("content") or "")
+    text = html.unescape(re.sub(r"<[^>]+>", "", text))
+    text = re.sub(r"\n\s*\n+", "\n", text).strip()
+    return {"opinion": c.get("opinion") or None, "goal": num(c.get("goalPrice")), "prev_goal": num(c.get("prevGoalPrice")),
+            "price_then": num(c.get("priceAtWriteDate")), "summary": text[:400], "pdf": c.get("attachUrl")}

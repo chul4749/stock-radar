@@ -22,6 +22,9 @@
     후보마다 정리 가격(`exit_level`: 스윙 20일 평균, 단타 걸린 날 저가, 저평가 10일 최저가)을 붙이고,
     성적표 `stops`(`stop_scorecard`)로 그 기준을 지켰을 때와 그냥 들고 있을 때를 비교한다.
     실적 시즌(`report_season`)에는 DART 목록으로 이번 분기 실적을 낸 회사를 `site/data/reported.json`에 모아 아직 안 낸 후보에 경고(`earn_season`).
+    증권사 리포트(네이버 리서치, `sources.naver_research`)는 `site/data/reports.json`에 150일 보관. `report_attention`: 최근 2주 건수, 그 전 석 달 없었으면 '오랜만에 다뤄짐'(선취매 신호),
+    최신 리포트 상세(의견·목표가·요약). 네이버 검색 상위 100(`search_rank`)은 '이미 알려짐' 주의 표시일 뿐 좋은 신호로 쓰지 않는다.
+    리포트는 저평가 주목 신호 5번째(`add_report_wake`)·조건별 성적(`report`, `report_fresh`, `search_top`)에도 들어간다.
     `site/data/prices.json`은 가장 최근 기준일 전 종목 종가(관심 종목 ★ 이후 수익률용).
     성적표는 다음 날 시가 진입·N영업일째 종가 청산, 거래 비용 `COST` 차감, 종목이 속한 시장 지수 대비,
     같은 탭·같은 종목이 N일 안에 다시 걸리면 한 번만 센다. 조건별 성적도 지수 대비 초과로 비교한다.

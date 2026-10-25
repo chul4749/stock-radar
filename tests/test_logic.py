@@ -536,3 +536,28 @@ def test_morning_summary_tone():
     down = logic.morning_summary([{"key": "ewy", "change": -1.2}, {"key": "usdkrw", "change": 0.5}])
     assert down["tone"] == "down"
     assert logic.morning_summary([])["label"] == "자료 없음"
+
+
+def test_report_attention_marks_fresh_coverage():
+    rep = lambda i, code, d: {"id": i, "code": code, "date": d, "title": "t", "broker": "b", "reads": 1}
+    st = logic.merge_reports({"since": "20260601"}, [rep(1, "A", "20261020"), rep(2, "B", "20261020"),
+                                                     rep(3, "B", "20260801"), rep(4, "C", "20260101")], "20261023", "20260601")
+    assert all(r["id"] != 4 for r in st["items"])              # 150일 지난 건 버림
+    a = logic.report_attention("A", st, "20261023")
+    assert a["n"] == 1 and a["fresh"] and a["known"]
+    b = logic.report_attention("B", st, "20261023")
+    assert b["n"] == 1 and b["before"] == 1 and not b["fresh"]
+    assert logic.report_attention("A", st, "20261019")["n"] == 0   # 기준일 뒤 리포트는 안 봄
+    short = logic.merge_reports({}, [rep(1, "A", "20261020")], "20261023", "20261010")
+    assert not logic.report_attention("A", short, "20261023")["fresh"]   # 기록이 짧으면 '오랜만' 판단 보류
+
+
+def test_report_wake_and_features():
+    x = {"wake": {"met": 1, "total": 4, "checks": [{"key": "flow", "ok": True}]},
+         "reports": {"n": 2, "before": 0, "fresh": True, "known": True, "items": []}, "search_rank": None}
+    logic.add_report_wake(x)
+    logic.add_report_wake(x)   # 두 번 불러도 한 번만
+    assert x["wake"]["met"] == 2 and x["wake"]["total"] == 5 and x["wake"]["checks"][-1]["value"] == "오랜만에 2건"
+    f = logic.features_of(x)
+    assert f["report"] is True and f["report_fresh"] is True and f["search_top"] is False
+    assert logic.features_of({})["search_top"] is None and logic.features_of({})["report"] is None

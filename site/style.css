@@ -358,3 +358,12 @@ table.fin .est { color: var(--faint); }
 .msum { margin: 0; font-size: 16px; }
 .mnums { grid-template-columns: repeat(3, 1fr); }
 .mnums small.faint { color: var(--faint); font-size: 11px; }
+.rep { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 13px; }
+.rep .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.rep > a { display: block; color: var(--text); margin-top: 2px; line-height: 1.45; }
+.rep > small, .rep .faint { color: var(--sub); }
+.rep .goal { margin-top: 4px; }
+.rep .rsum summary { cursor: pointer; color: var(--sub); font-size: 12px; margin-top: 4px; }
+.rep .rsum p { white-space: pre-line; font-size: 12px; color: var(--sub); line-height: 1.55; margin: 4px 0 0; }
+.tag.fresh { background: var(--calm-bg); color: var(--calm); }
+.tag.known { background: var(--fear-bg); color: var(--fear); }

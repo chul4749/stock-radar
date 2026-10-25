@@ -4,7 +4,7 @@
 """
 import math
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 
@@ -609,6 +609,19 @@ def value_wake(code, col, flow5, has_news, values=None, rules=WAKE_RULES):
     return {"met": sum(1 for c in checks if c["ok"]), "total": len(checks), "checks": checks}
 
 
+def add_report_wake(x):
+    """저평가 주목 신호에 '증권사 리포트가 최근 2주 안에 나옴'을 더한다 (리포트 기록이 있을 때만)."""
+    w, rep = x.get("wake"), x.get("reports")
+    if not w or rep is None or any(c.get("key") == "report" for c in w["checks"]):
+        return x
+    ok = rep["n"] > 0
+    value = ("오랜만에 " if rep.get("fresh") else "") + (f"{rep['n']}건" if ok else "없음")
+    w["checks"].append({"key": "report", "label": "증권사 리포트가 최근 2주 안에 나옴", "ok": ok, "value": value})
+    w["met"] += 1 if ok else 0
+    w["total"] += 1
+    return x
+
+
 def value_screen(universe, closes, fund_now, fund_hist, flows_5d, news_3d, rules=VALUE_RULES, values=None):
     """많이 떨어졌는데 장부가치 대비 싸졌고, 이익은 크게 줄지 않은 종목.
 
@@ -1167,6 +1180,39 @@ def morning_summary(items):
             "text": " · ".join(parts) + f" → 오늘 아침 {label}"}
 
 
+# ---------------------------------------------------------------- 증권사 리포트 (주목도)
+
+# 리포트는 '증권사가 다루기 시작했다'는 신호라 검색 순위보다 앞선다. 특히 오랫동안 없다가 새로 나온 리포트를 본다.
+REPORT_RULES = {"recent_days": 14, "quiet_days": 90}
+
+
+def merge_reports(store, new, base, fetched_since, keep_days=150):
+    """리포트 기록(reports.json)에 새 목록(fetched_since 이후를 받은 것)을 합치고 오래된 것은 버린다. 같은 리포트(id)는 한 번만."""
+    old = {r["id"]: r for r in store.get("items", [])}
+    for r in new:
+        old[r["id"]] = r
+    cut = (datetime.strptime(base, "%Y%m%d") - timedelta(days=keep_days)).strftime("%Y%m%d")
+    items = sorted((r for r in old.values() if r["date"] >= cut), key=lambda r: (r["date"], r["id"]), reverse=True)
+    since = min(store.get("since") or fetched_since, fetched_since)
+    return {"since": max(since, cut), "updated": max(store.get("updated") or base, base), "items": items}
+
+
+def report_attention(code, store, base, rules=REPORT_RULES):
+    """기준일까지 최근 2주 리포트와, 그 전 석 달 동안 리포트가 있었는지 ('오랜만에 다뤄짐' 판단)."""
+    if not store or not store.get("items"):
+        return None
+    b = datetime.strptime(base, "%Y%m%d")
+    recent_cut = (b - timedelta(days=rules["recent_days"])).strftime("%Y%m%d")
+    quiet_cut = (b - timedelta(days=rules["recent_days"] + rules["quiet_days"])).strftime("%Y%m%d")
+    mine = [r for r in store["items"] if r["code"] == code and r["date"] <= base]
+    recent = [r for r in mine if r["date"] > recent_cut]
+    before = [r for r in mine if quiet_cut < r["date"] <= recent_cut]
+    # 기록이 석 달 치가 안 되면 '오랜만'인지 알 수 없다
+    known = (store.get("since") or base) <= quiet_cut
+    return {"n": len(recent), "before": len(before), "fresh": bool(recent) and not before and known,
+            "known": known, "items": recent[:3]}
+
+
 # ---------------------------------------------------------------- 실적 시즌
 
 # 법정 마감: 분기·반기보고서는 분기 끝나고 45일, 사업보고서는 90일
@@ -1399,6 +1445,9 @@ VALUE_FEATURES = {
     "v_flow": "큰손이 5일 동안 삼",
     "v_news": "최근 3일 기사·공시 있음",
     "v_wake2": "주목 신호 2개 이상",
+    "report": "최근 2주 증권사 리포트",
+    "report_fresh": "오랜만에 나온 리포트",
+    "search_top": "네이버 검색 상위 100",
 }
 
 FEATURES = {
@@ -1407,6 +1456,9 @@ FEATURES = {
     "streak3": "3일 이상 연속 순매수",
     "fratio_up": "외국인 지분율 20일 증가",
     "overlap": "두 관점 겹침",
+    "report": "최근 2주 증권사 리포트",
+    "report_fresh": "오랜만에 나온 리포트",
+    "search_top": "네이버 검색 상위 100",
 }
 
 
@@ -1422,6 +1474,9 @@ def features_of(x):
         "v_flow": (x.get("flow5_eok") or 0) > 0,
         "v_news": bool(x.get("news")),
         "v_wake2": None if x.get("wake") is None else x["wake"]["met"] >= 2,
+        "report": None if x.get("reports") is None else x["reports"]["n"] > 0,
+        "report_fresh": None if not (x.get("reports") or {}).get("known") else x["reports"]["fresh"],
+        "search_top": None if "search_rank" not in x else x["search_rank"] is not None,   # 검색 순위를 못 받은 날은 뺌
     }
 
 

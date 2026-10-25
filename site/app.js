@@ -96,10 +96,11 @@ const INFO = {
   inverse: "지수가 떨어지면 돈을 버는 상품(ETF)입니다. 예: 코스피가 1% 내리면 약 1% 오름.\n주의: 매일 다시 계산되는 구조라, 지수가 오르락내리락하며 제자리여도 손해가 쌓입니다. 2배 상품은 더 심합니다. 그래서 '확실히 내리는 짧은 구간'에만 맞고, 이미 많이 떨어진 뒤 따라 들어가면 반등에 크게 당하기 쉽습니다.",
   score_swing: "강도: 이 종목이 조건에 얼마나 강하게 걸렸는지 0~100점입니다. 지금까지 같은 탭에 걸린 종목들 중 어디쯤인지로 매겨서, 세 탭을 같은 눈금으로 비교할 수 있습니다.\n스윙 계산: 회사 크기에 비해 최근 5일 큰손이 얼마나 많이 샀는지 + 며칠 연속 샀는지.\n강도가 높다고 오른다는 보장은 없습니다. '어떤 종목부터 볼지' 순서로만 쓰세요.",
   score_scalp: "강도: 이 종목이 조건에 얼마나 강하게 걸렸는지 0~100점입니다. 지금까지 같은 탭에 걸린 종목들 중 어디쯤인지로 매깁니다.\n단타 계산 (100점 만점을 나눠 가짐):\n· 큰손 확인 50%: 오늘 거래 중 큰손이 산 비중 (20% 이상이면 만점)\n· 거래 증가 25%: 평소보다 거래가 몇 배 늘었나 (8배면 만점, 15배 넘게 과열되면 오히려 감점)\n· 상승폭 25%: 5~15% 오르면 만점, 상한가 근처까지 튀면 감점\n너무 과열된 종목은 다음 날 꺾이는 경우가 많아서 이렇게 만들었습니다.",
+  report: "증권사 애널리스트가 이 회사를 분석해 쓴 보고서입니다. 리포트가 나온다는 건 시장의 관심이 이 회사로 오기 시작했다는 신호예요.\n· '오랜만에 다뤄짐': 석 달 넘게 리포트가 없다가 최근 2주 안에 새로 나온 경우. 아직 사람들이 많이 몰리기 전이라 가장 앞선 신호로 봅니다\n· 목표가: 애널리스트가 생각하는 적정 주가. 다만 증권사 목표가는 대체로 높게 잡히는 편이라 '지금보다 +50%'를 그대로 믿진 마세요\n· 목표가를 올렸는지 내렸는지가 숫자 자체보다 더 중요합니다\n정말 도움이 되는지는 성적표 '조건별 성적'의 리포트 줄에서 확인합니다.",
   exit: "언제 팔지 미리 정해 두는 기준입니다. 처음 투자할 때 가장 어려운 게 '언제 파느냐'라서, 사기 전에 정해 두면 손실이 커지는 걸 막을 수 있습니다.\n· 스윙: 종가가 20일 평균 가격 아래로 마감하면 정리 (오르는 흐름이 깨짐)\n· 단타: 걸린 날의 저가를 깨고 마감하면 정리 (급등 힘이 빠짐)\n· 저평가: 최근 10일 최저가를 깨고 마감하면 정리 (아직 바닥이 아니었음)\n괄호 안 %는 지금 가격에서 그 기준까지 거리입니다. 이 기준을 실제로 지켰다면 성적이 어땠는지는 성적표의 '정리 기준을 지켰다면'에서 확인합니다.",
   earn_season: "회사들은 분기가 끝나면 정해진 기한 안에 실적을 발표합니다 (1분기 5/15, 반기 8/14, 3분기 11/14, 1년 결산 3/31까지).\n발표 전에는 결과를 모르니, 좋든 나쁘든 발표 날 주가가 크게 움직일 수 있습니다. 조건에 맞아 산 종목도 실적 한 번에 기준이 깨질 수 있어 미리 알려 드립니다.\n'발표 예고 공시'는 회사가 실적 발표 날짜를 미리 알린 경우입니다.",
   morning: "새벽에 끝난 미국 시장 결과로 오늘 아침 한국 시장 분위기를 미리 짐작해 봅니다.\n· 한국 ETF(EWY): 미국에 상장된 한국 주식 묶음이라 밤사이 외국인 시각이 가장 잘 보입니다 (가장 크게 반영)\n· 나스닥·미국 반도체: 삼성전자·SK하이닉스 같은 큰 종목과 같이 움직이는 경우가 많음\n· 공포지수(VIX)·환율: 오르면 부담\n짐작일 뿐이고, 장이 열리면 다르게 움직일 수 있습니다.",
-  wake: "싼 종목도 시장이 관심을 안 주면 몇 년이고 싼 채로 남습니다 (가치 함정). 특히 한국 시장에서 흔합니다.\n그래서 '다시 주목받기 시작했나'를 따로 봅니다:\n· 큰손(기관+외국인)이 최근 5일 동안 샀나\n· 최근 3일 안에 기사·공시 같은 소식이 있나\n· 거래가 평소보다 늘었나\n· 최근 10일 바닥에서 5% 이상 올라왔나\n2개 이상이면 '움직일 계기가 생긴' 쪽입니다. 점수(강도)에는 넣지 않았고, 정말 성적이 나은지는 성적표의 '저평가 조건별 성적'에서 확인합니다.",
+  wake: "싼 종목도 시장이 관심을 안 주면 몇 년이고 싼 채로 남습니다 (가치 함정). 특히 한국 시장에서 흔합니다.\n그래서 '다시 주목받기 시작했나'를 따로 봅니다:\n· 큰손(기관+외국인)이 최근 5일 동안 샀나\n· 최근 3일 안에 기사·공시 같은 소식이 있나\n· 거래가 평소보다 늘었나\n· 최근 10일 바닥에서 5% 이상 올라왔나\n· 최근 2주 안에 증권사 리포트가 나왔나 (오랫동안 없다가 나오면 더 의미 있음)\n2개 이상이면 '움직일 계기가 생긴' 쪽입니다. 점수(강도)에는 넣지 않았고, 정말 성적이 나은지는 성적표의 '저평가 조건별 성적'에서 확인합니다.",
   score_value: "강도: 이 종목이 조건에 얼마나 강하게 걸렸는지 0~100점입니다. 지금까지 같은 탭에 걸린 종목들 중 어디쯤인지로 매깁니다.\n저평가 계산 (100점 만점을 나눠 가짐):\n· 낙폭 25%: 최근 고점보다 많이 빠졌나 (50% 빠지면 만점)\n· 싸짐 15%: 평소(1년)보다 얼마나 싸게 거래되나\n· PER 35%: 버는 돈에 비해 싼가 (PER 5 이하면 만점)\n· 이익 25%: 이익이 줄지 않고 버티거나 늘었나\n'싸면서 돈은 잘 버는 회사'가 위로 오게 했습니다.",
   futures: "외국인이 '코스피 선물'을 산 금액에서 판 금액을 뺀 값입니다.\n선물은 '앞으로 지수가 오를지 내릴지'에 거는 상품이라, 외국인의 방향 생각이 잘 드러납니다.\n· 며칠 연속 사면(+): 지수가 오를 쪽으로 보는 중\n· 며칠 연속 팔면(−): 내릴 쪽으로 보는 중\n한국 장의 방향을 먼저 알려 주는 지표로 많이 봅니다.",
   signals: "많이 떨어진 뒤 '이제 사도 될까?'를 세 단계로 확인합니다.\n1단계 투매 진정: 마구 팔던 게 잦아드는지 (신저가 종목·강제 매도 감소, 출렁임 감소)\n2단계 수급 전환: 큰손이 다시 사기 시작하는지 (외국인 선물·주식 순매수, 분위기 회복)\n3단계 추세 확인: 지수가 다시 오르는 흐름인지 (20일 평균 가격 회복)\n바닥은 아무도 정확히 못 맞힙니다. 그래서 한 번에 다 사지 말고 단계마다 나눠서(1/3 → 2/3 → 나머지) 들어가는 방법을 안내합니다.",
@@ -738,10 +739,29 @@ function valueCard(x) {
     <ul class="checks">${x.checks.map((c) => `<li><span>${esc(c.label)}</span><span>${esc(c.value)}</span></li>`).join("")}</ul>
     ${wakeBlock(x.wake)}
     ${exitBlock(x)}
+    ${reportBlock(x)}
     ${qualityRow(x)}
     ${news ? `<ul class="news">${news}</ul>` : `<p class="hint" style="margin:8px 0 0">최근 3일 관련 기사 없음</p>`}
     ${detailBtn(x)}
   </article>`;
+}
+
+// 증권사 리포트: 최근 2주에 나온 것, 오랜만에 다뤄지기 시작했는지, 가장 최근 리포트의 의견·목표가
+const OPINION = { buy: "매수", "strong buy": "강력 매수", outperform: "시장보다 좋음", hold: "보유", neutral: "중립", marketperform: "시장 수준", sell: "매도", underperform: "시장보다 나쁨", "trading buy": "단기 매수" };
+function reportBlock(x) {
+  const rp = x.reports;
+  if (!rp) return "";
+  if (!rp.n) return `<div class="rep"><small class="faint">최근 2주 증권사 리포트 없음${rp.known && !rp.before ? " (석 달 넘게 아무도 안 다룸)" : ""}</small></div>`;
+  const top = rp.items[0], d = rp.detail || {};
+  const op = d.opinion ? OPINION[d.opinion.toLowerCase()] || d.opinion : null;
+  const goal = d.goal ? `목표가 <b>${num(d.goal)}원</b>${d.prev_goal && d.prev_goal !== d.goal ? ` <small class="${cls(d.goal - d.prev_goal)}">(${d.goal > d.prev_goal ? "올림" : "내림"}, 전 ${num(d.prev_goal)})</small>` : ""}${x.close ? ` · 지금보다 <b class="${cls(d.goal - x.close)}">${signed((d.goal / x.close - 1) * 100, 0, "%")}</b>` : ""}` : "";
+  const more = rp.items.slice(1).map((r) => `<li><a href="https://m.stock.naver.com/research/company/${r.id}" target="_blank" rel="noopener">${esc(r.title)}</a><small>${esc(r.broker)} ${ymd(r.date).slice(5)}</small></li>`).join("");
+  return `<div class="rep"><div class="row"><b>증권사 리포트 ${rp.n}건 <small>(2주)</small>${infoBtn("report")}</b>${rp.fresh ? `<span class="tag fresh">오랜만에 다뤄짐</span>` : ""}</div>${infoBox("report")}
+    <a href="https://m.stock.naver.com/research/company/${top.id}" target="_blank" rel="noopener">${esc(top.title)}</a>
+    <small>${esc(top.broker)} ${ymd(top.date).slice(5)}${op ? ` · 의견 ${esc(op)}` : ""}</small>
+    ${goal ? `<div class="goal">${goal}</div>` : ""}
+    ${d.summary ? `<details class="rsum"><summary>리포트 요약 보기</summary><p>${esc(d.summary)}</p></details>` : ""}
+    ${more ? `<ul class="news">${more}</ul>` : ""}</div>`;
 }
 
 // 언제 정리할지 + 이번 실적 시즌 발표 여부
@@ -771,7 +791,7 @@ function cardHead(x) {
   return `<div class="hd">
       <a class="nm" data-code="${x.code}" href="https://m.stock.naver.com/domestic/stock/${x.code}" target="_blank" rel="noopener">${esc(x.name)}<span class="mk">${esc(x.market)} ${x.code}${x.sector ? " · " + esc(x.sector) : ""}</span></a>
       <div class="px">${starBtn(x)}<b>${num(x.close)}</b><span class="${cls(x.change)}">${signed(x.change, 1, "%")}</span></div>
-    </div>${streakTag(x)}${x.overlap ? `<span class="tag both">두 관점 겹침</span>` : ""}`;
+    </div>${streakTag(x)}${x.search_rank ? `<span class="tag known" title="네이버 증권에서 많이 검색한 상위 100개 안. 이미 많이 알려져 미리 사 두는 기회는 지났을 수 있음">검색 ${x.search_rank}위 · 이미 알려짐</span>` : ""}${x.overlap ? `<span class="tag both">두 관점 겹침</span>` : ""}`;
 }
 
 // 같은 탭에 며칠 연속 걸렸는지: 오늘 처음이면 '새로', 아니면 'N일째'
@@ -850,6 +870,7 @@ function card(x) {
     ${qualityRow(x)}
     <ul class="checks">${x.checks.map((c) => `<li><span>${esc(c.label)}</span><span>${esc(c.value)}</span></li>`).join("")}</ul>
     ${exitBlock(x)}
+    ${reportBlock(x)}
     <ul class="news">${news}</ul>
     ${detailBtn(x)}
   </article>`;
@@ -1193,6 +1214,8 @@ function renderRules() {
     <h3>정리 기준 (카드 아래)</h3>
     <ul><li>스윙: 종가가 20일 평균 가격 아래로 마감 · 단타: 걸린 날 저가 아래로 마감 · 저평가: 최근 10일 최저가 아래로 마감</li>
     <li>성적표 '정리 기준을 지켰다면'은 다음 날 시가에 사서, 5일 안에 종가가 기준 아래로 마감한 날 그 종가에 판 것으로 계산</li>
+    <li>증권사 리포트: 네이버 리서치 종목분석 목록(150일 보관). 최근 2주 리포트 수, 그 전 석 달 동안 없었으면 '오랜만에 다뤄짐'. 가장 최근 리포트의 투자의견·목표가</li>
+    <li>'검색 N위 · 이미 알려짐': 네이버 증권 검색 상위 100. 좋은 신호가 아니라 '이미 사람들이 몰림' 표시</li>
     <li>실적 시즌(1분기 4/1~5/15, 반기 7/1~8/14, 3분기 10/1~11/14, 결산 1/1~3/31)에는 DART에서 분기·반기·사업보고서나 잠정실적을 아직 안 낸 후보에 경고 표시</li></ul>`;
 }
 

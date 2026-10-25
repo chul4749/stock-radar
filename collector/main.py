@@ -201,6 +201,26 @@ def main(argv):
     for x in scalp[:10] + swing[:10] + value[:10]:
         if profile(x["code"]):
             x["profile"] = profiles[x["code"]]
+    # 증권사 리포트(주목도: 오랜만에 다뤄지기 시작했나)와 네이버 검색 상위(이미 알려짐)
+    reports = update_reports(base, errors)
+    search_top = [] if backfill else (safe("검색 상위", sources.naver_search_top, errors) or [])
+    rank = {c: i + 1 for i, c in enumerate(search_top)}
+    details = {}
+    for g, items in (("scalp", scalp[:10]), ("swing", swing[:10]), ("value", value[:10])):
+        for x in items:
+            att = logic.report_attention(x["code"], reports, base)
+            if att and att["items"]:
+                top = att["items"][0]
+                if top["id"] not in details:
+                    details[top["id"]] = safe(f"리포트 {top['id']}", lambda: sources.naver_research_detail(top["id"]), errors)
+                    time.sleep(0.2)
+                att["detail"] = details[top["id"]]
+            x["reports"] = att
+            if search_top:
+                x["search_rank"] = rank.get(x["code"])
+    for x in value[:10]:   # 리포트는 저평가 주목 신호에도 넣는다
+        logic.add_report_wake(x)
+    log(f"  리포트 기록 {len((reports or {}).get('items', []))}건 (since {(reports or {}).get('since')}), 상세 {len(details)}건, 검색 상위 {len(search_top)}")
     # 언제 정리할지(정리 가격)와 이번 실적 시즌 발표 여부
     for g, items in (("scalp", scalp[:10]), ("swing", swing[:10]), ("value", value[:10])):
         for x in items:
@@ -328,7 +348,12 @@ def main(argv):
             made = (rec.get("generated_at") or "")[:10].replace("-", "")
             if rec.get("backfill") or (made and (datetime.strptime(made, "%Y%m%d") - datetime.strptime(d, "%Y%m%d")).days >= 2):
                 backfill_dates.append(d)
-            history.append((d, {g: flt.get(g, []) for g in ("swing", "scalp", "value")}))
+            groups = {g: flt.get(g, []) for g in ("swing", "scalp", "value")}
+            # 리포트 기록은 150일 치가 있으니, 리포트를 저장하기 전 날짜의 후보에도 그날 기준으로 다시 붙여 조건별 성적에 쓴다
+            for x in (y for items in groups.values() for y in items):
+                if x.get("reports") is None and reports:
+                    x["reports"] = logic.report_attention(x["code"], reports, d)
+            history.append((d, groups))
             if d in long_days:
                 upto = [float(v) for v in long_vals.values[:long_days.index(d) + 1]]
                 rg = logic.market_regime(upto, rec.get("temperature") or {})
@@ -385,6 +410,26 @@ def update_season(base, dart_days, name_to_code, errors):
         json.dump(store, f, ensure_ascii=False, separators=(",", ":"))
     log(f"  {season['label']} 실적 시즌: 발표 {len(store['reported'])}곳 · 예고 {len(store['notice'])}곳 (확인한 날 {len(store['checked'])}, 이번에 더 받은 날 {len(todo)})")
     return season, store
+
+
+def update_reports(base, errors, keep_days=150):
+    """증권사 리포트 기록(reports.json)을 이어 받는다. 처음이면 150일 전부터, 그 뒤엔 마지막 기준일 사흘 전부터."""
+    path = os.path.join(DATA, "reports.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            store = json.load(f)
+    except (OSError, ValueError):
+        store = {}
+    start = (datetime.strptime(base, "%Y%m%d") - timedelta(days=keep_days)).strftime("%Y%m%d")
+    if store.get("updated") and store.get("since", "99999999") <= start:
+        start = max(start, (datetime.strptime(min(store["updated"], base), "%Y%m%d") - timedelta(days=3)).strftime("%Y%m%d"))
+    new = safe("증권사 리포트", lambda: sources.naver_research(start), errors)
+    if new is None:
+        return store
+    store = logic.merge_reports(store, new, base, start, keep_days)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(store, f, ensure_ascii=False, separators=(",", ":"))
+    return store
 
 
 def write_prices(base, closes, listing, index):
