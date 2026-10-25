@@ -1524,6 +1524,10 @@ def replay_mover(code, name, closes, values, net, caps, cand_by_day, reports=Non
         how = f"{lead}일 먼저 " + "·".join(cand_by_day[before[0]][code]) + " 후보로 잡음"
     elif surge in cand_days:
         verdict, lead, how = "sameday", 0, "급등 당일 " + "·".join(cand_by_day[surge][code]) + " 후보로 잡음"
+    elif [d for d in cand_days if d > surge]:
+        first = next(d for d in cand_days if d > surge)
+        verdict, lead = "late", -(days.index(first) - si)
+        how = f"급등 시작 {-lead}일 뒤에야 " + "·".join(cand_by_day[first][code]) + " 후보로 잡음"
     else:
         verdict, lead, how = "missed", None, "후보에 안 걸림"
     r5 = (closes[code].iloc[-1] / closes[code].iloc[-6] - 1) * 100
@@ -1575,7 +1579,7 @@ def mover_scorecard(movers):
     if not movers:
         return None
     n = len(movers)
-    cnt = {k: sum(1 for m in movers if m["verdict"] == k) for k in ("early", "sameday", "missed")}
+    cnt = {k: sum(1 for m in movers if m["verdict"] == k) for k in ("early", "sameday", "late", "missed")}
     sig = {}
     for m in movers:
         for e in m.get("early") or []:

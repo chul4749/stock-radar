@@ -696,3 +696,13 @@ def test_replay_mover_and_signal_validation():
     v = logic.signal_validation(closes, values, netd.iloc[25:], caps, {"A", "B"})
     row = next(r for r in v["rows"] if r["key"] == "streak3")
     assert v["base_n"] > 0 and row["n"] >= 1 and row["rate"] > v["base"]
+
+
+def test_replay_late_catch():
+    n = 40
+    days = [f"d{i:02d}" for i in range(n)]
+    closes = pd.DataFrame({"A": [100.0] * 34 + [110, 125, 130, 131, 132, 133]}, index=days)
+    values = pd.DataFrame({"A": [10 * EOK] * n}, index=days)
+    netd = pd.DataFrame({"A": [0.0] * n}, index=days)
+    rp = logic.replay_mover("A", "가", closes, values, netd, {"A": 1000 * EOK}, {"d35": {"A": ["단타"]}})
+    assert rp["surge"] == "d34" and rp["verdict"] == "late" and rp["lead"] == -1
