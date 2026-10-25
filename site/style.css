@@ -47,6 +47,8 @@ h1 { font-size: 19px; margin: 0; letter-spacing: -0.02em; }
 select { font: inherit; font-size: 14px; color: var(--text); background: var(--card); border: 1px solid var(--line);
   border-radius: 8px; padding: 5px 8px; }
 
+/* 큰 글씨 설정 등으로 뭔가 넘쳐도 화면 전체가 옆으로 밀리지 않게 (clip은 sticky를 깨지 않음) */
+html, body { overflow-x: clip; }
 main { max-width: 760px; margin: 0 auto; padding: 8px 16px 40px; }
 .block { margin-top: 18px; }
 h2 { font-size: 17px; margin: 0 0 10px; letter-spacing: -0.02em; }
@@ -148,7 +150,7 @@ footer b { color: var(--text); }
 .tag.both { background: var(--calm-bg); color: var(--calm); margin-top: 6px; }
 .tabs button { padding: 6px 11px; }
 table.score { width: 100%; border-collapse: collapse; font-size: 14px; }
-table.score th, table.score td { text-align: right; padding: 6px 2px; vertical-align: top; border-bottom: 1px solid var(--line); }
+table.score th, table.score td { text-align: right; padding: 6px 2px; vertical-align: top; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
 table.score tr:last-child th, table.score tr:last-child td { border-bottom: 0; }
 table.score th:first-child, table.score td:first-child { text-align: left; }
 table.score thead th { color: var(--faint); font-weight: 500; font-size: 12px; }

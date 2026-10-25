@@ -1750,7 +1750,14 @@ function fitOne(el) {
 let fitTimer = null;
 function fitAll() {
   clearTimeout(fitTimer);
-  fitTimer = setTimeout(() => document.querySelectorAll(FIT_SEL).forEach((el) => { try { fitOne(el); } catch (e) { /* 무시 */ } }), 60);
+  fitTimer = setTimeout(() => {
+    document.querySelectorAll(FIT_SEL).forEach((el) => { try { fitOne(el); } catch (e) { /* 무시 */ } });
+    // 표 칸은 한 줄로 만들면 칸이 아니라 표가 넓어져 fitOne이 못 잡는다: 표가 자리보다 넓어졌으면 그 표 칸들은 원래대로 줄바꿈
+    document.querySelectorAll("table").forEach((t) => {
+      if (!t.parentElement || t.offsetWidth <= t.parentElement.clientWidth + 0.5) return;
+      t.querySelectorAll("[data-fit-base]").forEach((el) => { el.style.fontSize = ""; el.style.whiteSpace = ""; delete el.dataset.fitBase; });
+    });
+  }, 60);
 }
 try {
   new MutationObserver(fitAll).observe(document.querySelector("main"), { childList: true, subtree: true });
