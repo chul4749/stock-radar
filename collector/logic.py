@@ -1201,7 +1201,10 @@ def morning_summary(items):
 
 # ---------------------------------------------------------------- 업종·테마 ETF
 
-THEME_RULES = {"overheat20": 20.0, "flow_days": 3, "breadth": 60}
+THEME_RULES = {"overheat20": 20.0, "flow_days": 3, "breadth": 60,
+               # '돈이 먼저 들어오는 중'은 좁게: 시총 대비 0.1% 이상, 4일 이상 순매수, 하루에 60% 넘게 몰리지 않음,
+               # 가격이 5일 새 3% 넘게 더 빠지지 않고 20일 평균에서 10% 안쪽 (떨어지는 칼날을 '선취매'로 부르지 않게)
+               "early_pct": 0.1, "early_days": 4, "early_one_day": 0.6, "early_r5": -3.0, "early_gap20": -10.0}
 
 
 def etf_trend(closes, bench=None):
@@ -1253,7 +1256,18 @@ def theme_strength(name, etfs, members, caps, closes, flows_daily, flows_5d, rep
     if hot:
         key, label = "hot", "과열 — 20일 새 많이 오름, 따라 사기 조심"
     elif money_in and not (tr and tr["above20"]):
-        key, label = "early", "돈이 먼저 들어오는 중 — 가격은 아직 (미리 볼 후보)"
+        pos = sum(v for v in daily if v > 0)
+        why = []
+        if flow_pct < rules["early_pct"]:
+            why.append("들어온 돈이 덩치에 비해 적음")
+        if sum(1 for v in daily if v > 0) < rules["early_days"] or (pos and max(daily) / pos > rules["early_one_day"]):
+            why.append("돈이 하루에 몰림")
+        if tr and (tr["r5"] < rules["early_r5"] or tr["gap20"] < rules["early_gap20"]):
+            why.append("가격이 아직 계속 빠지는 중")
+        if why:
+            key, label = "watch", "돈은 들어왔지만 " + "·".join(why) + " — 지켜보기"
+        else:
+            key, label = "early", "돈이 먼저 들어오는 중 — 가격은 아직 (미리 볼 후보)"
     elif money_in and price_ok and breadth >= rules["breadth"]:
         key, label = "strong", "돈도 들어오고 흐름도 좋음"
     elif price_ok and net5 < 0:
