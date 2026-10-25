@@ -748,3 +748,5 @@ def test_follow_through_splits():
     # A의 +20% 날과 +10% 날 둘 다 급등, 둘 다 종가가 고가 근처·소형. 두 번째는 이미 오른 뒤
     assert sp["all"]["n"] == 2 and sp["close_high"]["n"] == 2 and sp["small"]["n"] == 2
     assert sp["vol5"]["n"] == 1 and sp["first"]["n"] == 1 and sp["again"]["n"] == 1 and "large" not in sp
+    # 두 번째 급등(이미 오른 뒤)은 조합에서 빠지고, 첫 급등은 거래 6배라 '3배 안' 조합에도 없음
+    assert "first_quiet" not in sp

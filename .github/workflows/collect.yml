@@ -84,7 +84,12 @@ jobs:
           git --work-tree="$tmp" add -A -f .
           c=$(git -c user.name=stock-radar-bot -c user.email=41898282+github-actions[bot]@users.noreply.github.com \
                 commit-tree "$(git write-tree)" -m "차트·재무 캐시 $(date -u +%F)")
-          git push -q -f origin "$c:refs/heads/data-cache"
+          # 가끔 GitHub가 push를 거절함(remote rejected) → 몇 번 다시, 끝내 안 되면 경고만 (배포는 계속)
+          for i in 1 2 3; do
+            git push -q -f --no-thin origin "$c:refs/heads/data-cache" && exit 0
+            sleep $((i * 10))
+          done
+          echo "::warning::차트·재무 캐시 저장 실패 — 다음 수집 때 다시 받음"
       - uses: actions/upload-artifact@v4
         with:
           name: site

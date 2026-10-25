@@ -1629,6 +1629,14 @@ def follow_through(closes, opens, eligible, rules=FOLLOW, cost=None, highs=None,
     if net is not None and not net.empty:
         nt = net.reindex(index=cl.index, columns=cols)
         splits += [row("net_buy", "그날 큰손 순매수", surge & (nt > 0)), row("net_sell", "그날 큰손 순매도", surge & (nt < 0))]
+    # 위 줄들 중 성적이 나았던 모양을 겹친 조합 ('급등 이어짐' 필터 후보)
+    if values is not None:
+        quiet_first = surge & (pre5 < 10) & (mult < 3)
+        splits.append(row("first_quiet", "첫 급등 + 거래 3배 안", quiet_first))
+        if net is not None and not net.empty:
+            splits.append(row("first_quiet_buy", "첫 급등 + 거래 3배 안 + 큰손 순매수", quiet_first & (nt > 0)))
+        if highs is not None:
+            splits.append(row("first_quiet_high", "첫 급등 + 거래 3배 안 + 종가 고가 근처", quiet_first & near))
     if caps:
         small = pd.Series({c: (caps.get(c) or 0) < 3000 * EOK for c in cols})
         sm = pd.DataFrame([small.values] * len(cl.index), index=cl.index, columns=cols)
