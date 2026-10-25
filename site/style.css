@@ -367,3 +367,17 @@ table.fin .est { color: var(--faint); }
 .rep .rsum p { white-space: pre-line; font-size: 12px; color: var(--sub); line-height: 1.55; margin: 4px 0 0; }
 .tag.fresh { background: var(--calm-bg); color: var(--calm); }
 .tag.known { background: var(--fear-bg); color: var(--fear); }
+.search { position: relative; max-width: 760px; margin: 6px auto 0; }
+.search input { width: 100%; box-sizing: border-box; height: 36px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px;
+  background: var(--card); color: var(--text); font: inherit; font-size: 14px; }
+.search input::placeholder { color: var(--faint); font-size: 13px; }
+#q-list { position: absolute; left: 0; right: 0; top: 40px; margin: 0; padding: 4px; list-style: none; background: var(--card);
+  border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,.18); z-index: 10; }
+#q-list button { display: flex; width: 100%; align-items: baseline; gap: 6px; padding: 8px; border: 0; background: none; color: var(--text);
+  font: inherit; text-align: left; border-radius: 8px; cursor: pointer; }
+#q-list button:hover, #q-list button:focus { background: var(--neutral-bg); }
+#q-list button small { color: var(--sub); flex: 1; }
+#q-list .none { padding: 8px; color: var(--sub); font-size: 13px; }
+.fit.why .row small { color: var(--sub); text-align: right; }
+.fit.why .row .good { color: var(--calm); }
+.fit.why .row b { white-space: nowrap; }

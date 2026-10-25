@@ -561,3 +561,20 @@ def test_report_wake_and_features():
     f = logic.features_of(x)
     assert f["report"] is True and f["report_fresh"] is True and f["search_top"] is False
     assert logic.features_of({})["search_top"] is None and logic.features_of({})["report"] is None
+
+
+def test_stock_index_explains_why_not_picked():
+    n = 70
+    days = [f"d{i:02d}" for i in range(n)]
+    closes = pd.DataFrame({"A": [100.0 + i for i in range(n)], "B": [200.0 - i for i in range(n)]}, index=days)
+    values = pd.DataFrame({"A": [10 * EOK] * (n - 1) + [40 * EOK], "B": [20 * EOK] * n}, index=days)
+    fl = {"foreign": pd.Series({"A": 5 * EOK, "B": -1 * EOK}), "inst": pd.Series({"A": 1 * EOK, "B": 0})}
+    daily = [(d, fl) for d in days[-5:]]
+    five = {"foreign": pd.Series({"A": 25 * EOK, "B": -5 * EOK}), "inst": pd.Series({"A": 5 * EOK, "B": 0})}
+    uni = {"A": {"name": "가", "market": "KOSDAQ", "cap": 1000 * EOK, "value": 40 * EOK, "change": 3.0},
+           "B": {"name": "나", "market": "KOSPI", "cap": 300 * EOK, "value": 20 * EOK, "change": -0.5}}
+    idx = logic.stock_index(uni, {"B": ["유상증자"]}, closes, values, daily, five, {"A": []}, {"A": []}, picked={"A": ["swing"]})
+    a, b = idx["stocks"]["A"], idx["stocks"]["B"]
+    assert a["sw"] == "11111" and a["sc"] == "111" and a["nw"] == 2 and a["p"] == ["swing"] and a["sz"] == "11"
+    assert b["sw"][2] == "0" and b["sz"][0] == "0" and b["x"] == ["유상증자"] and b["nw"] == 0
+    assert len(idx["labels"]["swing"]) == 5 and len(idx["labels"]["value"]) == 5

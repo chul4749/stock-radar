@@ -30,6 +30,7 @@ async function init() {
     sel.innerHTML = idx.dates.map((d) => `<option value="${d}">${ymd(d)}</option>`).join("");
     sel.onchange = () => load(sel.value);
     state.latest = idx.latest;
+    setupSearch();
     await load(idx.latest);
     fetch("data/scorecard.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null))
       .then((sc) => { state.score = sc; renderScore(); renderRegime(); renderTurn(); }).catch(() => renderScore());
@@ -1153,6 +1154,76 @@ function companyBlock(x) {
     `<div class="nums">${metrics}</div>${table}${flow}${help}</div>`;
 }
 
+/* ---------------- 전체 종목 찾기 ---------------- */
+
+let stocksLoad = null;
+const loadStocks = () => (stocksLoad ||= fetch("data/stocks.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null)).catch(() => null));
+
+function setupSearch() {
+  const q = $("#q"), list = $("#q-list");
+  if (!q) return;
+  q.addEventListener("focus", loadStocks, { once: true });
+  q.addEventListener("input", async () => {
+    const t = q.value.trim().toLowerCase();
+    const db = await loadStocks();
+    if (!t || !db) { list.hidden = true; return; }
+    const hits = Object.entries(db.stocks)
+      .filter(([c, s]) => c.startsWith(t) || s.n.toLowerCase().includes(t))
+      .sort((a, b) => (a[1].n.toLowerCase().startsWith(t) ? 0 : 1) - (b[1].n.toLowerCase().startsWith(t) ? 0 : 1) || b[1].cap - a[1].cap)
+      .slice(0, 8);
+    list.innerHTML = hits.length
+      ? hits.map(([c, s]) => `<li><button type="button" data-stock="${c}"><b>${esc(s.n)}</b> <small>${c} · ${s.m === "P" ? "코스피" : "코스닥"}${s.p ? " · 오늘 후보" : ""}</small><span class="${cls(s.ch)}">${signed(s.ch, 1, "%")}</span></button></li>`).join("")
+      : `<li class="none">찾는 종목이 없어요 (보통주만, 스팩·우선주 제외)</li>`;
+    list.hidden = false;
+  });
+  document.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-stock]");
+    if (b) { list.hidden = true; q.value = ""; openStock(b.dataset.stock); return; }
+    if (!e.target.closest(".search")) list.hidden = true;
+  });
+}
+
+// 종목 하나의 오늘 상태와 탭별 조건 ✓/✗ — 왜 후보에 안 걸렸는지
+async function openStock(code) {
+  const db = await loadStocks();
+  const s = db && db.stocks[code];
+  if (!s) return;
+  const L = db.labels, R = db.rules;
+  const tabs = (s.p || []).map((g) => TAB_NAME[g]);
+  const gate = (ok, label) => `<li class="${ok ? "" : "no"}"><span>${esc(label)}</span><span></span></li>`;
+  const list = (bits, labels) => labels.map((l, i) => `<li class="${bits[i] === "1" ? "" : "no"}"><span>${esc(l)}</span><span></span></li>`).join("");
+  const miss = (bits, labels) => labels.filter((l, i) => bits[i] !== "1");
+  const verdict = (g, pre, bits, labels, why) => {
+    if (s.p && s.p.includes(g)) return `<b class="good">오늘 후보 ✓</b>`;
+    if (!bits) return `<small>${esc(why || "자료 부족으로 판단 못 함")}</small>`;
+    const m = [...pre.filter(([ok]) => !ok).map(([, l]) => l), ...miss(bits, labels)];
+    const all = pre.length + labels.length;
+    return m.length ? `<small>${all - m.length}/${all} 맞음 · ${m.length === 1 ? "하나만 더 맞으면 후보" : `${m.length}개 안 맞음`}</small>` : `<small>조건은 맞지만 ${s.x ? "위험 공시로 제외" : "기준일 이후 바뀜"}</small>`;
+  };
+  const sw = [[s.sz[0] === "1", `시총 ${num(R.min_cap)}억·거래대금 ${num(R.min_value)}억 이상`], [s.nw >= 1, "최근 3일 안에 기사·공시"]];
+  const sc = [[s.sz[0] === "1", `시총 ${num(R.min_cap)}억·거래대금 ${num(R.min_value)}억 이상`], [s.nw === 2, "오늘 기사·공시"]];
+  const va = [[s.sz[1] === "1", `시총 ${num(R.v_min_cap)}억·거래대금 ${num(R.v_min_value)}억 이상`]];
+  const block = (g, pre, bits, labels, why) => `<li><div class="row"><b>${TAB_NAME[g]}</b>${verdict(g, pre, bits, labels, why)}</div>
+    <ul class="checks">${pre.map(([ok, l]) => gate(ok, l)).join("")}${bits ? list(bits, labels) : ""}</ul></li>`;
+  const trend = s.g20 == null ? "–" : s.g20 > 0 && s.g60 > 0 ? "오르는 흐름 (20·60일 평균 위)" : s.g20 < 0 && s.g60 < 0 ? "내리는 흐름 (20·60일 평균 아래)" : "섞여 있음";
+  $("#detail-body").innerHTML = `<div class="hd"><a class="nm" href="https://m.stock.naver.com/domestic/stock/${code}" target="_blank" rel="noopener">${esc(s.n)}<span class="mk">${s.m === "P" ? "KOSPI" : "KOSDAQ"} ${code}${s.s ? " · " + esc(s.s) : ""}</span></a>
+      <div class="px"><b>${num(s.c)}</b><span class="${cls(s.ch)}">${signed(s.ch, 1, "%")}</span></div></div>
+    <p class="hint">${ymd(db.date)} 기준 · 시총 ${eokText(s.cap)} · 거래대금 ${num(s.v)}억${tabs.length ? ` · <b>오늘 ${tabs.join("·")} 후보</b>` : ""}</p>
+    ${s.x ? `<div class="earnwarn">⚠ 위험 공시·투자주의로 후보에서 뺀 종목: ${s.x.map(esc).join(", ")}</div>` : ""}
+    <div class="nums">
+      <div><small>5일 기관+외국인</small><b class="${cls(s.f5)}">${signed(s.f5, 0, "억")}</b><small>${s.pd}일 순매수</small></div>
+      <div><small>20일 평균 대비</small><b class="${cls(s.g20)}">${signed(s.g20, 1, "%")}</b><small>60일 ${signed(s.g60, 1, "%")}</small></div>
+      <div><small>PER · PBR</small><b>${s.per == null ? "–" : num(s.per, 1)} · ${s.pbr == null ? "–" : num(s.pbr, 2)}</b><small>${s.mul != null ? `거래 평소의 ${num(s.mul, 1)}배` : ""}</small></div>
+    </div>
+    <p class="hint">흐름: ${trend}${s.dr != null ? ` · 60일 고점보다 −${num(s.dr, 1)}%` : ""}</p>
+    <h3 class="sub">탭별 조건 <small>✓ 맞음 · ✗ 안 맞음</small></h3>
+    <ul class="fit why">${block("swing", sw, s.sw, L.swing)}${block("scalp", sc, s.sc, L.scalp)}${block("value", va, s.va, L.value, s.vr)}</ul>
+    ${tabs.length ? `<button class="more" type="button" data-code="${code}">후보 카드 자세히 보기</button>` : ""}
+    <p class="hint">조건에 다 맞아도 매수 추천은 아닙니다. 네이버에서 더 보려면 이름을 누르세요.</p>`;
+  if (!$("#detail").open) $("#detail").showModal();
+  $("#detail .dlg-in").scrollTop = 0;
+}
+
 function openDetail(code) {
   const f = state.data.filter;
   const x = [...(f.swing || []), ...(f.scalp || []), ...(f.value || [])].find((y) => y.code === code);
@@ -1177,7 +1248,8 @@ function openDetail(code) {
     <ul class="news">${newsList(x.news)}</ul>
     <p class="links"><a href="https://m.stock.naver.com/domestic/stock/${x.code}" target="_blank" rel="noopener">네이버 증권</a>
       <a href="https://dart.fss.or.kr/dsab007/main.do?option=corp&textCrpNm=${encodeURIComponent(x.name)}" target="_blank" rel="noopener">DART 공시</a></p>`;
-  $("#detail").showModal();
+  if (!$("#detail").open) $("#detail").showModal();
+  $("#detail .dlg-in").scrollTop = 0;
 }
 
 document.addEventListener("click", (e) => {

@@ -138,6 +138,7 @@ def main(argv):
 
     risk = logic.risk_codes(dart_bad, matcher, {c: v["section"] for c, v in universe.items()})
     excluded = [{"code": c, "name": universe[c]["name"], "reasons": r[:3]} for c, r in risk.items() if c in universe]
+    universe_all = universe
     universe = {c: v for c, v in universe.items() if c not in risk}
     log(f"  위험 공시·투자주의환기로 제외 {len(excluded)}")
 
@@ -330,6 +331,15 @@ def main(argv):
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"), default=_json_default)
     dates = reindex.write_index()
     write_prices(base, closes, listing, temp.get("index") or {})
+    # 전체 종목 검색용: 조건별 통과 여부 (가장 최근 기준일만)
+    picked = {}
+    for g, items in (("swing", swing), ("scalp", scalp), ("value", value)):
+        for x in items:
+            picked.setdefault(x["code"], []).append(g)
+    idx = logic.stock_index(universe_all, {c: r for c, r in risk.items()}, closes, values, flows_daily, flows_5d,
+                            news_today, news_3d, fund_now, fund_hist, sectors, picked)
+    write_latest("stocks.json", base, {**idx, "date": base, "generated_at": out["generated_at"]})
+    log(f"  전체 종목 요약 {len(idx['stocks'])}개")
     log(f"\n저장 {path} ({os.path.getsize(path) // 1024}KB), 오류 {errors or '없음'}")
 
     t = step("성적표")
@@ -430,6 +440,19 @@ def update_reports(base, errors, keep_days=150):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(store, f, ensure_ascii=False, separators=(",", ":"))
     return store
+
+
+def write_latest(name, base, obj):
+    """가장 최근 기준일 것만 남기는 파일 (예전 기준일을 다시 계산할 때는 덮어쓰지 않음)."""
+    path = os.path.join(DATA, name)
+    try:
+        with open(path, encoding="utf-8") as f:
+            if json.load(f).get("date", "") > base:
+                return
+    except (OSError, ValueError):
+        pass
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(obj, f, ensure_ascii=False, separators=(",", ":"), default=_json_default)
 
 
 def write_prices(base, closes, listing, index):

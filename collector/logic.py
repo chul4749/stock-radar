@@ -422,6 +422,52 @@ def flow_detail(code, flows_daily, flows_5d, pension_5d):
     }
 
 
+def scalp_checks(mult, change, net_today, value, rules=None):
+    """단타 조건 (거래대금 급증·상승·오늘 큰손 순매수). 종목 필터와 전체 종목 검색이 같이 쓴다."""
+    rules = rules or RULES
+    ratio = net_today / value * 100 if value else 0
+    return [
+        {"label": f"거래대금 20일 평균의 {rules['scalp_value_mult']:.0f}배 이상", "ok": mult >= rules["scalp_value_mult"],
+         "value": f"{mult:.1f}배"},
+        {"label": f"오늘 {rules['scalp_min_change']:.0f}% 이상 상승", "ok": change >= rules["scalp_min_change"],
+         "value": f"{change:+.1f}%"},
+        {"label": f"오늘 기관+외국인 순매수가 거래대금의 {rules['scalp_min_net_ratio']:.0f}% 이상",
+         "ok": bool(value) and ratio >= rules["scalp_min_net_ratio"],
+         "value": f"{net_today / EOK:+,.0f}억 ({ratio:.1f}%)"},
+    ]
+
+
+def swing_checks(close, m20, m60, m20_prev, rise5, days_pos, ratio, rules=None):
+    """스윙 조건 (며칠째 큰손 순매수·오르는 흐름·과열 아님)."""
+    rules = rules or RULES
+    return [
+        {"label": f"5일 중 {rules['swing_min_days']}일 이상 기관+외국인 순매수", "ok": days_pos >= rules["swing_min_days"],
+         "value": f"{days_pos}일"},
+        {"label": f"5일 순매수가 회사 덩치(시총)의 {rules['swing_min_ratio']}% 이상", "ok": ratio >= rules["swing_min_ratio"],
+         "value": f"{ratio:.2f}%"},
+        {"label": "주가 > 20일 평균 > 60일 평균 (오르는 흐름)", "ok": close > m20 > m60,
+         "value": f"{close:,.0f} / {m20:,.0f} / {m60:,.0f}"},
+        {"label": "20일 평균 가격이 오르는 중", "ok": m20 > m20_prev, "value": f"{(m20 / m20_prev - 1) * 100:+.1f}%"},
+        {"label": f"5일 상승률 {rules['swing_max_5d_rise']:.0f}% 이하 (과열 아님)",
+         "ok": rise5 <= rules["swing_max_5d_rise"], "value": f"{rise5:+.1f}%"},
+    ]
+
+
+def value_checks(drop, pbr, med, per, eps, eps0, rules=None):
+    """저평가 조건 (많이 빠짐·평소보다 쌈·절대로도 쌈·이익 유지)."""
+    rules = rules or VALUE_RULES
+    return [
+        {"label": f"60일 최고가 대비 {rules['min_drop']:.0f}% 이상 하락", "ok": drop >= rules["min_drop"],
+         "value": f"-{drop:.1f}%"},
+        {"label": f"PBR이 1년 중앙값의 {rules['max_pbr_ratio']:.0%} 이하", "ok": pbr / med <= rules["max_pbr_ratio"],
+         "value": f"{pbr:.2f} / {med:.2f}"},
+        {"label": f"흑자이고 PER {rules['max_per']:.0f} 이하", "ok": per <= rules["max_per"], "value": f"{per:.1f}"},
+        {"label": f"PBR {rules['max_pbr']:.0f} 이하", "ok": pbr <= rules["max_pbr"], "value": f"{pbr:.2f}"},
+        {"label": f"EPS가 1년 전의 {rules['min_eps_ratio']:.0%} 이상", "ok": eps / eps0 >= rules["min_eps_ratio"],
+         "value": f"{eps:,.0f} / {eps0:,.0f}"},
+    ]
+
+
 def screen(universe, closes, values, flows_daily, flows_5d, pension_5d, news_today, news_3d, rules=RULES):
     """단타·스윙 후보.
 
@@ -464,15 +510,7 @@ def screen(universe, closes, values, flows_daily, flows_5d, pension_5d, news_tod
         avg = avg_val20.get(code)
         mult = info["value"] / avg if avg and avg > 0 else None
         if has_today and mult is not None:
-            checks = [
-                {"label": f"거래대금 20일 평균의 {rules['scalp_value_mult']:.0f}배 이상", "ok": mult >= rules["scalp_value_mult"],
-                 "value": f"{mult:.1f}배"},
-                {"label": f"오늘 {rules['scalp_min_change']:.0f}% 이상 상승", "ok": info["change"] >= rules["scalp_min_change"],
-                 "value": f"{info['change']:+.1f}%"},
-                {"label": f"오늘 기관+외국인 순매수가 거래대금의 {rules['scalp_min_net_ratio']:.0f}% 이상",
-                 "ok": (f_today + i_today) / info["value"] * 100 >= rules["scalp_min_net_ratio"] if info["value"] else False,
-                 "value": f"{(f_today + i_today) / EOK:+,.0f}억 ({(f_today + i_today) / info['value'] * 100 if info['value'] else 0:.1f}%)"},
-            ]
+            checks = scalp_checks(mult, info["change"], f_today + i_today, info["value"], rules)
             if all(c["ok"] for c in checks):
                 score, parts = scalp_score(mult, info["change"], max(0, f_today + i_today) / info["value"])
                 scalp.append({**base, "checks": checks, "score": score, "score_parts": parts,
@@ -484,17 +522,7 @@ def screen(universe, closes, values, flows_daily, flows_5d, pension_5d, news_tod
             m20_prev = ma20[code].iloc[-6]
             rise5 = (close / closes[code].iloc[-6] - 1) * 100
             ratio = (f5 + i5) / info["cap"] * 100 if info["cap"] else 0
-            checks = [
-                {"label": f"5일 중 {rules['swing_min_days']}일 이상 기관+외국인 순매수", "ok": days_pos >= rules["swing_min_days"],
-                 "value": f"{days_pos}일"},
-                {"label": f"5일 순매수가 회사 덩치(시총)의 {rules['swing_min_ratio']}% 이상", "ok": ratio >= rules["swing_min_ratio"],
-                 "value": f"{ratio:.2f}%"},
-                {"label": "주가 > 20일 평균 > 60일 평균 (오르는 흐름)", "ok": close > m20 > m60,
-                 "value": f"{close:,.0f} / {m20:,.0f} / {m60:,.0f}"},
-                {"label": "20일 평균 가격이 오르는 중", "ok": m20 > m20_prev, "value": f"{(m20 / m20_prev - 1) * 100:+.1f}%"},
-                {"label": f"5일 상승률 {rules['swing_max_5d_rise']:.0f}% 이하 (과열 아님)",
-                 "ok": rise5 <= rules["swing_max_5d_rise"], "value": f"{rise5:+.1f}%"},
-            ]
+            checks = swing_checks(close, m20, m60, m20_prev, rise5, days_pos, ratio, rules)
             if all(c["ok"] for c in checks):
                 score = ratio * (1 + streak / 5)
                 swing.append({**base, "checks": checks, "score": round(score, 3),
@@ -656,16 +684,7 @@ def value_screen(universe, closes, fund_now, fund_hist, flows_5d, news_3d, rules
         if eps0 is None or math.isnan(eps0) or eps0 <= 0:
             continue
         pbr_ratio, eps_ratio = pbr / med, eps / eps0
-        checks = [
-            {"label": f"60일 최고가 대비 {rules['min_drop']:.0f}% 이상 하락", "ok": drop >= rules["min_drop"],
-             "value": f"-{drop:.1f}%"},
-            {"label": f"PBR이 1년 중앙값의 {rules['max_pbr_ratio']:.0%} 이하", "ok": pbr_ratio <= rules["max_pbr_ratio"],
-             "value": f"{pbr:.2f} / {med:.2f}"},
-            {"label": f"흑자이고 PER {rules['max_per']:.0f} 이하", "ok": per <= rules["max_per"], "value": f"{per:.1f}"},
-            {"label": f"PBR {rules['max_pbr']:.0f} 이하", "ok": pbr <= rules["max_pbr"], "value": f"{pbr:.2f}"},
-            {"label": f"EPS가 1년 전의 {rules['min_eps_ratio']:.0%} 이상", "ok": eps_ratio >= rules["min_eps_ratio"],
-             "value": f"{eps:,.0f} / {eps0:,.0f}"},
-        ]
+        checks = value_checks(drop, pbr, med, per, eps, eps0, rules)
         if not all(c["ok"] for c in checks):
             continue
         f5 = float(flows_5d["foreign"].get(code, 0) or 0)
@@ -1178,6 +1197,86 @@ def morning_summary(items):
         parts.append(f"공포지수 {'급등' if ch['vix'] > 0 else '급락'} {ch['vix']:+.0f}%")
     return {"tone": tone, "label": label, "score": round(score, 1),
             "text": " · ".join(parts) + f" → 오늘 아침 {label}"}
+
+
+# ---------------------------------------------------------------- 전체 종목 검색용 요약
+
+def _bits(checks):
+    return "".join("1" if c["ok"] else "0" for c in checks)
+
+
+def stock_index(universe, excluded, closes, values, flows_daily, flows_5d, news_today, news_3d,
+                fund_now=None, fund_hist=None, sectors=None, picked=None, rules=None, vrules=None):
+    """전 종목 한 줄 요약 + 탭별 조건 통과 여부(1/0 문자열). 화면의 '왜 후보에 안 걸렸나'용.
+
+    universe: 보통주 전체 {코드: listing 정보} (위험 공시로 뺀 종목 포함), excluded: {코드: [사유]}
+    조건 문구는 labels 에 한 번만 담고 종목마다 통과 여부만 담아 파일을 작게 한다.
+    """
+    rules, vrules = rules or RULES, vrules or VALUE_RULES
+    picked = picked or {}
+    ma20 = closes.rolling(20).mean()
+    ma60 = closes.rolling(60).mean()
+    avg_val20 = values.iloc[-21:-1].mean()
+    pbr_med = eps0s = None
+    if fund_now is not None and len(fund_now) and fund_hist:
+        h = pd.DataFrame({i: f["PBR"] for i, f in enumerate(fund_hist)})
+        pbr_med = h.where(h > 0).median(axis=1)
+        eps0s = fund_hist[0]["EPS"]
+    out = {}
+    for code, info in universe.items():
+        if code not in closes.columns:
+            continue
+        col = closes[code]
+        close = col.iloc[-1]
+        if close is None or math.isnan(close):
+            continue
+        fl = flow_detail(code, flows_daily, flows_5d, None)
+        f5 = (fl["foreign_5d"] or 0) + (fl["inst_5d"] or 0)
+        rec = {"n": info["name"], "m": {"KOSPI": "P", "KOSDAQ": "D"}.get(info["market"], info["market"][:1]), "c": round(float(close)), "ch": r1(info["change"]),
+               "cap": round(info["cap"] / EOK), "v": round(info["value"] / EOK), "f5": round(f5),
+               "pd": fl["days_pos"], "nw": 2 if code in news_today else 1 if code in news_3d else 0}
+        if sectors is not None and code in sectors:
+            rec["s"] = sectors.get(code)
+        size = info["cap"] >= rules["min_cap"] and info["value"] >= rules["min_value"]
+        vsize = info["cap"] >= vrules["min_cap"] and info["value"] >= vrules["min_value"]
+        rec["sz"] = ("1" if size else "0") + ("1" if vsize else "0")
+        avg = avg_val20.get(code)
+        if avg and avg > 0:
+            net = _money(flows_daily[-1][1]["foreign"], code) + _money(flows_daily[-1][1]["inst"], code) if flows_daily else 0.0
+            rec["sc"] = _bits(scalp_checks(info["value"] / avg, info["change"], net, info["value"], rules))
+            rec["mul"] = r1(info["value"] / avg)
+        c = col.dropna()
+        if len(closes) >= 61 and not math.isnan(ma60[code].iloc[-1]):
+            m20, m60, m20p = ma20[code].iloc[-1], ma60[code].iloc[-1], ma20[code].iloc[-6]
+            rise5 = (close / col.iloc[-6] - 1) * 100
+            ratio = f5 * EOK / info["cap"] * 100 if info["cap"] else 0
+            rec["sw"] = _bits(swing_checks(close, m20, m60, m20p, rise5, fl["days_pos"], ratio, rules))
+            rec["g20"], rec["g60"] = r1((close / m20 - 1) * 100), r1((close / m60 - 1) * 100)
+        if pbr_med is not None and code in fund_now.index and len(c) >= 60:
+            f = fund_now.loc[code]
+            pbr, per, eps = f.get("PBR", 0), f.get("PER", 0), f.get("EPS", 0)
+            med, eps0 = pbr_med.get(code), eps0s.get(code)
+            rec["per"], rec["pbr"] = (r1(per) if per else None), (round(float(pbr), 2) if pbr else None)
+            if not (pbr > 0 and per > 0 and eps > 0):
+                rec["vr"] = "적자이거나 재무 자료 없음"
+            elif med is None or math.isnan(med) or med <= 0 or eps0 is None or math.isnan(eps0) or eps0 <= 0:
+                rec["vr"] = "1년 전 재무 자료가 없음"
+            else:
+                drop = (1 - close / c.iloc[-60:].max()) * 100
+                rec["va"] = _bits(value_checks(drop, pbr, med, per, eps, eps0, vrules))
+                rec["dr"] = r1(drop)
+        if code in excluded:
+            rec["x"] = excluded[code][:2]
+        if picked.get(code):
+            rec["p"] = picked[code]
+        out[code] = rec
+    dummy = dict(mult=0, change=0, net_today=0, value=1)
+    labels = {"scalp": [c["label"] for c in scalp_checks(**dummy, rules=rules)],
+              "swing": [c["label"] for c in swing_checks(2, 1, 0, 1, 0, 0, 0, rules)],
+              "value": [c["label"] for c in value_checks(0, 1, 1, 1, 1, 1, vrules)]}
+    return {"labels": labels, "rules": {"min_cap": rules["min_cap"] / EOK, "min_value": rules["min_value"] / EOK,
+                                        "v_min_cap": vrules["min_cap"] / EOK, "v_min_value": vrules["min_value"] / EOK},
+            "stocks": out}
 
 
 # ---------------------------------------------------------------- 증권사 리포트 (주목도)
