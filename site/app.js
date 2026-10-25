@@ -933,7 +933,10 @@ function renderMorning() {
     el.hidden = true;
     return;
   }
-  const sm = m.summary || {};
+  const sm = { ...(m.summary || {}) };
+  // 주말에 만든 요약이면 '오늘 아침' 대신 '다음 장'으로
+  const wd = new Date(`${m.date.slice(0, 4)}-${m.date.slice(4, 6)}-${m.date.slice(6, 8)}T12:00:00+09:00`).getDay();
+  if (wd === 0 || wd === 6) sm.text = (sm.text || "").replace("오늘 아침", "다음 장(월요일) 시작");
   const color = sm.tone === "up" ? "var(--up)" : sm.tone === "down" ? "var(--down)" : "var(--text)";
   const items = m.items.map((x) => `<div><small>${esc(x.name)}</small><b class="${x.key === "vix" || x.key === "usdkrw" ? cls(-x.change) : cls(x.change)}">${signed(x.change, 2, "%")}</b><small class="faint">${num(x.value, x.value < 100 ? 2 : 0)}</small></div>`).join("");
   el.hidden = false;
