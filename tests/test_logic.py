@@ -528,6 +528,8 @@ def test_report_season_and_status():
     st = logic.update_reported({}, s, items, {"가나": "A", "다라": "B", "마바": "C"})
     assert st["reported"]["A"]["date"] == "20261020" and "B" in st["notice"]
     assert "C" not in st["reported"] and "C" not in st["notice"]
+    assert logic.earnings_status("A", "20261023", s, st) is None   # 한 날도 확인 못 했으면(DART 실패) 판단 안 함
+    st["checked"] = ["20261020"]
     assert logic.earnings_status("A", "20261023", s, st)["state"] == "done"
     assert logic.earnings_status("A", "20261019", s, st)["state"] == "pending"
     p = logic.earnings_status("B", "20261023", s, st)

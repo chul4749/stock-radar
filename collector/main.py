@@ -101,7 +101,9 @@ def main(argv):
     backfill = (datetime.now(KST).date() - datetime.strptime(base, "%Y%m%d").date()).days > 3
     nv = [] if backfill else (safe("네이버 주요뉴스", sources.naver_main_news, errors) or [])
     log(f"  네이버 주요뉴스 {len(nv)}{' (과거 기준일이라 생략)' if backfill else ''}")
-    dart = safe("DART", lambda: sources.dart_today(base), errors) or []
+    dart = safe("DART", lambda: sources.dart_today(base), errors)
+    dart_failed = dart is None
+    dart = dart or []
     # 실적 공시는 제목만으로 좋고 나쁨을 모르니 본문에서 영업이익 방향을 읽어, 줄었거나 적자면 재료에서 뺀다
     read_ok = 0
     for x in [x for x in dart if x.get("earnings")][:40]:
@@ -123,8 +125,12 @@ def main(argv):
     dart_bad = [x for x in dart if x["bad"]]
     dart_days = {base: dart}
     for d in used_days[-5:-1]:
-        dart_days[d] = safe(f"DART {d}", lambda: sources.dart_today(d), errors) or []
+        got = safe(f"DART {d}", lambda: sources.dart_today(d), errors)
+        dart_failed = dart_failed or got is None
+        dart_days[d] = got or []
         dart_bad += [x for x in dart_days[d] if x["bad"]]
+    if dart_failed:
+        dart_days = {d: v for d, v in dart_days.items() if v}   # 못 받은 날은 '확인한 날'로 치지 않음
     season, reported = update_season(base, dart_days, {v["name"]: c for c, v in listing.items()}, errors)
 
     matcher = logic.NameMatcher({c: v["name"] for c, v in universe.items()})
@@ -137,6 +143,16 @@ def main(argv):
     log(f"  기사 걸린 종목: 오늘 {len(news_today)} · 3일 {len(news_3d)}")
 
     risk = logic.risk_codes(dart_bad, matcher, {c: v["section"] for c, v in universe.items()})
+    if dart_failed:
+        # DART를 못 받은 날은 위험 공시 제외가 비게 되므로, 바로 전 기록의 제외 목록을 이어서 쓴다
+        prev = sorted(n[:8] for n in os.listdir(DATA) if n[:8].isdigit() and n.endswith(".json") and n[:8] < base)
+        if prev:
+            with open(os.path.join(DATA, f"{prev[-1]}.json"), encoding="utf-8") as f:
+                carried = (json.load(f).get("filter") or {}).get("excluded") or []
+            for e in carried:
+                if e["code"] not in risk:
+                    risk[e["code"]] = list(e.get("reasons") or []) + [f"{prev[-1][4:6]}/{prev[-1][6:]} 기록에서 이어옴 (DART 접속 실패)"]
+            log(f"  DART 실패 → {prev[-1]} 제외 목록 {len(carried)}개 이어서 씀")
     excluded = [{"code": c, "name": universe[c]["name"], "reasons": r[:3]} for c, r in risk.items() if c in universe]
     universe_all = universe
     universe = {c: v for c, v in universe.items() if c not in risk}

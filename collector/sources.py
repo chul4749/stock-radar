@@ -359,8 +359,16 @@ DART_NOT_GOOD = ["증권발행실적", "실적공시예고", "결산실적공시
 DART_EARNINGS = ["잠정)실적", "잠정실적", "손익구조"]
 
 
+DART_STATE = {"down": False}   # 한 번 첫 쪽부터 접속이 안 되면 이번 실행에선 더 부르지 않는다 (날마다 수 분씩 기다리지 않게)
+
+
 def dart_today(ymd, max_pages=15):
-    """DART 오늘 공시 목록(웹). 코스피·코스닥 상장사만. 정식 OpenDART 는 키가 필요하다."""
+    """DART 오늘 공시 목록(웹). 코스피·코스닥 상장사만. 정식 OpenDART 는 키가 필요하다.
+
+    첫 쪽부터 실패하면 예외를 낸다 (빈 목록과 '받지 못함'을 구분해야 위험 공시 제외가 조용히 약해지지 않는다).
+    """
+    if DART_STATE["down"]:
+        raise ConnectionError("DART 접속 안 됨 (이번 실행 앞에서 실패)")
     date_dot = f"{ymd[:4]}.{ymd[4:6]}.{ymd[6:]}"
     out, seen, stale = [], set(), 0
     for page in range(1, max_pages + 1):
@@ -369,7 +377,10 @@ def dart_today(ymd, max_pages=15):
                                   params={"selectDate": date_dot, "currentPage": page, "maxResults": 100,
                                           "maxLinks": 10, "sort": "", "series": ""}), tries=4, wait=5)
         except Exception as e:
-            log(f"  DART {page}쪽 실패: {e}")
+            if page == 1:
+                DART_STATE["down"] = True
+                raise
+            log(f"  DART {page}쪽 실패 (앞 쪽까지만 씀): {e}")
             break
         rows = re.findall(r"<tr>(.*?)</tr>", r.text, re.S)
         new = 0

@@ -1545,7 +1545,7 @@ def update_reported(store, season, items, name_to_code):
 
 def earnings_status(code, base, season, store):
     """후보 카드용: 이번 시즌 실적을 이미 냈는지, 아직이면 마감까지 며칠인지."""
-    if not season or store.get("season") != season["key"]:
+    if not season or store.get("season") != season["key"] or not store.get("checked"):   # 한 날도 못 받았으면 판단 안 함
         return None
     rep = store["reported"].get(code)
     if rep and rep["date"] <= base:
