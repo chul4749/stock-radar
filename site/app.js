@@ -763,7 +763,7 @@ function reportBlock(x) {
   if (!rp) return "";
   if (!rp.n) return `<div class="rep"><small class="faint">최근 2주 증권사 리포트 없음${rp.known && !rp.before ? " (석 달 넘게 아무도 안 다룸)" : ""}</small></div>`;
   const top = rp.items[0], d = rp.detail || {};
-  const op = d.opinion ? OPINION[d.opinion.toLowerCase()] || d.opinion : null;
+  const op = d.opinion && d.opinion !== "없음" ? OPINION[d.opinion.toLowerCase()] || d.opinion : null;
   const goal = d.goal ? `목표가 <b>${num(d.goal)}원</b>${d.prev_goal && d.prev_goal !== d.goal ? ` <small class="${cls(d.goal - d.prev_goal)}">(${d.goal > d.prev_goal ? "올림" : "내림"}, 전 ${num(d.prev_goal)})</small>` : ""}${x.close ? ` · 지금보다 <b class="${cls(d.goal - x.close)}">${signed((d.goal / x.close - 1) * 100, 0, "%")}</b>` : ""}` : "";
   const more = rp.items.slice(1).map((r) => `<li><a href="https://m.stock.naver.com/research/company/${r.id}" target="_blank" rel="noopener">${esc(r.title)}</a><small>${esc(r.broker)} ${ymd(r.date).slice(5)}</small></li>`).join("");
   return `<div class="rep"><div class="row"><b>증권사 리포트 ${rp.n}건 <small>(2주)</small>${infoBtn("report")}</b>${rp.fresh ? `<span class="tag fresh">오랜만에 다뤄짐</span>` : ""}</div>${infoBox("report")}
