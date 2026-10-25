@@ -385,7 +385,9 @@ function futuresTile(f) {
 // 억 원 → "1.23조" / "456억"
 const eokText = (v) => (v == null ? "–" : Math.abs(v) >= 10000 ? `${num(v / 10000, 2)}조` : `${num(v)}억`);
 
-const pctText = (p) => (p == null ? "" : ` · 1년 중 ${p}% 위치`);
+// '1년 중 76% 위치' 대신 말로: 지난 1년 값들 사이에서 어디쯤인지
+const pctWord = (p) => (p == null ? "" : p >= 90 ? "1년 중 가장 높은 쪽" : p >= 70 ? "1년 중 높은 편" : p > 30 ? "1년 중 보통" : p > 10 ? "1년 중 낮은 편" : "1년 중 가장 낮은 쪽");
+const pctText = (p) => (p == null ? "" : ` · ${pctWord(p)}`);
 
 function renderTemp() {
   const t = state.data.temperature;
@@ -437,10 +439,14 @@ function renderTemp() {
       if (!f) continue;
       for (const [k, who] of [["foreign", "외국인"], ["inst", "기관"]]) {
         const x = f[k];
-        if (x) rows.push(`<tr><td>${name} ${who}</td><td class="${cls(x.today)}">${signed(x.today, 0)}</td><td class="${cls(x.d5)}">${signed(x.d5, 0)}</td><td class="${cls(x.d20)}">${signed(x.d20, 0)}</td></tr>`);
+        if (x) rows.push(`<tr><td>${name} ${who}</td><td class="${cls(x.today)}">${sEok(x.today)}</td><td class="${cls(x.d5)}">${sEok(x.d5)}</td><td class="${cls(x.d20)}">${sEok(x.d20)}</td></tr>`);
       }
     }
-    tiles.push(`<div class="tile wide"><div class="l">시장 전체 순매수 (억 원) ${infoBtn("marketflows")}</div>${infoBox("marketflows")}<table class="flowtbl"><thead><tr><th></th><th>오늘</th><th>5일</th><th>20일</th></tr></thead><tbody>${rows.join("")}</tbody></table></div>`);
+    const kf = (t.flows.KOSPI || {}).foreign, ki = (t.flows.KOSPI || {}).inst;
+    const say = (who, x) => `${who}은 ${x > 0 ? `${eokText(Math.abs(x))} 샀고` : `${eokText(Math.abs(x))} 팔았고`}`;
+    const line = kf && ki ? `코스피에서 최근 20일 동안 ${say("외국인", kf.d20)} ${say("기관", ki.d20).replace(/고$/, "어요")}.` +
+      (kf.d5 * kf.d20 < 0 ? ` 다만 최근 5일은 외국인이 ${kf.d5 > 0 ? "다시 사는" : "다시 파는"} 쪽이에요.` : "") : "";
+    tiles.push(`<div class="tile wide"><div class="l">시장 전체 순매수 ${infoBtn("marketflows")}</div>${infoBox("marketflows")}<table class="flowtbl"><thead><tr><th></th><th>오늘</th><th>5일</th><th>20일</th></tr></thead><tbody>${rows.join("")}</tbody></table>${line ? `<p class="interp">${line}</p>` : ""}</div>`);
   }
   const cb = t.credit_balance || {};
   if (cb.loan) {
@@ -508,17 +514,18 @@ function bars(daily) {
 function renderToday() {
   const d = state.data, t = d.temperature, rg = t.regime, th = t.thermo, f = d.filter;
   const rows = [];
-  if (th) rows.push(["시장 온도", `<b style="color:${THERMO_COLOR(th.score)}">${th.score}점 ${esc(th.label)}</b>`]);
+  if (th) rows.push(["시장 온도", `<b style="color:${THERMO_COLOR(th.score)}">${th.score}점 ${esc(th.label)}</b> <small>(0 몹시 겁먹음 ~ 100 과열)</small>`]);
   if (rg) {
     const by = (grade) => ["swing", "scalp", "value"].filter((g) => rg.fit[g].grade === grade).map((g) => TAB_NAME[g]);
     const good = by("good"), bad = by("bad");
     rows.push(["장세", `<b>${esc(rg.label)}</b> <small>코스피 20일 ${signed(rg.trend.chg20, 1, "%")}${rg.trend_key && rg.key === "panic" ? ` · 추세만 보면 ${REGIME_NAME[rg.trend_key]}` : ""}</small>`]);
-    rows.push(["맞는 시나리오", good.length ? `<b class="good">${good.join("·")}</b>` : "<span class=\"na\">없음</span>"]);
-    if (bad.length) rows.push(["피할 시나리오", `<b class="bad">${bad.join("·")}</b>`]);
+    const desc = (names) => names.map((n) => `${n} <small>(${TAB_DESC[n]})</small>`).join("<br>");
+    rows.push(["잘 맞는 방식", good.length ? `<b class="good">${desc(good)}</b>` : `<span class="na">없음 — 기다리는 게 나은 장</span>`]);
+    if (bad.length) rows.push(["피할 방식", `<b class="bad">${desc(bad)}</b>`]);
     rows.push(["인버스", esc(rg.inverse.label)]);
     const sg = d.temperature.signals, tn = d.temperature.transition;
     if (sg) rows.push(["사도 되는 신호", `<b style="color:${SIG_COLOR[sg.level]}">${sg.level}단계</b> <small>${esc(sg.guide)}</small>`]);
-    if (tn) rows.push(["장의 전환", `20일 평균선까지 ${tn.gap20 > 0 ? `${num(tn.gap20, 1)}% 남음` : "회복"}${tn.near ? ` <span class="tag new">전환 임박</span>` : ""}`]);
+    if (tn) rows.push(["장의 전환", tn.gap20 > 0 ? `${esc(tn.from)}에서 벗어나려면 코스피가 <b>${num(tn.gap20, 1)}%</b> 더 올라야 함 <small>(20일 평균 가격까지)</small>${tn.near ? ` <span class="tag new">전환 임박</span>` : ""}` : `코스피가 20일 평균 가격 위로 올라섬`]);
   }
   const tops = ["swing", "scalp", "value"].filter((g) => (f[g] || []).length).map((g) => {
     const x = f[g][0];
@@ -547,8 +554,36 @@ function renderToday() {
   if (tops.length) rows.push(["탭별 1위", `<span class="picks">${tops.map((p) => `<span>${p}</span>`).join("")}</span>`]);
   const hits = Object.keys(state.watch).filter((c) => ["swing", "scalp", "value"].some((g) => (f[g] || []).some((y) => y.code === c)));
   if (Object.keys(state.watch).length) rows.push(["관심 종목", hits.length ? `<b>${hits.map((c) => esc(state.watch[c])).join(", ")}</b> 오늘 걸림` : `<span class="na">오늘 걸린 종목 없음</span>`]);
-  $("#today-body").innerHTML = rows.length ? `<div class="today">${rows.map(([k, v]) => `<div class="tr"><span class="k">${k}</span><span class="v">${v}</span></div>`).join("")}</div>` +
-    `<p class="hint">아래 칸들의 결론만 모은 것입니다. 매수·매도 추천이 아닙니다.</p>` : "";
+  $("#today-body").innerHTML = verdictBox() + (rows.length ? `<div class="today">${rows.map(([k, v]) => `<div class="tr"><span class="k">${k}</span><span class="v">${v}</span></div>`).join("")}</div>` +
+    `<p class="hint">아래 칸들의 결론만 모은 것입니다. 매수·매도 추천이 아닙니다.</p>` : "");
+}
+
+const TAB_DESC = { "스윙": "오르는 종목을 며칠~몇 주 들고 가기", "단타": "하루 이틀 짧게", "저평가": "싸진 종목을 나눠 사서 기다리기" };
+
+// 맨 위 '오늘의 결론': 시장 분위기 → 할 일 → 볼 곳 → 무엇이 바뀌면 달라지나
+function verdictBox() {
+  const d = state.data, t = d.temperature || {}, rg = t.regime, th = t.thermo, sg = t.signals, tn = t.transition;
+  if (!rg || !th) return "";
+  const mood = th.score < 25 ? "몹시 겁먹은" : th.score < 45 ? "겁먹은" : th.score < 55 ? "차분한" : th.score < 75 ? "들뜬" : "과열된";
+  let act;
+  if (rg.key === "up") act = "평소처럼 — 오르는 흐름 종목(스윙) 위주로 보세요";
+  else if (sg && sg.applies) act = ["새로 사기보다 기다리는 날 — 꼭 산다면 아주 조금만", "사도 쓸 돈의 1/3까지만, 나눠서", "쓸 돈의 2/3까지, 나눠서", "평소처럼 — 오르는 흐름 종목 위주"][sg.level];
+  else act = rg.key === "range" ? "방향이 없는 장 — 짧게(단타)나 싼 종목(저평가) 위주로 조금씩" : "조심해서 — 나눠서 천천히";
+  const look = [];
+  const early = ((d.themes || {}).themes || []).filter((x) => x.key === "early").map((x) => x.name);
+  if (early.length) look.push(`돈이 먼저 들어오는 업종: ${early.slice(0, 3).map(esc).join("·")}`);
+  const mg = (((d.managers || {}).moves || {})["20"] || {}).buys || [];
+  const many = mg.filter((r) => r.n >= 2);
+  if (many.length) look.push(`운용사 여러 곳이 같이 산 종목: ${many.slice(0, 2).map((r) => esc(r.name)).join("·")}`);
+  const woke = (d.filter.value || []).filter((x) => x.wake && x.wake.met >= 2);
+  if (woke.length) look.push(`다시 주목받는 싼 종목: ${woke.slice(0, 2).map((x) => esc(x.name)).join("·")}`);
+  const change = [];
+  if (sg && sg.applies && sg.level < 3) change.push(esc(sg.next));
+  if (tn && tn.gap20 > 0) change.push(`코스피가 ${num(tn.gap20, 1)}% 더 오르면 하락장에서 벗어남`);
+  return `<div class="verdict"><p class="vm">지금은 <b>${mood} ${esc(rg.label)}</b>이에요 <small>(온도 ${th.score}/100)</small></p>
+    <p class="va">👉 ${act}</p>
+    ${look.length ? `<p class="vl">👀 볼 곳: ${look.join(" / ")}</p>` : ""}
+    ${change.length ? `<p class="vc">🔁 바뀌는 조건: ${change.join(" · ")}</p>` : ""}</div>`;
 }
 
 /* ---------------- 장의 전환 · 사도 되는 신호 ---------------- */
@@ -747,6 +782,7 @@ function valueCard(x) {
   const news = newsList(x.news);
   return `<article class="card">
     ${cardHead(x)}
+    ${whyLine(x)}
     ${scoreRow(x)}
     <div class="nums">
       <div><small>60일 고점 대비</small><b class="down">-${num(x.drop_60d, 1)}%</b></div>
@@ -802,6 +838,24 @@ function wakeBlock(w) {
   const msg = w.met >= 2 ? "시장이 다시 보기 시작한 신호가 있음" : w.met === 1 ? "신호가 하나뿐 — 좀 더 지켜보기" : "아직 아무도 안 보는 중 — 싼 채로 오래 갈 수 있음";
   return `<div class="wake"><div class="row"><b>주목 신호 <span class="${tone}">${w.met}/${w.total}</span>${infoBtn("wake")}</b><small>${msg}</small></div>${infoBox("wake")}
     <ul class="checks">${w.checks.map((c) => `<li class="${c.ok ? "" : "no"}"><span>${esc(c.label)}</span><span>${esc(c.value)}</span></li>`).join("")}</ul></div>`;
+}
+
+// 카드 맨 위 한 줄: 왜 걸렸는지 쉬운 말로
+function whyLine(x) {
+  const fl = x.flow || {}, bits = [];
+  if (state.tab === "swing") {
+    bits.push(`큰손(기관·외국인)이 ${fl.streak ? `${fl.streak}일째` : "며칠째"} 사는 중`, "주가가 오르는 흐름");
+  } else if (state.tab === "scalp") {
+    bits.push(`오늘 ${signed(x.change, 1, "%")}`, `거래가 평소의 ${num(x.value_mult, 1)}배`, "큰손도 같이 삼");
+  } else {
+    bits.push(`최근 고점보다 ${num(x.drop_60d, 0)}% 빠짐`, `버는 돈에 비해 싼 편(PER ${num(x.per, 1)})`);
+    if (x.wake) bits.push(x.wake.met >= 2 ? "다시 주목받기 시작" : "아직 관심 적음");
+  }
+  const rp = x.reports, d = rp && rp.detail;
+  if (rp && rp.fresh) bits.push("증권사가 오랜만에 다룸");
+  else if (d && d.goal && d.prev_goal && d.goal > d.prev_goal) bits.push("목표가 올라감");
+  if (x.managers && x.managers.buy && x.managers.buy.length) bits.push(`운용사 ${x.managers.buy.length}곳이 삼`);
+  return `<p class="why">${bits.map(esc).join(" · ")}</p>`;
 }
 
 function cardHead(x) {
@@ -865,7 +919,7 @@ function scoreRow(x) {
     return `<div class="scorerow"><div class="row"><span>강도 <b>${x.score_pct}점</b> · 오늘 ${i + 1}위/${total} ${infoBtn("score_" + state.tab)}</span>` +
       `<small>역대 상위 ${Math.max(1, 100 - x.score_pct)}%</small></div>` +
       `<div class="sbar"><i style="width:${Math.max(3, x.score_pct)}%"></i></div>` +
-      `<small class="f">역대 ${TAB_NAME[state.tab]} 후보 ${num(x.score_pool)}개 기준 · ${raw}</small>${infoBox("score_" + state.tab)}</div>`;
+      `<small class="f">지금까지 ${TAB_NAME[state.tab]} 후보 ${num(x.score_pool)}개 중 위에서 ${Math.max(1, 100 - x.score_pct)}% 안 <details class="calc"><summary>계산 보기</summary>${raw}</details></small>${infoBox("score_" + state.tab)}</div>`;
   }
   const top = list[0].score || 1, rel = Math.round((x.score / top) * 100);
   return `<div class="scorerow"><div class="row"><span>오늘 ${i + 1}위/${total} ${infoBtn("score_" + state.tab)}</span><small>1위 대비 ${rel}%</small></div>` +
@@ -887,6 +941,7 @@ function card(x) {
   const news = newsList(x.news);
   return `<article class="card">
     ${cardHead(x)}
+    ${whyLine(x)}
     ${scoreRow(x)}
     <div class="nums">${nums.map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join("")}</div>
     <div class="l" style="font-size:12px;color:var(--sub)">최근 5일 기관+외국인 순매수 (억)</div>

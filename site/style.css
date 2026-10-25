@@ -411,3 +411,13 @@ table.fin .est { color: var(--faint); }
 .hl { padding: 6px 0; border-top: 1px solid var(--line); font-size: 13px; }
 .hl > small { color: var(--sub); }
 .mlist { list-style: none; margin: 4px 0 0; padding: 0; font-size: 12px; line-height: 1.7; }
+.verdict { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--text); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+.verdict p { margin: 0 0 6px; line-height: 1.55; font-size: 14px; }
+.verdict p:last-child { margin-bottom: 0; }
+.verdict .vm { font-size: 16px; }
+.verdict small { color: var(--sub); font-weight: 400; }
+.verdict .vl, .verdict .vc { color: var(--sub); font-size: 13px; }
+.card .why { margin: 4px 0 6px; font-size: 13px; line-height: 1.5; color: var(--text); background: var(--neutral-bg); border-radius: 8px; padding: 6px 8px; }
+details.calc { display: inline; }
+details.calc summary { display: inline; cursor: pointer; color: var(--faint); text-decoration: underline; }
+details.calc[open] { display: block; margin-top: 2px; }
