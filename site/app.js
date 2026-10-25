@@ -1587,7 +1587,12 @@ function fitOne(el) {
   if (ratio < FIT_MIN) { el.style.whiteSpace = ""; return; }   // 많이 넘치면 줄바꿈 그대로
   const fs = parseFloat(getComputedStyle(el).fontSize);
   el.dataset.fitBase = "1";
-  el.style.fontSize = `${Math.floor(fs * ratio * 10) / 10}px`;
+  // 안쪽에 글자 크기가 고정된 조각(small 등)이 있으면 계산만큼 안 줄어들 수 있어, 줄인 뒤 다시 재고 안 맞으면 조금 더, 그래도 넘치면 원래대로
+  for (let f = ratio; f >= FIT_MIN; f -= 0.03) {
+    el.style.fontSize = `${Math.floor(fs * f * 10) / 10}px`;
+    if (el.scrollWidth <= el.clientWidth) return;
+  }
+  el.style.fontSize = ""; el.style.whiteSpace = ""; delete el.dataset.fitBase;
 }
 
 let fitTimer = null;
