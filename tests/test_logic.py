@@ -491,3 +491,48 @@ def test_value_feature_stats_skip_unknown_days():
     fs = logic.feature_stats([e(None, 1.0), e(True, 2.0), e(False, -1.0)], groups=("value",), features=logic.VALUE_FEATURES)
     w2 = next(f for f in fs if f["key"] == "v_wake2")
     assert w2["yes"]["n"] == 1 and w2["no"]["n"] == 1
+
+
+def test_exit_level_per_tab():
+    c = pd.Series([100.0 + i for i in range(30)])
+    lo = c - 2
+    sw = logic.exit_level("swing", c, lo)
+    assert sw["stop"] == round(sum(c.iloc[-20:]) / 20) and sw["gap"] < 0 and "20일 평균" in sw["rule"]
+    assert logic.exit_level("scalp", c, lo)["stop"] == 127
+    assert logic.exit_level("value", c, lo)["stop"] == 118
+    assert logic.exit_level("swing", c.iloc[:10], lo.iloc[:10]) is None
+
+
+def test_stop_scorecard_sells_when_close_breaks_stop():
+    days = [f"202610{d:02d}" for d in range(1, 31)]
+    up = [100.0 + i for i in range(23)] + [123, 124, 125, 126, 127, 128, 129]
+    down = [100.0 + i for i in range(23)] + [123, 90, 85, 80, 75, 70, 65]
+    closes = pd.DataFrame({"A": up, "B": down}, index=days)
+    lows = closes - 1
+    hist = [(days[22], {"swing": [{"code": "A", "name": "a", "close": 122}, {"code": "B", "name": "b", "close": 122}]})]
+    st = logic.stop_scorecard(hist, closes, lows, opens=closes, horizons=(5,), cost=0)["swing"]["5"]
+    assert st["hit"] == 50 and st["hold"]["n"] == 2
+    assert st["stop"]["avg"] > st["hold"]["avg"]   # B는 첫날 손절해서 덜 잃음
+
+
+def test_report_season_and_status():
+    s = logic.report_season("20261023")
+    assert s["key"] == "2026Q3" and s["due"] == "20261114"
+    assert logic.report_season("20260601") is None and logic.report_season("20270210")["key"] == "2026Y"
+    items = [{"corp": "가나", "title": "분기보고서 (2026.09)", "at": "2026-10-20T15:00+09:00"},
+             {"corp": "다라", "title": "결산실적공시예고", "at": "2026-10-21T15:00+09:00"},
+             {"corp": "가나", "title": "[기재정정]분기보고서", "at": "2026-10-22T15:00+09:00"}]
+    st = logic.update_reported({}, s, items, {"가나": "A", "다라": "B"})
+    assert st["reported"]["A"]["date"] == "20261020" and "B" in st["notice"]
+    assert logic.earnings_status("A", "20261023", s, st)["state"] == "done"
+    assert logic.earnings_status("A", "20261019", s, st)["state"] == "pending"
+    p = logic.earnings_status("B", "20261023", s, st)
+    assert p["state"] == "pending" and p["days_left"] == 22 and p["notice"]
+
+
+def test_morning_summary_tone():
+    up = logic.morning_summary([{"key": "ewy", "change": 1.5}, {"key": "nasdaq", "change": 0.8}, {"key": "vix", "change": -6}])
+    assert up["tone"] == "up" and "한국 ETF +1.5%" in up["text"] and "공포지수 급락" in up["text"]
+    down = logic.morning_summary([{"key": "ewy", "change": -1.2}, {"key": "usdkrw", "change": 0.5}])
+    assert down["tone"] == "down"
+    assert logic.morning_summary([])["label"] == "자료 없음"

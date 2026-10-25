@@ -1,0 +1,56 @@
+name: morning  # 새벽 미국장 결과로 '아침 요약'만 갱신 (종목 수집 없음)
+
+on:
+  schedule:
+    - cron: "41 22 * * 0-4"   # 평일 07:41 KST (미국장 마감 후)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: collect   # 저녁 수집과 같은 줄에 세워 push가 엇갈리지 않게
+  cancel-in-progress: false
+
+jobs:
+  morning:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: 아침 요약·저장
+        run: |
+          git config user.name "stock-radar-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python -m collector.morning
+          cp site/data/morning.json "$RUNNER_TEMP/morning.json"
+          git fetch -q origin "$GITHUB_REF_NAME"
+          git checkout -q -f -B "$GITHUB_REF_NAME" "origin/$GITHUB_REF_NAME"
+          cp "$RUNNER_TEMP/morning.json" site/data/morning.json
+          git add site/data/morning.json
+          git diff --cached --quiet || git commit -q -m "data: 아침 요약 $(TZ=Asia/Seoul date +%F)"
+          git push -q origin "$GITHUB_REF_NAME"
+      - if: vars.PAGES_ENABLED == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/
+
+  deploy:
+    if: vars.PAGES_ENABLED == 'true'
+    needs: morning
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

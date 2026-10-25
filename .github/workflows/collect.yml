@@ -13,6 +13,9 @@ on:
       dates:
         description: "먼저 다시 계산할 과거 기준일들 (공백으로 구분, 성적표 채우기용)"
         required: false
+      if_missing:
+        description: "1이면 그날 데이터가 이미 있을 때 건너뜀 (외부 예약용)"
+        required: false
 
 permissions:
   contents: write
@@ -60,7 +63,8 @@ jobs:
           python -m collector.main ${{ inputs.base_date }}
           save "$(date -u +%F)"
         env:
-          IF_MISSING: ${{ github.event.schedule == '47 11 * * 1-5' && '1' || '' }}
+          # 예약 실행·외부 예약(if_missing=1)은 그날 데이터가 이미 있으면 건너뜀 (먼저 도착한 쪽만 수집)
+          IF_MISSING: ${{ (github.event_name == 'schedule' || inputs.if_missing == '1') && '1' || '' }}
           KRX_ID: ${{ secrets.KRX_ID }}
           KRX_PW: ${{ secrets.KRX_PW }}
       - uses: actions/upload-artifact@v4

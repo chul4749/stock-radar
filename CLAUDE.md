@@ -19,9 +19,14 @@
     저평가 이익 항목은 네이버 추정 EPS가 있으면 반반 섞는다(`apply_forward_eps`).
     저평가는 가치 함정(관심 없으면 몇 년이고 싼 채로 남음) 때문에 '주목 신호'(`value_wake`: 큰손 5일 매수·3일 소식·거래 증가·10일 바닥 반등)를
     점수와 따로 보여 주고, 성적표 `VALUE_FEATURES`(저평가 조건별 성적)로 정말 나은지 확인한다.
+    후보마다 정리 가격(`exit_level`: 스윙 20일 평균, 단타 걸린 날 저가, 저평가 10일 최저가)을 붙이고,
+    성적표 `stops`(`stop_scorecard`)로 그 기준을 지켰을 때와 그냥 들고 있을 때를 비교한다.
+    실적 시즌(`report_season`)에는 DART 목록으로 이번 분기 실적을 낸 회사를 `site/data/reported.json`에 모아 아직 안 낸 후보에 경고(`earn_season`).
+    `site/data/prices.json`은 가장 최근 기준일 전 종목 종가(관심 종목 ★ 이후 수익률용).
     성적표는 다음 날 시가 진입·N영업일째 종가 청산, 거래 비용 `COST` 차감, 종목이 속한 시장 지수 대비,
     같은 탭·같은 종목이 N일 안에 다시 걸리면 한 번만 센다. 조건별 성적도 지수 대비 초과로 비교한다.
     공식이나 기준을 바꾸면 화면의 '필터 기준 보기'(`renderRules`)와 ⓘ 설명(`INFO`)도 같이 고친다
+  - `morning.py` — 아침 요약: 야후 차트로 미국장 마감(EWY·나스닥·S&P·반도체·VIX·환율) → `site/data/morning.json` (`logic.morning_summary`)
   - `util.py` — KST, EOK(억), log
 - `site/` — 빌드 없는 정적 페이지 (`index.html`, `app.js`, `style.css`), 데이터는 `site/data/`
 - `probe/` — 데이터 출처 접속 시험 스크립트. 결과는 `docs/data-sources.md`에 정리
@@ -30,8 +35,10 @@
 ## 운영
 
 - 사무실 PC에서는 증권 사이트가 대부분 막혀 있어 **수집은 GitHub Actions에서만** 한다.
-- `.github/workflows/collect.yml`: 평일 18:23 KST에 실행(20:47 예비 실행은 그날 데이터가 있으면 건너뜀) → 테스트 → 수집 → `data: YYYY-MM-DD` 커밋 → (설정 시) Pages 배포.
+- `.github/workflows/collect.yml`: 평일 18:23 KST에 실행(20:47 예비 실행) → 테스트 → 수집 → `data: YYYY-MM-DD` 커밋 → (설정 시) Pages 배포.
   시작할 때 최신 main을 받고, 저장할 때도 최신 main 위에 새로 만든 파일만 덮어쓴다(다른 실행이 올린 날짜 파일을 지우지 않음).
+- `.github/workflows/morning.yml`: 평일 07:41 KST 아침 요약만 갱신·배포. 화면은 가장 최근 수집일을 볼 때, 그 뒤 아침에 만든 요약만 보여 준다.
+- 예약 실행은 모두 `IF_MISSING`(그날 데이터 있으면 건너뜀). 외부 예약(cron-job.org)은 `if_missing=1`로 부른다 — `docs/external-schedule.md`.
 - `.github/workflows/pages.yml`: `site/` 코드(데이터 제외)가 main에 올라오면 수집 없이 바로 배포.
   수동 실행 때 `dates`에 과거 기준일을 넣으면 다시 계산한다(성적표 채우기용).
 - KRX는 로그인 필요: Secrets `KRX_ID`/`KRX_PW`.

@@ -7,11 +7,12 @@ const signed = (v, d = 1, unit = "") => (v == null ? "–" : (v > 0 ? "+" : "") 
 const cls = (v) => (v == null ? "na" : v > 0 ? "up" : v < 0 ? "down" : "");
 const ymd = (s) => `${s.slice(0, 4)}.${s.slice(4, 6)}.${s.slice(6, 8)}`;
 
-let state = { data: null, tab: "swing", score: null, expAll: false, watch: {} };
+let state = { data: null, tab: "swing", score: null, expAll: false, watch: {}, watchFrom: {}, prices: null, morning: null, latest: null };
 try {
   state.tab = localStorage.getItem("tab") || "swing";
   state.expAll = localStorage.getItem("expAll") === "1";
   state.watch = JSON.parse(localStorage.getItem("watch") || "{}") || {};
+  state.watchFrom = JSON.parse(localStorage.getItem("watchFrom") || "{}") || {};   // ★ 누른 날 가격 {코드: {price, date, kospi}}
 } catch (e) { /* 저장 불가 환경 */ }
 
 async function load(date) {
@@ -28,9 +29,14 @@ async function init() {
     const sel = $("#date");
     sel.innerHTML = idx.dates.map((d) => `<option value="${d}">${ymd(d)}</option>`).join("");
     sel.onchange = () => load(sel.value);
+    state.latest = idx.latest;
     await load(idx.latest);
     fetch("data/scorecard.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null))
       .then((sc) => { state.score = sc; renderScore(); renderRegime(); renderTurn(); }).catch(() => renderScore());
+    fetch("data/prices.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null))
+      .then((p) => { state.prices = p; renderWatch(); }).catch(() => {});
+    fetch("data/morning.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null))
+      .then((m) => { state.morning = m; renderMorning(); }).catch(() => {});
   } catch (e) {
     $("#cards").innerHTML = `<div class="empty">${esc(e.message || "데이터가 아직 없습니다")}</div>`;
   }
@@ -61,6 +67,7 @@ function render() {
   renderToday();
   renderTurn();
   renderRules();
+  renderMorning();
   const n = d.filter.news_count;
   $("#sources").textContent = `데이터: KRX(시세·수급), 구글 뉴스 ${n.google}건 · 네이버 ${n.naver}건 · DART 공시 ${n.dart}건, CBOE(VIX), FRED(하이일드), CNN(공포·탐욕). 네이버·CNN은 비공식 경로라 바뀌면 빠질 수 있습니다.`;
   $("#errors").textContent = d.errors && d.errors.length ? `수집 실패: ${d.errors.join(", ")}` : "";
@@ -89,6 +96,9 @@ const INFO = {
   inverse: "지수가 떨어지면 돈을 버는 상품(ETF)입니다. 예: 코스피가 1% 내리면 약 1% 오름.\n주의: 매일 다시 계산되는 구조라, 지수가 오르락내리락하며 제자리여도 손해가 쌓입니다. 2배 상품은 더 심합니다. 그래서 '확실히 내리는 짧은 구간'에만 맞고, 이미 많이 떨어진 뒤 따라 들어가면 반등에 크게 당하기 쉽습니다.",
   score_swing: "강도: 이 종목이 조건에 얼마나 강하게 걸렸는지 0~100점입니다. 지금까지 같은 탭에 걸린 종목들 중 어디쯤인지로 매겨서, 세 탭을 같은 눈금으로 비교할 수 있습니다.\n스윙 계산: 회사 크기에 비해 최근 5일 큰손이 얼마나 많이 샀는지 + 며칠 연속 샀는지.\n강도가 높다고 오른다는 보장은 없습니다. '어떤 종목부터 볼지' 순서로만 쓰세요.",
   score_scalp: "강도: 이 종목이 조건에 얼마나 강하게 걸렸는지 0~100점입니다. 지금까지 같은 탭에 걸린 종목들 중 어디쯤인지로 매깁니다.\n단타 계산 (100점 만점을 나눠 가짐):\n· 큰손 확인 50%: 오늘 거래 중 큰손이 산 비중 (20% 이상이면 만점)\n· 거래 증가 25%: 평소보다 거래가 몇 배 늘었나 (8배면 만점, 15배 넘게 과열되면 오히려 감점)\n· 상승폭 25%: 5~15% 오르면 만점, 상한가 근처까지 튀면 감점\n너무 과열된 종목은 다음 날 꺾이는 경우가 많아서 이렇게 만들었습니다.",
+  exit: "언제 팔지 미리 정해 두는 기준입니다. 처음 투자할 때 가장 어려운 게 '언제 파느냐'라서, 사기 전에 정해 두면 손실이 커지는 걸 막을 수 있습니다.\n· 스윙: 종가가 20일 평균 가격 아래로 마감하면 정리 (오르는 흐름이 깨짐)\n· 단타: 걸린 날의 저가를 깨고 마감하면 정리 (급등 힘이 빠짐)\n· 저평가: 최근 10일 최저가를 깨고 마감하면 정리 (아직 바닥이 아니었음)\n괄호 안 %는 지금 가격에서 그 기준까지 거리입니다. 이 기준을 실제로 지켰다면 성적이 어땠는지는 성적표의 '정리 기준을 지켰다면'에서 확인합니다.",
+  earn_season: "회사들은 분기가 끝나면 정해진 기한 안에 실적을 발표합니다 (1분기 5/15, 반기 8/14, 3분기 11/14, 1년 결산 3/31까지).\n발표 전에는 결과를 모르니, 좋든 나쁘든 발표 날 주가가 크게 움직일 수 있습니다. 조건에 맞아 산 종목도 실적 한 번에 기준이 깨질 수 있어 미리 알려 드립니다.\n'발표 예고 공시'는 회사가 실적 발표 날짜를 미리 알린 경우입니다.",
+  morning: "새벽에 끝난 미국 시장 결과로 오늘 아침 한국 시장 분위기를 미리 짐작해 봅니다.\n· 한국 ETF(EWY): 미국에 상장된 한국 주식 묶음이라 밤사이 외국인 시각이 가장 잘 보입니다 (가장 크게 반영)\n· 나스닥·미국 반도체: 삼성전자·SK하이닉스 같은 큰 종목과 같이 움직이는 경우가 많음\n· 공포지수(VIX)·환율: 오르면 부담\n짐작일 뿐이고, 장이 열리면 다르게 움직일 수 있습니다.",
   wake: "싼 종목도 시장이 관심을 안 주면 몇 년이고 싼 채로 남습니다 (가치 함정). 특히 한국 시장에서 흔합니다.\n그래서 '다시 주목받기 시작했나'를 따로 봅니다:\n· 큰손(기관+외국인)이 최근 5일 동안 샀나\n· 최근 3일 안에 기사·공시 같은 소식이 있나\n· 거래가 평소보다 늘었나\n· 최근 10일 바닥에서 5% 이상 올라왔나\n2개 이상이면 '움직일 계기가 생긴' 쪽입니다. 점수(강도)에는 넣지 않았고, 정말 성적이 나은지는 성적표의 '저평가 조건별 성적'에서 확인합니다.",
   score_value: "강도: 이 종목이 조건에 얼마나 강하게 걸렸는지 0~100점입니다. 지금까지 같은 탭에 걸린 종목들 중 어디쯤인지로 매깁니다.\n저평가 계산 (100점 만점을 나눠 가짐):\n· 낙폭 25%: 최근 고점보다 많이 빠졌나 (50% 빠지면 만점)\n· 싸짐 15%: 평소(1년)보다 얼마나 싸게 거래되나\n· PER 35%: 버는 돈에 비해 싼가 (PER 5 이하면 만점)\n· 이익 25%: 이익이 줄지 않고 버티거나 늘었나\n'싸면서 돈은 잘 버는 회사'가 위로 오게 했습니다.",
   futures: "외국인이 '코스피 선물'을 산 금액에서 판 금액을 뺀 값입니다.\n선물은 '앞으로 지수가 오를지 내릴지'에 거는 상품이라, 외국인의 방향 생각이 잘 드러납니다.\n· 며칠 연속 사면(+): 지수가 오를 쪽으로 보는 중\n· 며칠 연속 팔면(−): 내릴 쪽으로 보는 중\n한국 장의 방향을 먼저 알려 주는 지표로 많이 봅니다.",
@@ -649,8 +659,18 @@ function renderRegime() {
 
 const starBtn = (x) => {
   const on = !!state.watch[x.code];
-  return `<button class="star${on ? " on" : ""}" type="button" data-code="${x.code}" data-name="${esc(x.name)}" aria-pressed="${on}" aria-label="관심 종목${on ? " 해제" : "에 추가"}">${on ? "★" : "☆"}</button>`;
+  return `<button class="star${on ? " on" : ""}" type="button" data-code="${x.code}" data-name="${esc(x.name)}" data-price="${x.close ?? ""}" aria-pressed="${on}" aria-label="관심 종목${on ? " 해제" : "에 추가"}">${on ? "★" : "☆"}</button>`;
 };
+
+// ★ 누른 날 가격 대비 지금(가장 최근 수집일 종가) 몇 %인지, 같은 기간 코스피와 함께
+function watchPerf(c) {
+  const from = state.watchFrom[c], p = state.prices;
+  const now = p && p.close ? p.close[c] : null;
+  if (!from || !from.price || now == null || p.date <= from.date) return from ? ` <small class="perf">${ymd(from.date)}부터</small>` : "";
+  const r = (now / from.price - 1) * 100;
+  const k = from.kospi && p.index && p.index.kospi ? (p.index.kospi / from.kospi - 1) * 100 : null;
+  return ` <small class="perf">${ymd(from.date).slice(5)}부터 <b class="${cls(r)}">${signed(r, 1, "%")}</b>${k != null ? ` (코스피 ${signed(k, 1, "%")})` : ""}</small>`;
+}
 
 function renderWatch() {
   const codes = Object.keys(state.watch);
@@ -659,9 +679,10 @@ function renderWatch() {
   const rows = codes.map((c) => {
     const groups = ["swing", "scalp", "value"].filter((g) => (f[g] || []).some((y) => y.code === c));
     const name = esc(state.watch[c]);
+    const perf = watchPerf(c);
     return groups.length
-      ? `<li class="hit"><button class="more" type="button" data-code="${c}">${name}</button> <span class="tag both">${groups.map((g) => TAB_NAME[g]).join("·")}</span></li>`
-      : `<li class="miss">${name} <small>조건 밖</small></li>`;
+      ? `<li class="hit"><button class="more" type="button" data-code="${c}">${name}</button> <span class="tag both">${groups.map((g) => TAB_NAME[g]).join("·")}</span>${perf}</li>`
+      : `<li class="miss">${name} <small>조건 밖</small>${perf}</li>`;
   });
   const hits = rows.filter((r) => r.startsWith('<li class="hit"')).length;
   $("#watch").innerHTML = `<div class="watch"><div class="l">관심 종목 <small>${hits ? `오늘 ${hits}개 걸림` : "오늘 걸린 종목 없음"}</small></div><ul>${rows.join("")}</ul></div>`;
@@ -671,8 +692,18 @@ document.addEventListener("click", (e) => {
   const b = e.target.closest("button.star");
   if (!b) return;
   const c = b.dataset.code;
-  if (state.watch[c]) delete state.watch[c]; else state.watch[c] = b.dataset.name;
-  try { localStorage.setItem("watch", JSON.stringify(state.watch)); } catch (err) { /* 무시 */ }
+  if (state.watch[c]) {
+    delete state.watch[c];
+    delete state.watchFrom[c];
+  } else {
+    state.watch[c] = b.dataset.name;
+    const k = ((state.data.temperature || {}).index || {}).kospi;
+    if (b.dataset.price) state.watchFrom[c] = { price: Number(b.dataset.price), date: state.data.base_date, kospi: k ? k.close : null };
+  }
+  try {
+    localStorage.setItem("watch", JSON.stringify(state.watch));
+    localStorage.setItem("watchFrom", JSON.stringify(state.watchFrom));
+  } catch (err) { /* 무시 */ }
   const on = !!state.watch[c];
   document.querySelectorAll(`button.star[data-code="${c}"]`).forEach((s) => {
     s.classList.toggle("on", on); s.textContent = on ? "★" : "☆"; s.setAttribute("aria-pressed", on);
@@ -706,10 +737,25 @@ function valueCard(x) {
     </div>
     <ul class="checks">${x.checks.map((c) => `<li><span>${esc(c.label)}</span><span>${esc(c.value)}</span></li>`).join("")}</ul>
     ${wakeBlock(x.wake)}
+    ${exitBlock(x)}
     ${qualityRow(x)}
     ${news ? `<ul class="news">${news}</ul>` : `<p class="hint" style="margin:8px 0 0">최근 3일 관련 기사 없음</p>`}
     ${detailBtn(x)}
   </article>`;
+}
+
+// 언제 정리할지 + 이번 실적 시즌 발표 여부
+function exitBlock(x) {
+  const e = x.exit, es = x.earn_season;
+  let earn = "";
+  if (es && es.state === "pending") {
+    earn = `<div class="earnwarn">⚠ ${esc(es.label)} 실적 아직 안 나옴 — ${ymd(es.due).slice(5)}까지 발표${es.days_left >= 0 ? ` (${es.days_left}일 남음)` : ""}.${es.notice ? ` <a href="${esc(es.notice.url || "#")}" target="_blank" rel="noopener">발표 예고 공시 ${ymd(es.notice.date).slice(5)}</a>` : ""} 발표 전후로 크게 출렁일 수 있음${infoBtn("earn_season")}</div>${infoBox("earn_season")}`;
+  } else if (es && es.state === "done") {
+    earn = `<div class="earnok">${esc(es.label)} 실적 발표함 (${ymd(es.date).slice(5)})</div>`;
+  }
+  if (!e) return earn ? `<div class="exit">${earn}</div>` : "";
+  return `<div class="exit"><div class="row"><b>정리 기준${infoBtn("exit")}</b><span><b>${num(e.stop)}원</b> 아래 마감 시 <small class="down">(${signed(e.gap, 1, "%")})</small></span></div>${infoBox("exit")}
+    <small>${esc(e.rule)} — ${esc(e.why)}. 들고 가는 기간 ${esc(e.hold)}.</small>${earn}</div>`;
 }
 
 // 싼 종목이 다시 주목받기 시작했나 (가치 함정 거르기용, 점수엔 안 들어감)
@@ -803,6 +849,7 @@ function card(x) {
     ${bars(fl.daily)}
     ${qualityRow(x)}
     <ul class="checks">${x.checks.map((c) => `<li><span>${esc(c.label)}</span><span>${esc(c.value)}</span></li>`).join("")}</ul>
+    ${exitBlock(x)}
     <ul class="news">${news}</ul>
     ${detailBtn(x)}
   </article>`;
@@ -855,8 +902,45 @@ function renderScore() {
   $("#scorecard").innerHTML = how + bf + `<div class="tile wide"><table class="score">
       <thead><tr><th></th>${hs.map((h) => `<th>${h}일 뒤</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div>${warn}
     ${scoreCheckTable(sc.score_check)}
+    ${stopTable(sc.stops)}
     ${featureTable(sc.features)}
     ${recent ? `<details class="rules"><summary>최근 기록 보기</summary><table class="score recent"><thead><tr><th>날짜</th><th>구분</th><th style="text-align:left">종목</th>${hs.map((h) => `<th>${h}일</th>`).join("")}</tr></thead><tbody>${recent}</tbody></table></details>` : ""}`;
+}
+
+// 정리 기준을 지켰다면: 그냥 들고 있기 vs 기준 아래로 마감한 날 팔기 (5일, 시장 지수 대비)
+function stopTable(st) {
+  if (!st) return "";
+  const rows = ["swing", "scalp", "value"].filter((g) => st[g] && st[g]["5"] && st[g]["5"].hold).map((g) => {
+    const a = st[g]["5"];
+    const c = (x) => `<td><b class="${cls(x.excess)}">${signed(x.excess, 1, "%p")}</b><br><small>상승 ${x.win}% · ${x.n}건</small></td>`;
+    const gap = a.stop.excess != null && a.hold.excess != null ? a.stop.excess - a.hold.excess : null;
+    const verdict = gap == null ? "–" : a.hold.n < 30 ? "기록 부족" : gap > 0.5 ? "지키는 게 나음" : gap < -0.5 ? "들고 있는 게 나음" : "차이 없음";
+    return `<tr><th>${TAB_NAME[g]}</th>${c(a.hold)}${c(a.stop)}<td><small>${a.hit}% 정리<br>${verdict}</small></td></tr>`;
+  }).join("");
+  if (!rows) return "";
+  return `<h3 class="sub">정리 기준을 지켰다면 <small>5일 기준, 시장 지수 대비</small></h3>
+    <div class="tile wide"><table class="score"><thead><tr><th></th><th>그냥 5일 들고 있기</th><th>기준 깨지면 팔기</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="hint">카드의 '정리 기준'(종가가 그 가격 아래로 마감하면 그날 종가에 팔기)을 지켰을 때와 그냥 들고 있었을 때 비교입니다. '정리' %는 5일 안에 기준이 깨진 비율입니다.</p>`;
+}
+
+/* ---------------- 아침 요약 ---------------- */
+
+function renderMorning() {
+  const m = state.morning, el = $("#morning");
+  if (!el) return;
+  // 가장 최근 수집일을 보고 있고, 그 뒤 아침에 만든 요약일 때만 (저녁 수집 뒤엔 숨김)
+  if (!m || !state.data || state.data.base_date !== state.latest || m.date <= state.data.base_date || !m.items.length) {
+    el.hidden = true;
+    return;
+  }
+  const sm = m.summary || {};
+  const color = sm.tone === "up" ? "var(--up)" : sm.tone === "down" ? "var(--down)" : "var(--text)";
+  const items = m.items.map((x) => `<div><small>${esc(x.name)}</small><b class="${x.key === "vix" || x.key === "usdkrw" ? cls(-x.change) : cls(x.change)}">${signed(x.change, 2, "%")}</b><small class="faint">${num(x.value, x.value < 100 ? 2 : 0)}</small></div>`).join("");
+  el.hidden = false;
+  el.innerHTML = `<h2>아침 요약 <small>${m.at.slice(5, 10).replace("-", "/")} ${m.at.slice(11, 16)} · 새벽 미국장 마감 기준</small>${infoBtn("morning")}</h2>${infoBox("morning")}
+    <div class="tile wide"><p class="msum" style="color:${color}"><b>${esc(sm.label || "")}</b></p><p class="hint" style="margin:2px 0 8px">${esc(sm.text || "")}</p>
+    <div class="nums mnums">${items}</div>
+    <p class="hint">VIX·환율은 내리면 좋은 쪽이라 색을 반대로 칠했습니다. 짐작일 뿐, 장이 열리면 다를 수 있습니다.</p></div>`;
 }
 
 function featureTable(all) {
@@ -1102,7 +1186,11 @@ function renderRules() {
     <ul><li>스윙: 시총 대비 5일 기관+외국인 순매수 비율(%) × (1 + 연속 순매수일 ÷ 5)</li>
     <li>단타: 0~100점 가중평균 — 큰손 확인(거래대금 중 기관+외국인 순매수 비중 0%→0, 20%→100) 50%, 거래 증가(평소의 3배→0, 8배→100, 15배 넘으면 깎여 30배에 0) 25%, 상승폭(2%→0, 5~15%→100, 29%→0) 25%</li>
     <li>저평가: 0~100점 가중평균 — 낙폭(20%→0, 50%→100) 25%, 1년 중앙 PBR 대비 할인(20%→0, 70%→100) 15%, PER(15→0, 5→100) 35%, 이익(EPS 1년 전의 0.8배→0, 1.5배→100, 추정 EPS 있으면 반반) 25%</li>
-    <li>카드의 강도는 이 계산값이 지금까지 같은 탭 후보들 중 몇 % 위치인지 (세 탭 공통 0~100)</li></ul>`;
+    <li>카드의 강도는 이 계산값이 지금까지 같은 탭 후보들 중 몇 % 위치인지 (세 탭 공통 0~100)</li></ul>
+    <h3>정리 기준 (카드 아래)</h3>
+    <ul><li>스윙: 종가가 20일 평균 가격 아래로 마감 · 단타: 걸린 날 저가 아래로 마감 · 저평가: 최근 10일 최저가 아래로 마감</li>
+    <li>성적표 '정리 기준을 지켰다면'은 다음 날 시가에 사서, 5일 안에 종가가 기준 아래로 마감한 날 그 종가에 판 것으로 계산</li>
+    <li>실적 시즌(1분기 4/1~5/15, 반기 7/1~8/14, 3분기 10/1~11/14, 결산 1/1~3/31)에는 DART에서 분기·반기·사업보고서나 잠정실적을 아직 안 낸 후보에 경고 표시</li></ul>`;
 }
 
 function valueRules(v, eok) {

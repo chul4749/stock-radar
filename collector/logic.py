@@ -1133,6 +1133,172 @@ def entry_signals(t):
 
 # ---------------------------------------------------------------- 성적표
 
+# ---------------------------------------------------------------- 아침 요약
+
+def morning_summary(items):
+    """미국장 마감 결과 → 오늘 한국장 출발 분위기 한 줄. EWY(미국 상장 한국 ETF)를 가장 무겁게 본다."""
+    ch = {x["key"]: x["change"] for x in items}
+    if not ch:
+        return {"tone": "neutral", "label": "자료 없음", "text": "미국장 자료를 못 받았습니다."}
+    score = 0.0
+    for key, w in (("ewy", 2.0), ("nasdaq", 1.0), ("sox", 1.0), ("sp500", 0.5)):
+        if key in ch:
+            score += w * ch[key]
+    if "vix" in ch:
+        score -= ch["vix"] / 10          # VIX 10% 오름 ≈ 지수 1% 내림만큼 나쁨
+    if "usdkrw" in ch:
+        score -= ch["usdkrw"] * 2        # 환율 0.5% 오름 ≈ 지수 1% 내림
+    if score >= 2:
+        tone, label = "up", "상승 출발 가능성"
+    elif score <= -2:
+        tone, label = "down", "하락 출발 가능성"
+    else:
+        tone, label = "neutral", "큰 방향 없음"
+    parts = []
+    if "ewy" in ch:
+        parts.append(f"한국 ETF {ch['ewy']:+.1f}%")
+    if "nasdaq" in ch:
+        parts.append(f"나스닥 {ch['nasdaq']:+.1f}%")
+    if "sox" in ch:
+        parts.append(f"미국 반도체 {ch['sox']:+.1f}%")
+    if "vix" in ch and abs(ch["vix"]) >= 5:
+        parts.append(f"공포지수 {'급등' if ch['vix'] > 0 else '급락'} {ch['vix']:+.0f}%")
+    return {"tone": tone, "label": label, "score": round(score, 1),
+            "text": " · ".join(parts) + f" → 오늘 아침 {label}"}
+
+
+# ---------------------------------------------------------------- 실적 시즌
+
+# 법정 마감: 분기·반기보고서는 분기 끝나고 45일, 사업보고서는 90일
+REPORT_TITLES = ("분기보고서", "반기보고서", "사업보고서", "잠정)실적", "잠정실적", "손익구조")
+NOTICE_TITLES = ("실적공시예고", "결산실적공시예고", "기업설명회")
+
+
+def report_season(base):
+    """기준일이 실적 발표 기간이면 그 기간 정보. 아니면 None."""
+    y, md = int(base[:4]), base[4:]
+    for start, due, key, label in (("0101", "0331", f"{y - 1}Y", f"{y - 1}년 결산"), ("0401", "0515", f"{y}Q1", "1분기"),
+                                   ("0701", "0814", f"{y}Q2", "2분기(반기)"), ("1001", "1114", f"{y}Q3", "3분기")):
+        if start <= md <= due:
+            return {"key": key, "label": label, "start": f"{y}{start}", "due": f"{y}{due}"}
+    return None
+
+
+def update_reported(store, season, items, name_to_code):
+    """DART 공시 목록에서 이번 시즌 실적 발표(보고서·잠정실적)와 발표 예고를 모은다. store 는 그대로 고쳐서 돌려준다."""
+    if not season:
+        return store
+    if store.get("season") != season["key"]:
+        store = {"season": season["key"], "checked": [], "reported": {}, "notice": {}}
+    for x in items:
+        code = name_to_code.get(x.get("corp"))
+        t = x.get("title", "")
+        if not code or "정정" in t[:8]:
+            continue
+        day = x["at"][:10].replace("-", "")
+        if day < season["start"]:
+            continue
+        kind = "reported" if any(k in t for k in REPORT_TITLES) and "예고" not in t else \
+            "notice" if any(k in t for k in NOTICE_TITLES) else None
+        if kind and (code not in store[kind] or store[kind][code]["date"] > day):
+            store[kind][code] = {"date": day, "title": t, "url": x.get("url")}
+    return store
+
+
+def earnings_status(code, base, season, store):
+    """후보 카드용: 이번 시즌 실적을 이미 냈는지, 아직이면 마감까지 며칠인지."""
+    if not season or store.get("season") != season["key"]:
+        return None
+    rep = store["reported"].get(code)
+    if rep and rep["date"] <= base:
+        return {"state": "done", "label": season["label"], "date": rep["date"], "title": rep["title"], "url": rep.get("url")}
+    left = (datetime.strptime(season["due"], "%Y%m%d") - datetime.strptime(base, "%Y%m%d")).days
+    note = store["notice"].get(code)
+    return {"state": "pending", "label": season["label"], "due": season["due"], "days_left": left,
+            "notice": note if note and note["date"] <= base else None}
+
+
+# ---------------------------------------------------------------- 언제 정리할지 (나가는 기준)
+
+EXIT_RULES = {
+    "swing": ("종가가 20일 평균 가격 아래로 마감하면 정리", "오르는 흐름이 깨졌다는 뜻", "보통 1~4주"),
+    "scalp": ("걸린 날 저가를 깨고 마감하면 정리", "급등을 만든 힘이 빠졌다는 뜻", "보통 1~3일, 길게 끌지 않기"),
+    "value": ("최근 10일 최저가를 깨고 마감하면 정리", "아직 바닥이 아니었다는 뜻", "몇 주~몇 달"),
+}
+
+
+def exit_level(group, close_s, low_s=None):
+    """걸린 날(마지막 값) 기준 정리 가격. close_s / low_s: 그날까지의 종가·저가 Series."""
+    c = close_s.dropna()
+    if len(c) < 20 or group not in EXIT_RULES:
+        return None
+    close = float(c.iloc[-1])
+    lows = low_s.dropna() if low_s is not None else None
+    if group == "swing":
+        stop = float(c.iloc[-20:].mean())
+    elif group == "scalp":
+        stop = float(lows.iloc[-1]) if lows is not None and len(lows) and lows.index[-1] == c.index[-1] else close * 0.97
+    else:
+        stop = float(lows.iloc[-10:].min()) if lows is not None and len(lows) >= 10 else float(c.iloc[-10:].min())
+    if not (0 < stop <= close):
+        return None
+    rule, why, hold = EXIT_RULES[group]
+    return {"stop": round(stop), "gap": r1((stop / close - 1) * 100), "rule": rule, "why": why, "hold": hold}
+
+
+def stop_scorecard(history, closes, lows, opens=None, bench=None, horizons=(5, 20), cost=None):
+    """정리 기준을 지켰다면: 그냥 N일 들고 있기 vs 기준 아래로 마감한 날 종가에 팔기 (둘 다 시장 지수 대비).
+
+    정리 가격은 그날까지의 종가·저가로 다시 계산한다 (예전 기록에도 같은 규칙 적용).
+    """
+    cost = COST if cost is None else cost
+    days = list(closes.index)
+    pos = {d: i for i, d in enumerate(days)}
+    acc, last = {}, {}
+    for date, groups in sorted(history, key=lambda h: h[0]):
+        if date not in pos:
+            continue
+        i0 = pos[date]
+        for g, items in groups.items():
+            for x in items:
+                code = x["code"]
+                if code not in closes.columns:
+                    continue
+                ex = exit_level(g, closes[code].iloc[:i0 + 1], lows[code].iloc[:i0 + 1] if lows is not None and code in lows.columns else None)
+                if not ex:
+                    continue
+                buy = opens[code].iloc[i0 + 1] if opens is not None and code in opens.columns and i0 + 1 < len(days) else None
+                for n in horizons:
+                    if i0 + n >= len(days) or buy is None or math.isnan(buy) or not buy:
+                        continue
+                    if (g, code, n) in last and i0 - last[(g, code, n)] < n:
+                        continue
+                    last[(g, code, n)] = i0
+                    path = closes[code].iloc[i0 + 1:i0 + n + 1]
+                    if path.isna().any():
+                        continue
+                    k_out = next((k for k, v in enumerate(path, 1) if v < ex["stop"]), None)
+                    mk = bench.get(x.get("market")) if bench else None
+
+                    def excess(k):
+                        r = (path.iloc[k - 1] / buy - 1) * 100 - cost
+                        if mk is None:
+                            return r, None
+                        k0, k1 = mk[0].get(days[i0 + 1]), mk[1].get(days[i0 + k])
+                        return r, (r - (k1 / k0 - 1) * 100) if k0 and k1 else None
+
+                    a = acc.setdefault(g, {}).setdefault(n, {"hold": [], "hold_x": [], "stop": [], "stop_x": [], "hit": 0})
+                    for kind, k in (("hold", n), ("stop", k_out or n)):
+                        r, e = excess(k)
+                        a[kind].append(r)
+                        if e is not None:
+                            a[kind + "_x"].append(e)
+                    a["hit"] += 1 if k_out else 0
+    return {g: {str(n): {"hold": summarize_returns(a["hold"], a["hold_x"]), "stop": summarize_returns(a["stop"], a["stop_x"]),
+                         "hit": round(100 * a["hit"] / len(a["hold"])) if a["hold"] else None}
+                for n, a in by_n.items()} for g, by_n in acc.items()}
+
+
 HORIZONS = (1, 5, 20)
 
 

@@ -67,6 +67,7 @@ def main(argv):
     values = pd.DataFrame({d: daily[d]["거래대금"] for d in used_days}).T.astype(float)
     closes = closes.replace(0, float("nan"))
     opens = pd.DataFrame({d: daily[d]["시가"] for d in used_days}).T.astype(float).replace(0, float("nan"))
+    lows = pd.DataFrame({d: daily[d]["저가"] for d in used_days}).T.astype(float).replace(0, float("nan"))
     log(f"  {len(used_days)}일, {time.time() - t:.0f}초")
 
     t = step("종목별 수급")
@@ -120,8 +121,11 @@ def main(argv):
     all_items = news + nv + dart
     # 악재성 공시는 최근 5영업일을 본다 (기준일은 위에서 받음)
     dart_bad = [x for x in dart if x["bad"]]
+    dart_days = {base: dart}
     for d in used_days[-5:-1]:
-        dart_bad += [x for x in (safe(f"DART {d}", lambda: sources.dart_today(d), errors) or []) if x["bad"]]
+        dart_days[d] = safe(f"DART {d}", lambda: sources.dart_today(d), errors) or []
+        dart_bad += [x for x in dart_days[d] if x["bad"]]
+    season, reported = update_season(base, dart_days, {v["name"]: c for c, v in listing.items()}, errors)
 
     matcher = logic.NameMatcher({c: v["name"] for c, v in universe.items()})
     base_dt = datetime.strptime(base, "%Y%m%d").replace(tzinfo=KST)
@@ -197,6 +201,12 @@ def main(argv):
     for x in scalp[:10] + swing[:10] + value[:10]:
         if profile(x["code"]):
             x["profile"] = profiles[x["code"]]
+    # 언제 정리할지(정리 가격)와 이번 실적 시즌 발표 여부
+    for g, items in (("scalp", scalp[:10]), ("swing", swing[:10]), ("value", value[:10])):
+        for x in items:
+            if x["code"] in closes.columns:
+                x["exit"] = logic.exit_level(g, closes[x["code"]], lows[x["code"]] if x["code"] in lows.columns else None)
+            x["earn_season"] = logic.earnings_status(x["code"], base, season, reported)
     log(f"  기업 정보 {len(profiles) - failed}/{len(profiles)}")
     if profiles and failed == len(profiles):
         errors.append("기업 정보: 전부 실패")
@@ -299,6 +309,7 @@ def main(argv):
     with open(path, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"), default=_json_default)
     dates = reindex.write_index()
+    write_prices(base, closes, listing, temp.get("index") or {})
     log(f"\n저장 {path} ({os.path.getsize(path) // 1024}KB), 오류 {errors or '없음'}")
 
     t = step("성적표")
@@ -334,7 +345,8 @@ def main(argv):
                 bench[mk] = oc
         stats, recent, features, by_regime, score_check = logic.scorecard(
             history, closes, kospi, regimes, opens=opens, bench=bench or None)
-        card = {"generated_at": out["generated_at"], "base_date": base, "days": len(history),
+        stops = logic.stop_scorecard(history, closes, lows, opens=opens, bench=bench or None)
+        card = {"generated_at": out["generated_at"], "base_date": base, "days": len(history), "stops": stops,
                 "horizons": list(logic.HORIZONS), "stats": stats, "recent": recent, "features": features,
                 "by_regime": by_regime, "regimes": regimes, "score_check": score_check,
                 "method": {"entry": "다음 날 시가", "bench": "종목이 속한 시장 지수", "cost": logic.COST, "dedup": True},
@@ -343,6 +355,52 @@ def main(argv):
             json.dump(card, f, ensure_ascii=False, separators=(",", ":"), default=_json_default)
         log(f"  기록 {len(history)}일, 통계 {json.dumps(stats, ensure_ascii=False)}")
     return 0
+
+
+def update_season(base, dart_days, name_to_code, errors):
+    """이번 실적 시즌에 실적을 낸 회사 목록(reported.json)을 갱신한다. 처음이면 시즌 시작일부터 DART 목록을 거슬러 받는다."""
+    season = logic.report_season(base)
+    path = os.path.join(DATA, "reported.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            store = json.load(f)
+    except (OSError, ValueError):
+        store = {}
+    if not season:
+        return None, store
+    if store.get("season") and store["season"] > season["key"]:   # 지난 시즌 기준일을 다시 계산할 때는 건드리지 않음
+        return season, {}
+    store = logic.update_reported(store, season, [], name_to_code)
+    days = [d for d in sources.business_days(base, 40) if season["start"] <= d <= base]
+    todo = [d for d in days if d not in store["checked"] and d not in dart_days][-30:]
+    for d in todo:
+        dart_days[d] = safe(f"DART {d}", lambda: sources.dart_today(d), errors)
+        if dart_days[d] is None:
+            del dart_days[d]
+    for d, items in dart_days.items():
+        if items and d >= season["start"]:
+            store = logic.update_reported(store, season, items, name_to_code)
+            store["checked"] = sorted(set(store["checked"]) | {d})
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(store, f, ensure_ascii=False, separators=(",", ":"))
+    log(f"  {season['label']} 실적 시즌: 발표 {len(store['reported'])}곳 · 예고 {len(store['notice'])}곳 (확인한 날 {len(store['checked'])}, 이번에 더 받은 날 {len(todo)})")
+    return season, store
+
+
+def write_prices(base, closes, listing, index):
+    """관심 종목 성적용: 가장 최근 기준일의 전 종목 종가 (예전 기준일을 다시 계산할 때는 덮어쓰지 않음)."""
+    path = os.path.join(DATA, "prices.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            if json.load(f).get("date", "") > base:
+                return
+    except (OSError, ValueError):
+        pass
+    last = closes.iloc[-1]
+    px = {c: int(v) for c, v in last.items() if c in listing and v == v and v > 0}
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({"date": base, "close": px, "index": {k: v.get("close") for k, v in index.items()}},
+                  f, ensure_ascii=False, separators=(",", ":"))
 
 
 def past_scores(base):

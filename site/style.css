@@ -347,3 +347,14 @@ table.fin .est { color: var(--faint); }
 .wake .row small { color: var(--sub); }
 .wake .good { color: var(--calm); }
 .wake .bad { color: var(--fear); }
+.exit { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 13px; }
+.exit .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.exit > small { display: block; color: var(--sub); margin-top: 2px; line-height: 1.5; }
+.earnwarn { margin-top: 6px; padding: 6px 8px; border-radius: 8px; background: var(--fear-bg); color: var(--text); font-size: 12px; line-height: 1.5; }
+.earnwarn a { color: inherit; }
+.earnok { margin-top: 4px; font-size: 12px; color: var(--faint); }
+.watch .perf { color: var(--sub); margin-left: 4px; }
+#morning h2 small { font-size: 12px; font-weight: 400; color: var(--sub); }
+.msum { margin: 0; font-size: 16px; }
+.mnums { grid-template-columns: repeat(3, 1fr); }
+.mnums small.faint { color: var(--faint); font-size: 11px; }

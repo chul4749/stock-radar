@@ -7,7 +7,8 @@ import html
 import math
 import re
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 from email.utils import parsedate_to_datetime
 
 import pandas as pd
@@ -425,3 +426,19 @@ def _tag(block, name):
     if v.startswith("<![CDATA["):
         v = v[9:-3]
     return html.unescape(v).strip()
+
+
+# ---------------------------------------------------------------- 아침 요약 (미국장 마감)
+
+def yahoo_daily(symbol, rng="1mo"):
+    """야후 차트 API 일별 종가. 반환: [(YYYY-MM-DD(현지), 종가)] 오래된 순."""
+    r = retry(lambda: get(f"https://query1.finance.yahoo.com/v8/finance/chart/{quote(symbol)}",
+                          params={"range": rng, "interval": "1d"}), tries=3, wait=5)
+    res = r.json()["chart"]["result"][0]
+    off = res["meta"].get("gmtoffset", 0)
+    closes = res["indicators"]["quote"][0]["close"]
+    out = []
+    for ts, c in zip(res["timestamp"], closes):
+        if c is not None:
+            out.append((datetime.fromtimestamp(ts + off, tz=timezone.utc).strftime("%Y-%m-%d"), float(c)))
+    return out
