@@ -56,6 +56,8 @@ select { font: inherit; font-size: 14px; color: var(--text); background: var(--c
 
 /* 큰 글씨 설정 등으로 뭔가 넘쳐도 화면 전체가 옆으로 밀리지 않게 (clip은 sticky를 깨지 않음) */
 html, body { overflow-x: clip; }
+/* 일부 휴대폰 브라우저는 위 clip을 무시하고 손가락으로 옆으로 밀림 → 내용 상자 자체에서 잘라 둠 (안쪽엔 sticky 없음) */
+main, .top { overflow-x: hidden; }
 main { max-width: 760px; margin: 0 auto; padding: 8px 16px 40px; }
 .block { margin-top: 18px; }
 h2 { font-size: 17px; margin: 0 0 10px; letter-spacing: -0.02em; }
@@ -183,7 +185,7 @@ h3.sub small { font-weight: 400; color: var(--faint); font-size: 12px; }
 dialog#detail { border: 0; padding: 0; width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 40px); border-radius: 16px;
   background: var(--card); color: var(--text); }
 dialog#detail::backdrop { background: rgba(0,0,0,.45); }
-.dlg-in { padding: 16px 16px 20px; position: relative; overflow-y: auto; max-height: calc(100vh - 40px); }
+.dlg-in { padding: 16px 16px 20px; position: relative; overflow-y: auto; overflow-x: hidden; max-height: calc(100vh - 40px); }
 .dlg-in .close { position: sticky; top: 0; float: right; margin: -6px -6px 0 8px; z-index: 2; box-shadow: 0 1px 4px rgba(0,0,0,.18); border: 0; background: var(--neutral-bg); color: var(--text);
   width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 14px; }
 .dlg-in .hd { padding-right: 36px; }

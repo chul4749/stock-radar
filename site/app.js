@@ -1819,3 +1819,24 @@ let jumpRaf = 0;
 window.addEventListener("scroll", () => { cancelAnimationFrame(jumpRaf); jumpRaf = requestAnimationFrame(updateJump); }, { passive: true });
 window.addEventListener("resize", updateJump);
 updateJump();
+
+/* ---------------- 넘침 찾기 (주소 끝에 ?debug=1) ---------------- */
+
+// 어떤 휴대폰에서만 화면이 옆으로 밀릴 때: 화면보다 넓은 요소를 빨간 테두리로 칠하고 목록을 띄운다
+if (/[?&]debug=1/.test(location.search)) {
+  setTimeout(() => {
+    const W = document.documentElement.clientWidth;
+    const bad = [...document.querySelectorAll("body *")].filter((e) => {
+      const r = e.getBoundingClientRect();
+      return r.width && (r.right > W + 0.5 || r.left < -0.5);
+    });
+    const leaf = bad.filter((e) => !bad.some((o) => o !== e && e.contains(o)));
+    leaf.forEach((e) => { e.style.outline = "2px solid red"; });
+    const box = document.createElement("pre");
+    box.style.cssText = "position:fixed;left:0;right:0;bottom:0;max-height:40vh;overflow:auto;margin:0;padding:8px;font-size:11px;background:#000;color:#0f0;z-index:99;white-space:pre-wrap";
+    box.textContent = `화면 ${W}px · 문서 ${document.documentElement.scrollWidth}px · ${navigator.userAgent}\n` +
+      (leaf.length ? leaf.slice(0, 15).map((e) => { const r = e.getBoundingClientRect(); let s = e; while (s && !s.id) s = s.parentElement;
+        return `${e.tagName.toLowerCase()}.${e.className} @${s ? s.id : ""} ${Math.round(r.left)}~${Math.round(r.right)} "${(e.textContent || "").trim().slice(0, 30)}"`; }).join("\n") : "넘치는 요소 없음");
+    document.body.appendChild(box);
+  }, 3000);
+}
