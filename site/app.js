@@ -1824,19 +1824,25 @@ updateJump();
 
 // 어떤 휴대폰에서만 화면이 옆으로 밀릴 때: 화면보다 넓은 요소를 빨간 테두리로 칠하고 목록을 띄운다
 if (/[?&]debug=1/.test(location.search)) {
-  setTimeout(() => {
-    const W = document.documentElement.clientWidth;
+  // 2초마다 다시 잼 (칸을 펼치거나 팝업을 연 뒤에도 잡히게). 화면 확대 상태도 함께 보여 줌
+  const box = document.createElement("pre");
+  box.style.cssText = "position:fixed;left:0;right:0;bottom:0;max-height:35vh;overflow:auto;margin:0;padding:8px;font-size:11px;background:#000;color:#0f0;z-index:2147483647;white-space:pre-wrap;pointer-events:none";
+  document.body.appendChild(box);
+  const check = () => {
+    const W = document.documentElement.clientWidth, vv = window.visualViewport;
+    document.querySelectorAll("[data-dbg]").forEach((e) => { e.style.outline = ""; delete e.dataset.dbg; });
     const bad = [...document.querySelectorAll("body *")].filter((e) => {
+      if (e === box) return false;
       const r = e.getBoundingClientRect();
       return r.width && (r.right > W + 0.5 || r.left < -0.5);
     });
     const leaf = bad.filter((e) => !bad.some((o) => o !== e && e.contains(o)));
-    leaf.forEach((e) => { e.style.outline = "2px solid red"; });
-    const box = document.createElement("pre");
-    box.style.cssText = "position:fixed;left:0;right:0;bottom:0;max-height:40vh;overflow:auto;margin:0;padding:8px;font-size:11px;background:#000;color:#0f0;z-index:99;white-space:pre-wrap";
-    box.textContent = `화면 ${W}px · 문서 ${document.documentElement.scrollWidth}px · ${navigator.userAgent}\n` +
+    leaf.forEach((e) => { e.style.outline = "2px solid red"; e.dataset.dbg = "1"; });
+    box.textContent = `화면 ${W}px · 문서 ${document.documentElement.scrollWidth}px · 가로 위치 ${Math.round(scrollX)}` +
+      (vv ? ` · 확대 ${vv.scale.toFixed(2)}배 · 보이는 폭 ${Math.round(vv.width)}px · 밀린 정도 ${Math.round(vv.offsetLeft)}px` : "") + `\n${navigator.userAgent}\n` +
       (leaf.length ? leaf.slice(0, 15).map((e) => { const r = e.getBoundingClientRect(); let s = e; while (s && !s.id) s = s.parentElement;
         return `${e.tagName.toLowerCase()}.${e.className} @${s ? s.id : ""} ${Math.round(r.left)}~${Math.round(r.right)} "${(e.textContent || "").trim().slice(0, 30)}"`; }).join("\n") : "넘치는 요소 없음");
-    document.body.appendChild(box);
-  }, 3000);
+  };
+  setInterval(check, 2000);
+  setTimeout(check, 1500);
 }
