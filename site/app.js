@@ -1037,13 +1037,13 @@ function scoreCheckTable(chk) {
     const verdict = gap == null ? "–" : Math.min(hi.n, lo.n) < 30 ? "기록 부족" : gap > 1 ? "점수 높을수록 나음" : gap < -1 ? "오히려 반대" : "차이 없음";
     return `<tr><th>${TAB_NAME[g]}</th>${c("hi")}${c("lo")}<td><small>${verdict}</small></td></tr>`;
   }).join("");
-  const bars = ["swing", "scalp", "value"].filter((g) => chk[g]).flatMap((g) => {
+  const groups = ["swing", "scalp", "value"].filter((g) => chk[g]).map((g) => {
     const hi = (chk[g].hi || {})["5"], lo = (chk[g].lo || {})["5"];
-    return [hi && { label: `${TAB_NAME[g]} · 점수 위 절반`, v: hi.excess, n: hi.n, sub: `${num(hi.n)}건` },
-      lo && { label: `${TAB_NAME[g]} · 아래 절반`, v: lo.excess, n: lo.n, sub: `${num(lo.n)}건`, base: true }].filter(Boolean);
+    const n = Math.min(hi ? hi.n : 0, lo ? lo.n : 0);
+    return { label: TAB_NAME[g], sub: n < 30 ? "⚠ 기록 적음" : `${num(n)}건씩`, bars: [hi && { v: hi.excess }, lo && { v: lo.excess, base: true }].filter(Boolean) };
   });
-  return `<h3 class="fit-h">점수가 쓸모 있나</h3><div class="tile wide"><div class="chart-cap">${kindTag(true)}점수 높은 절반(색)이 낮은 절반(회색)보다 오른쪽이면 점수가 쓸모 있는 것 (5일 뒤, 지수보다 몇 % 더 벌었나)</div>
-    ${divBars(bars, { axis: ["지수보다 못함", "나음"], vs: "지수보다" })}${asTable(`<table class="score">
+  return `<h3 class="fit-h">점수가 쓸모 있나</h3><div class="tile wide"><div class="chart-cap">${kindTag(true)}탭마다 점수 높은 절반(색)이 낮은 절반(회색)보다 키가 크면 점수가 쓸모 있는 것 (5일 뒤, 지수보다 몇 % 더 벌었나)</div>
+    ${colBars(groups, { vs: "지수보다 더 번(덜 번) %", legend: [["점수 위 절반", "up"], ["아래 절반", "faint"]] })}${asTable(`<table class="score">
     <thead><tr><th></th><th>점수 위 절반</th><th>아래 절반</th><th></th></tr></thead><tbody>${rows}</tbody></table>`)}</div>
     <p class="hint">같은 날 같은 탭 후보를 점수순으로 반 나눠 비교해요. ⚠ 표시는 기록이 30건이 안 돼 아직 운일 수 있다는 뜻.</p>`;
 }
@@ -1086,10 +1086,10 @@ function renderScore() {
     ? `<p class="hint">${sc.backfill_dates.length}일(${ymd(sc.backfill_dates[0])}~${ymd(sc.backfill_dates.at(-1))})은 나중에 다시 계산한 기록이라, 그날 실제로 보이던 뉴스와 달라 스윙·단타 성적은 조금 할인해서 보세요.</p>` : "";
   if (!hs.includes(scoreH)) scoreH = hs.includes(5) ? 5 : hs[0];
   const groups = ["swing", "scalp", "value", ...(sc.stats.mgr ? ["mgr"] : [])];
-  const bars = divBars(groups.map((g) => {
+  const bars = colBars(groups.map((g) => {
     const s = (sc.stats[g] || {})[String(scoreH)];
-    return s ? { label: TAB_NAME[g] + (g === "mgr" ? " (2곳↑)" : ""), v: s.excess, n: s.n, sub: `${num(s.n)}번 · 주가 자체는 ${signed(s.avg, 1, "%")} · 100번 중 ${s.win}번 이익` } : null;
-  }).filter(Boolean), { axis: ["지수보다 못함", "지수보다 나음"], vs: "지수보다" });
+    return s ? { label: TAB_NAME[g] + (g === "mgr" ? " (2곳↑)" : ""), sub: `${num(s.n)}번${s.n < 30 ? " · ⚠ 기록 적음" : ""} · 주가 자체 ${signed(s.avg, 1, "%")}`, bars: [{ v: s.excess }] } : null;
+  }).filter(Boolean), { vs: "지수보다 더 번(덜 번) %" });
   const ranked = groups.map((g) => [g, (sc.stats[g] || {})[String(scoreH)]]).filter(([, x]) => x && x.excess != null).sort((p, q) => q[1].excess - p[1].excess);
   const sTake = ranked.length ? `${scoreH}일 뒤 기준, ${TAB_NAME[ranked[0][0]]} 탭 후보가 지수보다 ${signed(ranked[0][1].excess, 1, "%")} 더 벌어(주가 자체는 ${signed(ranked[0][1].avg, 1, "%")}) 가장 나았고` +
     `${ranked.length > 1 ? ` ${TAB_NAME[ranked.at(-1)[0]]} 탭은 지수보다 ${signed(ranked.at(-1)[1].excess, 1, "%")}였어요` : "어요"}.` +
@@ -1118,14 +1118,13 @@ function stopTable(st) {
   }).join("");
   if (!rows) return "";
   return `<h3 class="sub">정리 기준을 지켰다면 <small>5일 기준, 시장 지수 대비</small></h3>
-    <div class="tile wide"><div class="chart-cap">${kindTag(true)}그냥 5일 들고 있기(회색) vs 카드의 “정리 가격” 아래로 마감하면 팔기(색) — 5일 뒤, 지수보다 몇 % 더 벌었나</div>
-    ${divBars(["swing", "scalp", "value"].filter((g) => st[g] && st[g]["5"] && st[g]["5"].hold).flatMap((g) => {
+    <div class="tile wide"><div class="chart-cap">${kindTag(true)}그냥 5일 들고 있기(회색) vs 카드의 “정리 가격” 아래로 마감하면 팔기(색) — 색 막대가 더 크면 기준을 지키는 게 나았던 것</div>
+    ${colBars(["swing", "scalp", "value"].filter((g) => st[g] && st[g]["5"] && st[g]["5"].hold).map((g) => {
       const a = st[g]["5"];
-      return [{ label: `${TAB_NAME[g]} · 그냥 들고 있기`, v: a.hold.excess, n: a.hold.n, base: true, sub: `${num(a.hold.n)}건` },
-        { label: `${TAB_NAME[g]} · 기준 지키기`, v: a.stop.excess, n: a.stop.n, sub: `100번 중 ${a.hit}번은 5일 안에 정리됨` }];
-    }), { axis: ["지수보다 못함", "나음"], vs: "지수보다" })}
+      return { label: TAB_NAME[g], sub: `${a.hold.n < 30 ? "⚠ 기록 적음 · " : ""}100번 중 ${a.hit}번 정리됨`, bars: [{ v: a.hold.excess, base: true }, { v: a.stop.excess }] };
+    }), { vs: "지수보다 더 번(덜 번) %", legend: [["그냥 5일 들고 있기", "faint"], ["정리 가격 지키기", "up"]] })}
     ${asTable(`<table class="score"><thead><tr><th></th><th>그냥 5일 들고 있기</th><th>기준 깨지면 팔기</th><th></th></tr></thead><tbody>${rows}</tbody></table>`)}</div>
-    <p class="hint">정리 가격 = 카드마다 적힌 '이 아래로 마감하면 정리' 가격. 색 막대가 회색보다 오른쪽이면 그 기준을 지키는 게 나았던 것.</p>`;
+    <p class="hint">정리 가격 = 카드마다 적힌 '이 아래로 마감하면 정리' 가격. 색 막대가 회색보다 크면(위로) 그 기준을 지키는 게 나았던 것.</p>`;
 }
 
 // 그동안 급등주를 얼마나 미리 잡았나, 급등 전에 어떤 신호가 자주 먼저 보였나
@@ -1188,22 +1187,40 @@ function divBars(rows, o = {}) {
   return `<div class="dbars">${body}${axis}${leg}</div>`;
 }
 
+// 세로 막대를 가로로 나란히: 몇 개 안 되는 것끼리 키를 비교할 때.
+// groups: [{label, sub, bars:[{v, base, name, n}]}]  o: {unit, vs, legend:[[이름, 색]], color(v,bar)}
+function colBars(groups, o = {}) {
+  groups = groups.map((g) => ({ ...g, bars: g.bars.filter((b) => b.v != null) })).filter((g) => g.bars.length);
+  if (!groups.length) return "";
+  const vals = groups.flatMap((g) => g.bars.map((b) => b.v));
+  let lo = Math.min(0, ...vals), hi = Math.max(0, ...vals);
+  const pad = (hi - lo || 1) * 0.18;
+  hi += hi > 0 ? pad : 0; lo -= lo < 0 ? pad : 0;
+  if (hi - lo < (o.minSpan || 1)) hi = lo + (o.minSpan || 1);
+  const H = 130, y = (v) => ((hi - v) / (hi - lo)) * H, zero = y(0);
+  const unit = o.unit ?? "%";
+  const fmt = (v) => o.count ? `${num(v, 0)}번` : signed(v, 1, unit);
+  const col = (b) => o.color ? o.color(b) : b.base ? "faint" : b.v >= 0 ? "up" : "down";
+  const cols = groups.map((g) => `<div class="cg"><div class="cbars" style="height:${H}px">${g.bars.map((b) => {
+      const top = Math.min(y(b.v), zero), h = Math.max(2, Math.abs(y(b.v) - zero));
+      const lab = b.v >= 0 ? `bottom:${H - top + 3}px` : `top:${top + h + 3}px`;
+      return `<div class="cb"><i style="top:${top}px;height:${h}px;background:var(--${col(b)})"></i><b class="cv ${b.base || o.count ? "" : cls(b.v)}" style="${lab}">${fmt(b.v)}</b></div>`;
+    }).join("")}<i class="cz" style="top:${zero}px"></i></div>
+    <div class="cl">${esc(g.label)}${g.sub ? `<small>${g.sub}</small>` : ""}</div></div>`).join("");
+  const leg = o.legend ? `<div class="cleg">${o.legend.map(([n, c]) => `<span><i style="background:var(--${c})"></i>${n}</span>`).join("")}</div>` : "";
+  return `<div class="cols">${leg}<div class="crow">${cols}</div>${o.vs ? `<div class="dax"><span></span><span>값 = ${o.vs}</span></div>` : ""}</div>`;
+}
+
 // 100번 중 몇 번: 맨 위 회색 '평소' 막대 + 경우별 막대.  rows: {label, v, base, n, sub}
 function rateDots(rows, o = {}) {
-  // 100번 중 몇 번이었나: 맨 위 회색 '평소' 막대와 길이만 비교하면 되게
+  // 100번 중 몇 번이었나: 맨 왼쪽 회색 '평소' 막대와 키를 비교
   rows = rows.filter((r) => r.v != null);
   if (!rows.length) return "";
   const base = rows.find((r) => r.base != null)?.base;
-  const all = base != null ? [{ label: o.baseLabel || "평소 (아무 종목·아무 날)", v: base, isBase: true }, ...rows] : rows;
-  const M = Math.max(...all.map((r) => r.v)) * 1.1 || 1;
-  const body = all.map((r) => {
-    const col = r.isBase || base == null ? "faint" : r.v > base * 1.1 ? "up" : r.v < base * 0.9 ? "down" : "sub";
-    const sub = [r.sub, !r.isBase && base ? `평소의 ${num(r.v / base, 1)}배` : "", !r.isBase && r.n != null && r.n < 30 ? "⚠ 기록 적음 — 운일 수 있음" : ""].filter(Boolean).join(" · ");
-    return `<div class="rd${r.isBase ? " rbase-row" : ""}"><div class="dl">${esc(r.label)}${sub ? `<small>${sub}</small>` : ""}</div>
-      <div class="rt"><i class="rbar" style="width:${(r.v / M) * 100}%;background:var(--${col})"></i></div>
-      <b class="dv">${num(r.v, 0)}번<small class="vs">100번 중</small></b></div>`;
-  }).join("");
-  return `<div class="dbars">${body}</div>`;
+  const few = (r) => r.n != null && r.n < 30 ? "⚠ 기록 적음" : "";
+  const groups = [...(base != null ? [{ label: o.baseLabel || "평소", sub: "아무 종목·아무 날", bars: [{ v: base, base: true }] }] : []),
+    ...rows.map((r) => ({ label: r.label, sub: [base ? `평소의 ${num(r.v / base, 1)}배` : "", few(r)].filter(Boolean).join(" · "), bars: [{ v: r.v }] }))];
+  return colBars(groups, { unit: "번", count: true, vs: "100번 중 몇 번", color: (b) => b.base || base == null ? "faint" : b.v > base * 1.1 ? "up" : b.v < base * 0.9 ? "down" : "sub" });
 }
 
 // 속설 결과 막대: 같은 날 다른 종목들보다 몇 % 더(덜). 운으로도 나올 만한 작은 차이면 회색 + '근거 부족'.  rows: {label, sub, x, se, head}
@@ -1281,7 +1298,7 @@ function renderReplay() {
       return ok.length && ok[0].lift >= 1.5 ? `‘${esc(ok[0].label)}’ 신호가 뜬 종목은 아무 종목보다 ${ok[0].lift}배 자주 급등했어요.`
         : "아직 어떤 신호도 급등을 확실히 미리 알려 주진 못했어요 (아무 종목이나 고른 것과 비슷)."; })())}
     <div class="tile wide"><div class="chart-cap">이 신호가 뜬 종목 100개 중, ${v.fwd}일 안에 +${v.hit}% 넘게 급등한 종목 수</div>
-      ${rateDots(v.rows.map((r) => ({ label: r.label, v: r.rate, base: v.base, n: r.n, sub: `${num(r.n)}건` })), { baseLabel: "아무 종목이나 골랐을 때" })}
+      ${rateDots(v.rows.map((r) => ({ label: r.label, v: r.rate, base: v.base, n: r.n, sub: `${num(r.n)}건` })), { baseLabel: "아무 종목" })}
       ${asTable(vtable)}</div>
     <p class="hint">맨 위 회색 막대(아무 종목이나 골랐을 때)보다 긴 빨간 막대면 그 신호가 실제로 급등을 미리 알려 줬다는 뜻. 기간이 약 ${v.days}일로 짧아 참고용이고, 매일 다시 계산해요.</p>` : "";
   const fo = rp.follow, frows = fo ? fo.rows.filter((r) => r.n) : [];
@@ -1296,11 +1313,12 @@ function renderReplay() {
       if (two && two.n >= 30 && two.h3 < -2) t += ` 이틀 연속 +15%였던 종목은 평균 ${signed(two.h3, 1, "%")}로 손해였어요.`;
       return t; })())}
     <div class="tile wide"><div class="chart-cap">급등 뒤 3일 안에, 하루 +${fo.rules.again}% 넘게 또 오른 날이 있었던 횟수</div>
-      ${rateDots(fcases.map((r) => ({ label: r.label, v: r.again3, base: fbase.again3, n: r.n, sub: `${num(r.n)}건` })), { baseLabel: "평소 (아무 종목·아무 날)" })}
+      ${rateDots(fcases.map((r) => ({ label: r.label, v: r.again3, base: fbase.again3, n: r.n, sub: `${num(r.n)}건` })), { baseLabel: "평소" })}
       <div class="chart-cap">다음 날은 쉬었다가(제자리·하락), 그다음 이틀 안에 다시 +${fo.rules.rebound}% 넘게 오른 횟수</div>
-      ${rateDots(fcases.map((r) => ({ label: r.label, v: r.rest_again, base: fbase.rest_again, n: r.n })), { baseLabel: "평소 (아무 종목·아무 날)" })}
+      ${rateDots(fcases.map((r) => ({ label: r.label, v: r.rest_again, base: fbase.rest_again, n: r.n })), { baseLabel: "평소" })}
       <div class="chart-cap">${kindTag(false)}그런데 따라 샀다면? 우리가 실제로 살 수 있는 다음 날 아침에 사서 3일 뒤, 주가가 평균 몇 % 올랐나</div>
-      ${divBars(fcases.map((r) => ({ label: r.label, v: r.h3, n: r.n, sub: `100번 중 ${num(r.h3_win, 0)}번 이익` })), { unit: "%", ref: fbase.h3, refLabel: "평소", axis: ["손해", "이익"], vs: "주가" })}
+      ${colBars([{ label: "평소", sub: "아무 종목·아무 날", bars: [{ v: fbase.h3, base: true }] },
+        ...fcases.map((r) => ({ label: r.label, sub: `100번 중 ${num(r.h3_win, 0)}번 이익${r.n < 30 ? " · ⚠ 기록 적음" : ""}`, bars: [{ v: r.h3 }] }))], { vs: "주가가 오른(내린) %" })}
       ${asTable(ftable)}</div>
     ${(fo.splits || []).length > 1 ? (() => {
       const all = fo.splits[0];
@@ -1472,7 +1490,10 @@ function mythCard(x, base) {
   } else rec = `<p class="hint">이 기간엔 이런 날이 없었어요.</p>`;
   const isGap = x.kind === "gap";
   rec = `<div class="chart-cap">${kindTag(true)}${isGap ? "갭이 아닌 날(같은 만큼 벌어진 날)보다, 4일 안에 원래 가격으로 돌아온 횟수가 100번 중 몇 번 더 많았나" : "같은 날 산 다른 종목들보다 3일 뒤 주가가 몇 % 더 올랐나 — 말대로 됐으면 오른쪽"}</div>
-    ${forest(mythRows(x), isGap ? { axis: ["덜 메워짐", "더 메워짐"], min: 2, unit: "번", vs: "100번 중 더" } : {})}${asTable(rec, "자세한 숫자 보기")}`;
+    ${colBars(mythRows(x).map((r) => ({ label: r.label, sub: r.sub, bars: [{ v: r.x, sig: r.se ? Math.abs(r.x) >= 2 * r.se - 1e-9 : false }] })),
+      { unit: isGap ? "번" : "%", vs: isGap ? "100번 중 몇 번 더 메워졌나" : "다른 종목보다 더 오른(덜 오른) % — 위로 클수록 말대로",
+        color: (b) => !b.sig ? "faint" : b.v > 0 ? "up" : "down" })}
+    <p class="hint">색 막대 = 운으로 보기 어려운 차이, 회색 = 아직 근거 부족.</p>${asTable(rec, "자세한 숫자 보기")}`;
   const sell = x.kind === "sell" || x.kind === "pair";
   const say = { true: sell ? "이 기간엔 정말 그런 경우 따라 사면 다른 종목보다 못했어요." : x.kind === "gap" ? "같은 거리만큼 벌어진 다른 날보다 실제로 더 잘 돌아왔어요." : "이 기간엔 같은 날 다른 종목보다 정말 나았어요.",
     false: sell ? "이 기간엔 오히려 따라 산 게 다른 종목보다 나았어요." : x.kind === "gap" ? "갭이 아닌 날보다 오히려 덜 돌아왔어요 — 갭 방향으로 더 가는 편." : "이 기간엔 오히려 같은 날 다른 종목보다 못했어요.",
