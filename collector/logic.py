@@ -1551,14 +1551,15 @@ def replay_mover(code, name, closes, values, net, caps, cand_by_day, reports=Non
             "verdict": verdict, "lead": lead, "how": how, "early": sorted(early, key=lambda e: -e["lead"]), "timeline": timeline}
 
 
-def find_movers(closes, universe, rules=SURGE, min_cap=None, top=12):
-    """최근 급등주: 5일 +20%↑ 또는 최근 5일 중 하루 +15%↑ (시총 기준 이상만)."""
+def find_movers(closes, universe, rules=SURGE, min_cap=None, top=20):
+    """최근 급등주: 5일 +20%↑ 또는 최근 5일 중 하루 +15%↑ (시총 기준 이상만).
+    순서는 5일 상승률과 하루 최대 상승률 중 큰 값 — 5일 상승률로만 줄 세우면 오늘 상한가처럼 하루에 몰린 급등이 잘려 나갔음."""
     min_cap = min_cap if min_cap is not None else RULES["min_cap"]
     r5 = (closes.iloc[-1] / closes.iloc[-6] - 1) * 100
-    d1 = (closes.pct_change().iloc[-5:] * 100).max()
+    d1 = (closes.pct_change(fill_method=None).iloc[-5:] * 100).max()
     codes = [c for c in closes.columns if c in universe and universe[c]["cap"] >= min_cap
              and (r5.get(c, 0) >= rules["r5"] or d1.get(c, 0) >= rules["d1"])]
-    return sorted(codes, key=lambda c: -r5.get(c, 0))[:top]
+    return sorted(codes, key=lambda c: -max(r5.get(c, 0), d1.get(c, 0)))[:top]
 
 
 def signal_validation(closes, values, net, caps, eligible, rules=SURGE):

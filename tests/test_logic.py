@@ -688,6 +688,11 @@ def test_replay_mover_and_signal_validation():
     caps = {"A": 1000 * EOK, "B": 1000 * EOK}
     uni = {"A": {"cap": 1000 * EOK}, "B": {"cap": 1000 * EOK}}
     assert logic.find_movers(closes, uni) == ["A"]
+    # 오늘 하루 +30%(5일로는 +13%)도 5일 +25%보다 뒤로 밀려 잘리지 않게: 둘 중 큰 값 순서
+    up = pd.DataFrame({"S": [100.0] * 34 + [100, 110, 120, 125, 125, 125], "D": [100.0] * 39 + [100.0]}, index=days)
+    up.iloc[-6:, 1] = [100, 100, 95, 90, 87, 113.1]
+    u2 = {"S": {"cap": 1000 * EOK}, "D": {"cap": 1000 * EOK}}
+    assert logic.find_movers(up, u2) == ["D", "S"] and logic.find_movers(up, u2, top=1) == ["D"]
     cand = {"d35": {"A": ["단타"]}}
     rp = logic.replay_mover("A", "가", closes, values, netd, caps, cand)
     assert rp["surge"] == "d35" and rp["verdict"] == "sameday"
