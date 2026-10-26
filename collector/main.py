@@ -244,6 +244,7 @@ def main(argv):
     # 증권사 리포트(주목도: 오랜만에 다뤄지기 시작했나)와 네이버 검색 상위(이미 알려짐)
     reports = update_reports(base, errors)
     search_top = [] if backfill else (safe("검색 상위", sources.naver_search_top, errors) or [])
+    attention = update_attention(base, search_top)
     rank = {c: i + 1 for i, c in enumerate(search_top)}
     details = {}
     for g, items in (("scalp", scalp[:10]), ("swing", swing[:10]), ("value", value[:10])):
@@ -347,7 +348,7 @@ def main(argv):
     log(f"  테마 {len(themes['themes'])}개: " + ", ".join(f"{x['name']}({x['key']})" for x in themes["themes"][:6]))
 
     t = step("급등주 복기·신호 검증")
-    replay = build_replay(base, closes, values, flows_hist, listing, universe_all, {"scalp": scalp, "swing": swing, "value": value}, reports, opens, highs, lows)
+    replay = build_replay(base, closes, values, flows_hist, listing, universe_all, {"scalp": scalp, "swing": swing, "value": value}, reports, opens, highs, lows, reported, attention)
     log(f"  급등주 {len(replay['movers'])}개: " + ", ".join(f"{m['name']}({m['verdict']})" for m in replay["movers"][:8]))
 
     t = step("운용사 방향 (액티브 ETF)")
@@ -497,7 +498,8 @@ def update_season(base, dart_days, name_to_code, errors):
     return season, store
 
 
-def build_replay(base, closes, values, flows_hist, listing, universe, today, reports, opens=None, highs=None, lows=None):
+def build_replay(base, closes, values, flows_hist, listing, universe, today, reports, opens=None, highs=None, lows=None,
+                 reported=None, attention=None):
     """최근 급등주를 거슬러 보고(언제 어떤 신호가 먼저 있었나·우리가 언제 잡았나), 신호별로 급등을 앞섰는지 잰다."""
     net = logic.net_frame(flows_hist)
     caps = {c: v["cap"] for c, v in listing.items()}
@@ -539,7 +541,10 @@ def build_replay(base, closes, values, flows_hist, listing, universe, today, rep
     if follow is not None:
         follow["hold"] = hold
     try:
-        myths = logic.myth_check(closes, opens, highs, lows, values, elig, reports) if opens is not None and highs is not None and lows is not None else None
+        markets = {c: {"KOSPI": "P", "KOSDAQ": "D"}.get(v.get("market"), "") for c, v in listing.items()}
+        myths = (logic.myth_check(closes, opens, highs, lows, values, elig, reports, markets=markets, caps=caps,
+                                  reported=(reported or {}).get("reported"), attention=attention)
+                 if opens is not None and highs is not None and lows is not None else None)
         if myths:
             log("  속설 검증: " + ", ".join(f"{x['title']}({x['verdict']}, {x['n']}건)" for x in myths["items"]))
     except Exception as e:
@@ -658,6 +663,23 @@ def build_themes(base, days, closes, flows_daily, flows_5d, listing, reports, re
     out.sort(key=lambda x: (order[x["key"]], -x["flow_pct"]))
     heat = logic.theme_heat(heat_src, logic.net_frame(flows_hist or []), caps, days=20)
     return {"themes": out, "bench": {c: logic.etf_trend(sr) for c, sr in bench.items()}, "heat": heat}
+
+
+def update_attention(base, search_top, keep_days=150):
+    """네이버 검색 상위 100을 날마다 쌓는다 (attention.json) — '모두가 볼 때는 늦었다' 속설을 나중에 검증하려고."""
+    path = os.path.join(DATA, "attention.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            store = json.load(f)
+    except (OSError, ValueError):
+        store = {}
+    if search_top:
+        store[base] = list(search_top)
+    cut = (datetime.strptime(base, "%Y%m%d") - timedelta(days=keep_days)).strftime("%Y%m%d")
+    store = {d: v for d, v in sorted(store.items()) if d >= cut}
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(store, f, ensure_ascii=False, separators=(",", ":"))
+    return store
 
 
 def update_reports(base, errors, keep_days=150):

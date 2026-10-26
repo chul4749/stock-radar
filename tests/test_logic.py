@@ -806,4 +806,29 @@ def test_myth_check_events():
     assert it["down5"]["n"] >= 1
     # C의 갭은 그날 종가(1000)가 전날 종가와 같으니 그날 안에 메워짐
     assert it["gap"]["up"]["n"] >= 1 and it["gap"]["up"]["same_day"] is not None
-    assert {x["verdict"] for x in out["items"]} <= {"true", "false", "none", "few"}
+    assert {x["verdict"] for x in out["items"]} <= {"true", "false", "none", "few", "shaky_true", "shaky_false"}
+
+
+def test_myth_check_excess_and_skew():
+    import numpy as np
+    days = [f"2026{i:04d}" for i in range(100, 182)]
+    n = len(days)
+    rng = np.random.default_rng(5)
+    cols = [f"{i:06d}" for i in range(60)]
+    base = rng.normal(0, 0.01, (n, 60))
+    base[40] -= 0.05          # 시장 전체가 빠진 날 → 다음 날들 전 종목 반등
+    base[41:44] += 0.02
+    cl = pd.DataFrame(1000 * np.exp(np.cumsum(base, 0)), index=days, columns=cols)
+    op = cl.shift(1).fillna(1000.0)
+    hi, lo = np.maximum(cl, op) * 1.001, np.minimum(cl, op) * 0.999
+    va = pd.DataFrame(1.0, index=days, columns=cols)
+    out = logic.myth_check(cl, op, hi, lo, va, set(cols), cost=0,
+                           markets={c: "P" for c in cols}, caps={c: 5000 * logic.EOK for c in cols})
+    d5 = {x["key"]: x for x in out["items"]}["down5"]
+    if d5["n"]:
+        # 같은 날 평균을 빼니 시장 전체 반등은 초과 수익에서 빠짐 (원래 수익보다 훨씬 작음)
+        assert abs(d5["x3"]) < abs(d5["h3"]) + 0.5
+        assert "seg" in d5 and "kospi" in d5["seg"]
+    assert logic._trim_mean([0] * 19 + [100]) == 0.0   # 20개↑면 한 종목 폭등은 빠짐
+    assert logic._trim_mean([0] * 9 + [100]) == 10.0   # 20개 안 되면 그냥 평균
+    assert logic._trim_mean([0] * 38 + [100, -100]) == 0.0

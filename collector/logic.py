@@ -1746,10 +1746,24 @@ MYTH = {"fwd": (3, 5), "gap": 3.0, "gap_days": 5, "high_days": 60, "down_days": 
         "hype_mult": 5.0, "hype_ret": 10.0, "report_n": 3}
 
 
-def myth_check(closes, opens, highs, lows, values, eligible, reports=None, rules=MYTH, cost=None):
+def _trim_mean(a, cut=0.05):
+    """위아래 5%를 뺀 평균 (한두 종목의 폭등·폭락이 평균을 끌고 가지 않게). 20개 안 되면 그냥 평균."""
+    import numpy as np
+    a = np.sort(np.asarray(a, dtype=float))
+    if len(a) >= 20:
+        k = int(len(a) * cut)
+        a = a[k:len(a) - k]
+    return float(a.mean()) if len(a) else None
+
+
+def myth_check(closes, opens, highs, lows, values, eligible, reports=None, rules=MYTH, cost=None,
+               markets=None, caps=None, reported=None, attention=None):
     """주식 속설 검증: 흔히 믿는 심리 패턴이 최근 약 80영업일 실제로 맞았나.
-    매수 쪽 속설은 '다음 날 시가에 사서 3·5영업일째 종가에 팖'(비용 뺌)을 평소(모든 종목·날)와 비교,
-    갭은 '며칠 안에 전날 종가로 돌아왔나' 비율로 본다."""
+    사는 쪽 속설은 '다음 날 시가에 사서 3·5영업일째 종가에 팖'(비용 뺌). 판정은 통으로 보지 않고
+    · 같은 날 전 종목 평균을 뺀 초과 수익(시장 전체가 오르내린 날의 효과를 뺌), 위아래 5%를 뺀 평균
+    · 몇 종목·며칠에 몰렸나(상위 5종목 몫, 하루 최대 몫), 기간 앞·뒤 절반이 같은 방향인가
+    · 코스피/코스닥, 시총 크기, 시장이 오르는 중/내리는 중으로 나눠 봄
+    갭은 '며칠 안에 전날 종가로 돌아왔나'를 같은 만큼 벌어진 다른 날과 비교한다."""
     import numpy as np
     cost = COST if cost is None else cost
     cols = [c for c in closes.columns if c in eligible and c in opens.columns and c in highs.columns and c in lows.columns and c in values.columns]
@@ -1763,37 +1777,72 @@ def myth_check(closes, opens, highs, lows, values, eligible, reports=None, rules
     fwd = {n: (cl.shift(-n) / entry - 1) * 100 - cost for n in rules["fwd"]}
     n_last = max(rules["fwd"])
     valid = entry.notna() & fwd[n_last].notna() & ret.notna()
+    # 같은 날 전 종목 평균 대비 (시장 전체 효과 빼기)
+    exc = {n: f.sub(f.where(valid).mean(axis=1), axis=0) for n, f in fwd.items()}
+    # 시장 흐름: 전 종목 평균 등락을 이어 붙인 지수가 20일 평균 위면 '오르는 중'
+    mk = (1 + ret.where(valid | ret.notna()).mean(axis=1).fillna(0) / 100).cumprod()
+    mk_up = (mk > mk.rolling(20, min_periods=10).mean()).values
+    col_mkt = np.array([(markets or {}).get(c, "") for c in cols])
+    cap_arr = np.array([float((caps or {}).get(c) or 0) for c in cols])
+    size = np.where(cap_arr >= 10000 * EOK, "large", np.where(cap_arr >= 3000 * EOK, "mid", "small"))
+    dates = np.array(idx)
 
-    def perf(mask):
+    def perf(mask, segs=True):
         m = (mask & valid).values
         n = int(m.sum())
         if not n:
             return {"n": 0}
-        out = {"n": n}
-        for k, f in fwd.items():
-            a = f.values[m]
+        tt, jj = np.nonzero(m)
+        out = {"n": n, "stocks": int(len(set(jj))), "days": int(len(set(tt)))}
+        for k in rules["fwd"]:
+            a, x = fwd[k].values[m], exc[k].values[m]
             out[f"h{k}"] = r1(float(np.mean(a)))
             out[f"h{k}_med"] = r1(float(np.median(a)))
             out[f"h{k}_win"] = round(float((a > 0).mean() * 100), 1)
+            out[f"x{k}"] = r1(_trim_mean(x))
+            out[f"x{k}_med"] = r1(float(np.median(x)))
+            out[f"beat{k}"] = round(float((x > 0).mean() * 100), 1)
+        x3 = exc[3].values[m]
+        # 쏠림: 종목별 초과 수익 합 중 위 5종목 몫(이긴 쪽 기준), 가장 많이 걸린 하루의 몫
+        per = pd.Series(x3).groupby(jj).sum()
+        pos = per[per > 0].sort_values(ascending=False)
+        out["top5"] = round(float(pos.head(5).sum() / pos.sum() * 100), 1) if len(pos) and pos.sum() > 0 else None
+        out["top5_names"] = [cols[c] for c in pos.head(5).index]
+        out["day_max"] = round(float(pd.Series(tt).value_counts().iloc[0] / n * 100), 1)
+        # 기간 앞·뒤 절반
+        mid = np.median(tt)
+        first, second = x3[tt <= mid], x3[tt > mid]
+        out["halves"] = [r1(_trim_mean(first)) if len(first) else None, r1(_trim_mean(second)) if len(second) else None]
+        if segs:
+            seg = {}
+            for key, sel in (("kospi", col_mkt[jj] == "P"), ("kosdaq", col_mkt[jj] == "D"),
+                             ("large", size[jj] == "large"), ("mid", size[jj] == "mid"), ("small", size[jj] == "small"),
+                             ("mk_up", mk_up[tt]), ("mk_down", ~mk_up[tt])):
+                if sel.sum():
+                    seg[key] = {"n": int(sel.sum()), "x3": r1(_trim_mean(x3[sel])), "beat3": round(float((x3[sel] > 0).mean() * 100), 1)}
+            out["seg"] = seg
         return out
 
-    base = perf(ret.notna())
+    base = perf(ret.notna(), segs=False)
 
     def verdict(p, bullish=True):
-        if p.get("n", 0) < 30:
+        """같은 날 평균 대비 3일 초과(위아래 5% 뺀 평균) ±1%p 이상 + 이긴 비율 50%에서 ±5%p 이상이어야 '맞음/반대'.
+        상위 5종목이 이긴 몫의 절반 넘게 차지하거나, 기간 앞·뒤가 반대 방향이면 '불안정'."""
+        if p.get("n", 0) < 30 or p.get("stocks", 0) < 20 or p.get("days", 0) < 8:
             return "few"
-        ex = p["h3"] - base["h3"]
-        wex = p["h3_win"] - base["h3_win"]
+        x, b = p["x3"], p["beat3"] - 50
         if not bullish:
-            ex, wex = -ex, -wex
-        if ex >= 1.0 and wex >= 3:
-            return "true"
-        if ex <= -1.0 and wex <= -3:
-            return "false"
-        return "none"
+            x, b = -x, -b
+        v = "true" if x >= 1.0 and b >= 5 else "false" if x <= -1.0 and b <= -5 else "none"
+        if v != "none":
+            h = [y for y in p.get("halves", []) if y is not None]
+            flip = len(h) == 2 and h[0] * h[1] < 0 and min(abs(h[0]), abs(h[1])) >= 0.5
+            if flip or (p.get("top5") or 0) > 50:
+                return "shaky_" + v
+        return v
 
     items = []
-    # 1) 매물대를 뚫으면 간다: 전 40일 거래가 가장 많았던 가격대(대표가×거래대금 20칸) 윗선을 종가로 처음 넘은 날
+    # 1) 매물대를 뚫으면 간다
     W, B = rules["vp_days"], rules["vp_bins"]
     typ = ((hi + lo + cl) / 3).values
     V, C = va.values, cl.values
@@ -1815,7 +1864,7 @@ def myth_check(closes, opens, highs, lows, values, eligible, reports=None, rules
     p = perf(pd.DataFrame(brk, index=idx, columns=cols))
     items.append({"key": "vp_break", "title": "매물대를 뚫으면 간다", "kind": "buy", **p, "verdict": verdict(p),
                   "event": f"종가가 최근 {W}일 가장 많이 거래된 가격대를 처음 넘은 날"})
-    # 2) 신고가는 사라: 종가가 직전 60일 최고가(고가 기준)를 처음 넘은 날
+    # 2) 신고가는 사라
     H = rules["high_days"]
     prev_high = hi.shift(1).rolling(H, min_periods=H).max()
     newhi = (cl > prev_high) & ~(cl.shift(1) > prev_high.shift(1))
@@ -1864,22 +1913,59 @@ def myth_check(closes, opens, highs, lows, values, eligible, reports=None, rules
     base_next = round(float((nxt.values[bm] > 0).mean() * 100), 1) if bm.sum() else None
     items.append({"key": "down5", "title": f"{K}일 연속 빠지면 반등한다", "kind": "buy", **p, "base_next_up": base_next,
                   "verdict": verdict(p), "event": f"종가가 {K}일 연속 내린 날"})
-    # 5) 모두가 볼 때는 늦었다: 거래 평소 5배↑ + 그날 +10%↑ (관심이 한꺼번에 몰림), 리포트 5일 3건↑ 따로
+    # 5) 모두가 볼 때는 늦었다: 관심이 한꺼번에 몰린 날 다음 날 사면 (파는 쪽 속설 — 평소보다 나쁘면 맞음)
     mult = va / va.shift(1).rolling(20, min_periods=10).mean()
     hype = (mult >= rules["hype_mult"]) & (ret >= rules["hype_ret"])
     p = perf(hype)
     item = {"key": "hype", "title": "모두가 볼 때는 늦었다", "kind": "sell", **p, "verdict": verdict(p, bullish=False),
             "event": f"거래대금이 평소의 {rules['hype_mult']:g}배 넘고 그날 +{rules['hype_ret']:g}% 넘게 오른 날 (관심이 한꺼번에 몰림)"}
+    subs = []
+    hype2 = hype & (mult.shift(1) >= rules["hype_mult"])
+    subs.append({"label": "이틀 연속 거래 폭발 + 급등", **perf(hype2, segs=False)})
+    pos = {d: k for k, d in enumerate(idx)}
+    rep_cnt = pd.DataFrame(0, index=idx, columns=cols)
     if reports and reports.get("items"):
-        cnt = pd.DataFrame(0, index=idx, columns=cols)
-        pos = {d: i for i, d in enumerate(idx)}
         for x in reports["items"]:
-            if x["code"] in cnt.columns and x["date"] in pos:
-                cnt.iat[pos[x["date"]], cnt.columns.get_loc(x["code"])] += 1
-        many = cnt.rolling(5, min_periods=1).sum() >= rules["report_n"]
-        rp = perf(many & ~many.shift(1, fill_value=False))
-        item["reports"] = {**rp, "event": f"증권사 리포트가 5일 안에 {rules['report_n']}건 넘게 쏟아진 날"}
+            if x["code"] in rep_cnt.columns and x["date"] in pos:
+                rep_cnt.iat[pos[x["date"]], rep_cnt.columns.get_loc(x["code"])] += 1
+        many = rep_cnt.rolling(5, min_periods=1).sum() >= rules["report_n"]
+        subs.append({"label": f"증권사 리포트 5일 안 {rules['report_n']}건↑ 쏟아짐", **perf(many & ~many.shift(1, fill_value=False), segs=False)})
+    if attention:
+        top = pd.DataFrame(False, index=idx, columns=cols)
+        for d, codes in attention.items():
+            if d in pos:
+                for c in codes:
+                    if c in top.columns:
+                        top.iat[pos[d], top.columns.get_loc(c)] = True
+        subs.append({"label": "네이버 검색 상위 100 (쌓는 중)", **perf(top & ~top.shift(1, fill_value=False), segs=False)})
+    item["subs"] = subs
     items.append(item)
+    # 6) 소문에 사서 뉴스에 팔아라: 뉴스(실적 발표 공시·오랜만의 증권사 리포트) 전 10일 이미 +10%↑ 올랐던(소문) 종목이
+    #    뉴스 뒤에 소문 없던 종목보다 못하면 맞음. 뉴스 다음 날 시가에 산 성적으로 비교
+    news_e = pd.DataFrame(False, index=idx, columns=cols)
+    for c, v in ((reported or {}).items()):
+        d = v.get("date") if isinstance(v, dict) else v
+        if c in news_e.columns and d in pos:
+            news_e.iat[pos[d], news_e.columns.get_loc(c)] = True
+    news_r = (rep_cnt > 0) & (rep_cnt.shift(1).rolling(20, min_periods=1).sum().fillna(0) == 0)
+    pre = (cl.shift(1) / cl.shift(11) - 1) * 100
+    rumor = pre >= 10
+    rows = []
+    for lab, ev in (("실적 발표 공시", news_e), ("오랜만의 증권사 리포트 (20일 없다가)", news_r), ("뉴스 전체", news_e | news_r)):
+        a, b = perf(ev & rumor, segs=False), perf(ev & ~rumor & pre.notna(), segs=False)
+        rows.append({"label": lab, "rumor": a, "quiet": b})
+    allr = rows[-1]
+    a, b = allr["rumor"], allr["quiet"]
+    if min(a.get("n", 0), b.get("n", 0)) < 30 or a.get("stocks", 0) < 15:
+        v = "few"
+    else:
+        dx, db = a["x3"] - b["x3"], a["beat3"] - b["beat3"]
+        v = "true" if dx <= -1 and db <= -5 else "false" if dx >= 1 and db >= 5 else "none"
+        if v != "none" and (a.get("top5") or 0) > 50:
+            v = "shaky_" + v
+    items.append({"key": "rumor", "title": "소문에 사서 뉴스에 팔아라", "kind": "pair", "n": int(a.get("n", 0)) + int(b.get("n", 0)),
+                  "rows": rows, "verdict": v, "pre_run": r1(float(pre[(news_e | news_r) & rumor & valid].stack().mean())) if a.get("n") else None,
+                  "event": "실적 발표·오랜만의 리포트(뉴스) 전 10일 동안 이미 +10%↑ 오른 종목(소문에 산 사람이 있음) vs 안 오른 종목 — 뉴스 다음 날 시가에 샀다면"})
     days = [d for d in idx if valid.loc[d].any()]
     return {"from": days[0] if days else None, "to": days[-1] if days else None, "base": base, "cost": cost, "rules": rules, "items": items}
 
