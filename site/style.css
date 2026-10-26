@@ -545,8 +545,6 @@ table.mythsum th { font-size: 13px; }
 .dt .dref { position: absolute; top: -4px; bottom: -4px; width: 0; border-left: 1.5px dashed var(--text); opacity: .7; }
 .dref-leg { display: inline-block; width: 0; height: 10px; border-left: 1.5px dashed var(--text); vertical-align: -1px; margin-right: 2px; }
 .dv { text-align: right; font-size: 13px; white-space: nowrap; }
-.db.few, .rd.few { opacity: .45; }
-.db.base .dl { color: var(--sub); }
 .dax { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--faint); margin-top: 2px; padding-left: calc(8.5em + 8px); padding-right: calc(4.2em + 8px); }
 .rt { position: relative; height: 14px; }
 .rt .rbar { position: absolute; left: 0; top: 5px; height: 4px; border-radius: 2px; opacity: .35; }
@@ -578,3 +576,6 @@ table.mythsum th { font-size: 13px; }
 .kd.rel { background: #ede9fe; color: #5b21b6; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .kd.rel { background: #2e1065; color: #c4b5fd; } }
 :root[data-theme="dark"] .kd.rel { background: #2e1065; color: #c4b5fd; }
+.rt .rbar { top: 2px; height: 10px; border-radius: 3px; opacity: 1; }
+.rd.rbase-row .dl { color: var(--sub); }
+.rd.rbase-row { border-bottom: 1px dashed var(--line); padding-bottom: 7px; margin-bottom: 2px; }
