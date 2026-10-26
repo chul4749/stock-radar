@@ -1516,7 +1516,7 @@ def replay_mover(code, name, closes, values, net, caps, cand_by_day, reports=Non
     sig, ret, mult = _signal_frames(closes[[code]], values[[code]], net[[code]] if code in net.columns else pd.DataFrame(), caps)
     days = list(closes.index[-rules["lookback"]:])
     r = ret[code]
-    recent = [d for d in days[-5:] if r.get(d, 0) >= rules["d1"]]
+    recent = [d for d in days[-5:] if r.get(d, 0) >= rules["d1"] - 1e-6]
     surge = recent[0] if recent else max(days[-5:], key=lambda d: r.get(d, 0))
     si = days.index(surge)
     timeline = []
@@ -1556,7 +1556,7 @@ def find_movers(closes, universe, rules=SURGE, min_cap=None, top=30):
     """최근 급등주: 최근 5영업일 중 하루라도 +20% 이상 오른 종목 (시총 기준 이상만), 그날 상승률이 큰 순서.
     가격이 끊긴 날(권리락 등)은 종가 비교가 틀어지므로 하루 +30.5% 넘는 값은 급등으로 치지 않는다."""
     min_cap = min_cap if min_cap is not None else RULES["min_cap"]
-    d = closes.pct_change(fill_method=None).iloc[-5:] * 100
+    d = (closes.pct_change(fill_method=None).iloc[-5:] * 100).round(6)
     d1 = d.where(d <= 30.5).max()
     codes = [c for c in closes.columns if c in universe and universe[c]["cap"] >= min_cap and d1.get(c, 0) >= rules["d1"]]
     return sorted(codes, key=lambda c: -d1.get(c, 0))[:top]
@@ -1573,7 +1573,7 @@ def signal_validation(closes, values, net, caps, eligible, rules=SURGE):
     sig["streak3+flow_big"] = sig["streak3"] & sig["flow_big"]
     f = rules["fwd"]
     # 그 뒤 f일 안에 '하루 +hit% 이상' 오른 날이 있었나 (급등 정의와 같게: 누적이 아니라 하루)
-    dr = (cl.pct_change(fill_method=None) * 100).where(lambda x: x <= 30.5)
+    dr = (cl.pct_change(fill_method=None) * 100).round(6).where(lambda x: x <= 30.5)
     fwd_max = dr[::-1].rolling(f, min_periods=f).max()[::-1].shift(-1)
     days = [d for d in net.index if d in cl.index and cl.index.get_loc(d) + f < len(cl.index)]
     if not days:
@@ -1593,19 +1593,21 @@ def signal_validation(closes, values, net, caps, eligible, rules=SURGE):
             "fwd": f, "hit": rules["hit"], "rows": rows}
 
 
-FOLLOW = {"big": 15.0, "mid": 8.0, "again": 8.0, "rebound": 5.0}
+# 급등 = 하루 +20% 이상 (SURGE와 같은 정의). mid(+8~20%)는 급등이 아닌 큰 상승 — 비교용
+FOLLOW = {"big": 20.0, "mid": 8.0, "again": 20.0, "rebound": 5.0}
 
 
 def follow_through(closes, opens, eligible, rules=FOLLOW, cost=None, highs=None, values=None, net=None, caps=None):
     """급등한 날 뒤에 어떻게 됐나 (최근 약 80영업일, 시총·거래대금 기준 이상 종목):
-    다음 날도 오름, 3일 안에 또 +8%↑ 하루, 하루 쉬고(다음 날 보합·하락) 2~3일째 +5%↑,
+    다음 날도 오름, 3일 안에 또 하루 +20%↑, 하루 쉬고(다음 날 보합·하락) 2~3일째 +5%↑,
     그리고 실제로 살 수 있는 '다음 날 시가'에 사서 3·5영업일째 종가에 판 수익(비용 뺌)을 평소(모든 종목·날)와 비교."""
     cost = COST if cost is None else cost
     cols = [c for c in closes.columns if c in eligible and c in opens.columns]
     if not cols or len(closes.index) < 8:
         return None
     cl, op = closes[cols], opens[cols]
-    ret = cl.pct_change() * 100
+    ret = (cl.pct_change(fill_method=None) * 100).round(6)   # 반올림: 100→120이 19.999…%로 빠지지 않게
+    ret = ret.where(ret <= 30.5)   # 하루 +30.5% 넘음 = 가격 끊김(권리락 등), 급등 아님
     r1_, r2_, r3_ = ret.shift(-1), ret.shift(-2), ret.shift(-3)
     entry = op.shift(-1)
     h3 = (cl.shift(-3) / entry - 1) * 100 - cost
@@ -1628,12 +1630,12 @@ def follow_through(closes, opens, eligible, rules=FOLLOW, cost=None, highs=None,
     big = ret >= rules["big"]
     prev_big = big.shift(1, fill_value=False)
     rows = [row("big", f"하루 +{rules['big']:g}%↑", big),
-            row("mid", f"하루 +{rules['mid']:g}~{rules['big']:g}%", (ret >= rules["mid"]) & ~big),
+            row("mid", f"하루 +{rules['mid']:g}~{rules['big']:g}% (급등 아님, 비교용)", (ret >= rules["mid"]) & ~big),
             row("big2", f"+{rules['big']:g}%↑ 이틀 연속", big & prev_big),
             row("base", "평소 (모든 종목·날)", ret.notna())]
-    # 어떤 급등이 이어졌나: +8%↑ 급등 날을 그날 모양으로 나눠 본다 (필터 조건 후보를 고르는 근거)
-    surge = ret >= rules["mid"]
-    splits = [row("all", f"+{rules['mid']:g}%↑ 급등 전체", surge)]
+    # 어떤 급등이 이어졌나: 하루 +20%↑ 급등 날을 그날 모양으로 나눠 본다 (필터 조건 후보를 고르는 근거)
+    surge = big
+    splits = [row("all", f"하루 +{rules['big']:g}%↑ 급등 전체", surge)]
     if highs is not None:
         hi = highs.reindex(index=cl.index, columns=cols)
         near = cl >= hi * 0.97
@@ -1665,25 +1667,26 @@ def follow_through(closes, opens, eligible, rules=FOLLOW, cost=None, highs=None,
             "rows": rows, "splits": [x for x in splits if x["n"]]}
 
 
-HOLD = {"min": 8.0, "days": 10, "trail": 7.0}
+HOLD = {"min": 20.0, "limit": 29.0, "days": 10, "trail": 7.0}   # 급등 = 하루 +20%↑, limit = 상한가 근처
 
 
 def hold_after_surge(closes, opens, lows, eligible, values=None, rules=HOLD):
-    """이미 들고 있던 종목이 급등한 날(+8%↑) 종가 기준으로, 그 뒤 10영업일 동안 어떻게 됐나 — '얼마나 들고 가야 하나'.
+    """이미 들고 있던 종목이 급등한 날(하루 +20%↑) 종가 기준으로, 그 뒤 10영업일 동안 어떻게 됐나 — '얼마나 들고 가야 하나'.
     · after: 1·3·5·10일 뒤 종가가 급등일 종가보다 높았던 비율과 가운데 값
     · peak: 10일 안 가장 높은 종가가 나온 날 (급등 당일·1일 뒤·2일 뒤·3~5일·6~10일) 비율
     · giveback: 10일 안에 종가가 급등 전날 종가 아래로 (오른 걸 다 돌려줌) 내려간 비율
     · exits: 팔기 방법별 급등일 종가 대비 수익 — 다음 날 시가·다음 날 종가·3일·5일·10일 보유,
       '전날 저가 깨지면 그날 종가', '최고 종가에서 7% 내려오면 그날 종가' (10일째엔 무조건 팖)
-    묶음: 전체, 하루 +15%↑, 거래 평소 5배↑(뜨거운 급등), 첫 급등 + 거래 3배 안(조용한 급등)."""
+    묶음: 전체, 상한가 근처(+29%↑), 거래 평소 5배↑(뜨거운 급등), 첫 급등 + 거래 3배 안(조용한 급등)."""
     import numpy as np
     cols = [c for c in closes.columns if c in eligible and c in opens.columns and c in lows.columns]
     if not cols:
         return None
     cl, op, lo = closes[cols], opens[cols].reindex(index=closes.index), lows[cols].reindex(index=closes.index)
-    ret = cl.pct_change() * 100
+    ret = (cl.pct_change(fill_method=None) * 100).round(6)
+    ret = ret.where(ret <= 30.5)
     pre5 = (cl.shift(1) / cl.shift(6) - 1) * 100
-    groups = {"all": ret >= rules["min"], "big": ret >= 15}
+    groups = {"all": ret >= rules["min"], "big": ret >= rules.get("limit", 29.0)}
     if values is not None:
         va = values.reindex(index=cl.index, columns=cols)
         mult = va / va.shift(1).rolling(20, min_periods=10).mean()

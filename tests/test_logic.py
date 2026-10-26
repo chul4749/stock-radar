@@ -726,14 +726,14 @@ def test_theme_heat_rows():
 
 def test_follow_through():
     days = [f"202609{i:02d}" for i in range(1, 13)]
-    # A: 3일째 +20% 급등 → 다음 날 −2%(쉼) → 그다음 +10%(또 급등·쉬고 다시) ; B: 평범하게 매일 +1%
+    # A: 3일째 +20% 급등 → 다음 날 −2%(쉼) → 그다음 +10%(쉬고 다시 오름, 급등은 아님) ; B: 평범하게 매일 +1%
     a = [100, 100, 120, 117.6, 129.36, 130, 131, 132, 133, 134, 135, 136]
     b = [100 * 1.01 ** i for i in range(12)]
     closes = pd.DataFrame({"A": a, "B": b}, index=days)
     opens = closes.shift(1).fillna(100)
     out = logic.follow_through(closes, opens, {"A", "B"}, cost=0)
     big = next(r for r in out["rows"] if r["key"] == "big")
-    assert big["n"] == 1 and big["next_up"] == 0 and big["again3"] == 100 and big["rest_again"] == 100
+    assert big["n"] == 1 and big["next_up"] == 0 and big["again3"] == 0 and big["rest_again"] == 100
     # 다음 날 시가(=급등 날 종가 120)에 사서 3일째 종가(130) → +8.3%
     assert big["h3"] == 8.3
     base = next(r for r in out["rows"] if r["key"] == "base")
@@ -751,10 +751,10 @@ def test_follow_through_splits():
     out = logic.follow_through(closes, opens, {"A", "B"}, cost=0, highs=highs, values=values,
                                caps={"A": 1000 * logic.EOK, "B": 9000 * logic.EOK})
     sp = {r["key"]: r for r in out["splits"]}
-    # A의 +20% 날과 +10% 날 둘 다 급등, 둘 다 종가가 고가 근처·소형. 두 번째는 이미 오른 뒤
-    assert sp["all"]["n"] == 2 and sp["close_high"]["n"] == 2 and sp["small"]["n"] == 2
-    assert sp["vol5"]["n"] == 1 and sp["first"]["n"] == 1 and sp["again"]["n"] == 1 and "large" not in sp
-    # 두 번째 급등(이미 오른 뒤)은 조합에서 빠지고, 첫 급등은 거래 6배라 '3배 안' 조합에도 없음
+    # 급등(하루 +20%↑)은 A의 +20% 날 하나뿐 (+10% 날은 급등 아님). 종가 고가 근처·소형·첫 급등·거래 6배
+    assert sp["all"]["n"] == 1 and sp["close_high"]["n"] == 1 and sp["small"]["n"] == 1
+    assert sp["vol5"]["n"] == 1 and sp["first"]["n"] == 1 and "again" not in sp and "large" not in sp
+    # 첫 급등은 거래 6배라 '3배 안' 조합에 없음
     assert "first_quiet" not in sp
 
 
