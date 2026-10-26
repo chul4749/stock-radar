@@ -570,3 +570,5 @@ table.mythsum th { font-size: 13px; }
 .tk { margin: 8px 0 6px; padding: 9px 12px; border-radius: 10px; background: var(--neutral-bg); font-size: 14px; line-height: 1.55; font-weight: 600; }
 .seg { flex-wrap: wrap; }
 .seg button { white-space: nowrap; }
+.dax.top { margin: 0 0 2px; }
+.seldesc { margin-top: 2px; }
