@@ -128,6 +128,24 @@ def sectors(ymd):
     return pd.concat(parts)
 
 
+def sector_indices(ymd):
+    """KRX 업종 지수와 업종 분류 짝: {(시장, 업종명): (지수 코드, 지수 이름, 구성 종목 set)}.
+    업종 분류(get_market_sector_classifications) 이름과 같은 이름의 지수만 (가운뎃점·띄어쓰기 무시). 기준일 시점 구성 종목."""
+    from pykrx import stock
+    norm = lambda s: re.sub(r"[\s·・,]", "", re.sub(r"^(코스피|코스닥)\s*", "", str(s)))
+    out = {}
+    for market in ("KOSPI", "KOSDAQ"):
+        names = set(retry(lambda: stock.get_market_sector_classifications(ymd, market))["업종명"])
+        idx = {norm(stock.get_index_ticker_name(t)): (t, stock.get_index_ticker_name(t))
+               for t in retry(lambda: stock.get_index_ticker_list(ymd, market=market))}
+        for name in names:
+            hit = idx.get(norm(name))
+            if hit:
+                members = set(retry(lambda: stock.get_index_portfolio_deposit_file(hit[0], ymd)))
+                out[(market, name)] = (hit[0], hit[1], members)
+    return out
+
+
 def index_history(ticker, fromdate, todate):
     from pykrx import stock
     df = retry(lambda: stock.get_index_ohlcv(fromdate, todate, ticker))

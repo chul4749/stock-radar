@@ -299,6 +299,21 @@ def main(argv):
             if x["code"] in closes.columns:
                 x["exit"] = logic.exit_level(g, closes[x["code"]], lows[x["code"]] if x["code"] in lows.columns else None)
             x["earn_season"] = logic.earnings_status(x["code"], base, season, reported)
+    # 업종 지수 (업종 분류와 이름이 같은 KRX 업종 지수만, 구성 종목은 기준일 시점)
+    sec_idx = safe("업종 지수", lambda: sources.sector_indices(base), errors) or {}
+    sec_close = {}
+
+    def sector_of(code, market):
+        name = sectors.get(code) if sectors is not None else None
+        hit = sec_idx.get((logic.mkt_of(market), name)) if name else None
+        if not hit:
+            return None
+        t, _, members = hit
+        if t not in sec_close:
+            s = safe(f"업종 지수 {t}", lambda: sources.index_open_close(t, used_days[0], base)[1], errors)
+            sec_close[t] = s
+        return {"name": name, "members": members, "close": sec_close[t]}
+
     # 상대강도(20·60일, 종목이 속한 시장 지수 대비)와 평소 하루 변동폭(ATR14): 조건 통과 후보 전체. 점수·필터엔 안 씀
     for g, items in (("scalp", scalp), ("swing", swing), ("value", value)):
         for x in items:
@@ -307,6 +322,9 @@ def main(argv):
                 continue
             mk = bench.get(logic.mkt_of(x.get("market")))
             x["rs"] = logic.rs_pair(closes[c], mk[1] if mk else None, breaks[c])
+            sec = sector_of(c, x.get("market"))
+            if sec:
+                x["rs"]["sector"] = logic.sector_rs(c, closes[c], sec, breaks[c])
             atr = logic.atr_wilder(highs[c], lows[c], closes[c], breaks_s=breaks[c]) if c in highs.columns else None
             x["risk"] = logic.entry_risk(float(closes[c].iloc[-1]), (x.get("exit") or {}).get("stop"), atr)
     log(f"  기업 정보 {len(profiles) - failed}/{len(profiles)}")
@@ -429,7 +447,8 @@ def main(argv):
     for g, items in groups_now.items():
         extra = {x["code"]: {"rs20": ((x.get("rs") or {}).get("r20") or {}).get("diff"),
                              "rs60": ((x.get("rs") or {}).get("r60") or {}).get("diff"),
-                             "atr": (x.get("risk") or {}).get("atr")} for x in items}
+                             "atr": (x.get("risk") or {}).get("atr"),
+                             "srs20": (((x.get("rs") or {}).get("sector") or {}).get("r20") or {}).get("diff")} for x in items}
         pools[g] = logic.pool_record(g, items, extra)
     made = datetime.now(KST)
     origin = "recalc" if backfill else logic.record_origin(base, made)

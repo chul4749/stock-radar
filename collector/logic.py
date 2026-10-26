@@ -2580,6 +2580,26 @@ def rs_pair(close_s, idx_close, breaks_s=None):
     return out
 
 
+SECTOR_MIN = 10   # 업종 지수 구성 종목이 이보다 적으면 그 종목 하나가 지수를 좌우해 비교 의미가 없음
+
+
+def sector_rs(code, close_s, sector, breaks_s=None, min_members=SECTOR_MIN):
+    """업종 지수 대비 20·60일 힘. sector: {"name", "members": set, "close": Series(index=YYYYMMDD)} 또는 None.
+    그 종목이 실제로 지수에 들어 있고, 지수 구성이 min_members 이상일 때만 계산한다."""
+    if not sector:
+        return None
+    out = {"name": sector["name"]}
+    if code not in sector["members"]:
+        out["why"] = "업종 지수에 안 들어 있음"
+    elif len(sector["members"]) < min_members:
+        out["why"] = f"업종 지수 종목이 {len(sector['members'])}개뿐 (이 종목 영향이 큼)"
+    elif sector.get("close") is None:
+        out["why"] = "업종 지수 시세 없음"
+    else:
+        out.update(rs_pair(close_s, sector["close"], breaks_s))
+    return out
+
+
 def atr_wilder(high, low, close, n=14, breaks_s=None, min_len=None):
     """평소 하루 변동폭 ATR(n). TR = max(고가−저가, |고가−전일 종가|, |저가−전일 종가|),
     첫 값은 TR n개 평균, 그 뒤 (전 ATR×(n−1) + TR)/n (Wilder). 빈 날·가격 끊긴 날 뒤부터만 쓴다.

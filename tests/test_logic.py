@@ -1057,3 +1057,15 @@ def test_live_record_kept_apart_from_recalc(tmp_path, monkeypatch):
     rec, origin = main.load_record("20261026")      # 날짜 파일이 나중에 다시 계산돼도 실제 기록을 쓴다
     x = rec["filter"]["swing"][0]
     assert origin == "live" and x["code"] == "A" and "profile" not in x and x["reports"] == {"n": 1}
+
+
+def test_sector_rs_only_for_members_of_large_enough_index():
+    days = [f"2026{i:04d}" for i in range(101, 131)]
+    c = pd.Series([100.0 * 1.01 ** i for i in range(30)], index=days)
+    sec = pd.Series([1000.0] * 30, index=days)
+    members = {f"{i:06d}" for i in range(12)} | {"A"}
+    r = logic.sector_rs("A", c, {"name": "화학", "members": members, "close": sec})
+    assert r["name"] == "화학" and r["r20"]["mkt"] == 0.0 and r["r20"]["diff"] == r["r20"]["stock"] and r["r60"]["why"] == "기간 부족"
+    assert logic.sector_rs("B", c, {"name": "화학", "members": members, "close": sec})["why"] == "업종 지수에 안 들어 있음"
+    assert "5개뿐" in logic.sector_rs("A", c, {"name": "통신", "members": {"A", "1", "2", "3", "4"}, "close": sec})["why"]
+    assert logic.sector_rs("A", c, None) is None

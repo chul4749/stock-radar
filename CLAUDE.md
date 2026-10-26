@@ -59,6 +59,7 @@
     후보 변화(`build_changes`·`candidate_changes`): 어제 상위 10개 대비 새로/유지, 점수 변화를 점수 재료별로 나눔(`score_change`, 원인 지어내지 않음),
     빠진 종목은 순위 밖(`rank`) / 조건 깨짐(`filter`, `failed_conditions`) / 추적 불가(`unknown`), 우리 기록상 처음 걸린 날(`first_seen`)과 그 뒤 주가(가격 끊기면 추적 불가).
     상대강도(`rs_pair`·`rel_strength`): 20·60영업일 종목 − 그 시장 지수, 같은 날짜, 빈 날·가격 끊김이면 안 함. 점수·필터엔 안 넣는다.
+    업종 대비(`sector_rs`, `sources.sector_indices`): 업종 분류와 이름이 같은 KRX 업종 지수(probe/sector_index.py로 확인: 지수 구성은 100% 그 업종), 구성 종목이고 지수 종목 10개 이상일 때만.
     진입 위험(`atr_wilder` 와일더 ATR14, `entry_risk`): 기준일 종가 → 정리선 거리 %와 ATR 배수. 최대·예상 손실이라고 쓰지 않는다.
     정리선은 걸린 날 값으로 고정(스윙도 걸린 날 20일 평균). `stop_scorecard`: 정리선 아래 마감 → 다음 거래되는 날 시가에 팔고 끝날까지 현금,
     끝날까지 못 팔면 끝날 종가. 나쁜 10% 평균(`low10`)·거래별 최대 하락(`dd`, 포트폴리오 MDD 아님)·정리선 대비 체결(`fill_gap`).
