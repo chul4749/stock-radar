@@ -940,7 +940,7 @@ function exitRisk(x, e, earn) {
   const head = stop
     ? `<div class="row"><b>정리선${infoBtn("exit")}</b><b class="xstop">${num(stop)}원</b></div>${infoBox("exit")}
        <p class="xwhat">= ${EXIT_SHORT[state.tab] || "정리 기준 가격"}. <b>마감 가격</b>이 이 아래로 내려가면 다음 날 아침에 판다는 규칙 (장중에 잠깐 내려간 건 상관없음)</p>`
-    : `<div class="row"><b>정리선${infoBtn("exit")}</b><span class="na">계산 안 됨</span></div>${infoBox("exit")}<p class="xwhat">가격 기록이 20일이 안 돼 정리선을 못 정했어요.</p>`;
+    : `<div class="row"><b>정리선${infoBtn("exit")}</b><span class="na">계산 안 됨</span></div>${infoBox("exit")}<p class="xwhat">이 날 기록엔 정리선이 없어요 (가격 기록이 20일이 안 되거나, 저가 자료가 어긋나 계산에서 빠짐 — 10/27 수집부터 고침).</p>`;
   const now = stop ? `<p class="xnow">${gapText(ref, stop, atr, `지금 가격(${asof} 마감 ${num(ref)}원)`)}</p>` : "";
   const usual = atr ? `<p class="xusual">이 종목은 평소 하루에 <b>${num(atr)}원 (${num(r.atr_pct, 1)}%)</b>쯤 움직여요${infoBtn("risk")}</p>${infoBox("risk")}` : "";
   const calc = stop ? `<div class="risk" data-stop="${stop}" data-atr="${atr || ""}">
