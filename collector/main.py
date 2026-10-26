@@ -408,7 +408,7 @@ def main(argv):
 
     t = step("급등주 복기·신호 검증")
     replay = build_replay(base, closes, values, flows_hist, listing, universe_all, {"scalp": scalp, "swing": swing, "value": value}, reports, opens, highs, lows, reported, attention,
-                          {d.strftime("%Y%m%d"): float(v) for d, v in kospi_long.items()} if kospi_long is not None else None, dart_sig)
+                          {d.strftime("%Y%m%d"): float(v) for d, v in kospi_long.items()} if kospi_long is not None else None, dart_sig, breaks)
     log(f"  급등주 {len(replay['movers'])}개: " + ", ".join(f"{m['name']}({m['verdict']})" for m in replay["movers"][:8]))
 
     t = step("운용사 방향 (액티브 ETF)")
@@ -508,11 +508,11 @@ def main(argv):
     kospi = safe("코스피 기간", lambda: sources.index_history("1001", used_days[0], base), errors)
     if kospi is not None:
         kospi.index = [d.strftime("%Y%m%d") for d in kospi.index]
-        build_scorecard(base, dates, closes, opens, lows, kospi, kospi_long, reports, bench, breaks, out["generated_at"])
+        build_scorecard(base, dates, closes, opens, lows, kospi, kospi_long, reports, bench, breaks, out["generated_at"], highs)
     return 0
 
 
-def build_scorecard(base, dates, closes, opens, lows, kospi, kospi_long, reports, bench, breaks, generated_at):
+def build_scorecard(base, dates, closes, opens, lows, kospi, kospi_long, reports, bench, breaks, generated_at, highs=None):
     """기록 파일 전체로 성적표(scorecard.json)를 만든다. 후보는 실제 기록(live/)이 있으면 그것을 쓴다."""
     history, regimes, backfill_dates, signal_levels, theme_recs, mover_recs = [], {}, [], {}, [], {}
     origins, rest, pool_dates, versions = {}, [], [], {}
@@ -542,12 +542,20 @@ def build_scorecard(base, dates, closes, opens, lows, kospi, kospi_long, reports
                     i0 = pos[d]
                     x["rs"] = {"r20": logic.rel_strength(closes[x["code"]].iloc[:i0 + 1], mk[1] if mk else None,
                                                          breaks[x["code"]].iloc[:i0 + 1], 20)[0] or {}}
+                # 평소 하루 변동폭(ATR14 %)도 그날까지의 가격으로 (단타 변동폭 구간별 성적용)
+                if not (x.get("risk") or {}).get("atr_pct") and d in pos and highs is not None and x["code"] in highs.columns:
+                    i0, c = pos[d], x["code"]
+                    atr = logic.atr_wilder(highs[c].iloc[:i0 + 1], lows[c].iloc[:i0 + 1], closes[c].iloc[:i0 + 1], breaks_s=breaks[c].iloc[:i0 + 1])
+                    px = closes[c].iloc[i0]
+                    if atr and px == px and px > 0:
+                        x["atr_pct"] = logic.r1(atr / px * 100)
         # 전체 최소 기록이 있는 날: 11위 밑 후보도 성적을 따로 잰다 (화면 상위 10개 vs 조건 통과 전체)
         if flt.get("pools"):
             pool_dates.append(d)
             top_codes = {g: {x["code"] for x in groups[g]} for g in groups}
             rest.append((d, {f"{g}_rest": [{"code": r["c"], "name": r["n"], "close": r["p"], "market": r.get("m"), "r": r["r"],
-                                            "mul": r.get("mul"), "rs": {"r20": {"diff": r.get("rs20")}}}
+                                            "mul": r.get("mul"), "rs": {"r20": {"diff": r.get("rs20")}},
+                                            "atr_pct": logic.r1(r["atr"] / r["p"] * 100) if r.get("atr") and r.get("p") else None}
                                            for r in flt["pools"].get(g) or [] if r["c"] not in top_codes.get(g, set())]
                              for g in ("swing", "scalp", "value")}))
         # 운용사 여러 곳(2곳 이상)이 20일 동안 같이 산 종목도 같은 방식으로 성적을 본다
@@ -626,7 +634,7 @@ def update_season(base, dart_days, name_to_code, errors):
 
 
 def build_replay(base, closes, values, flows_hist, listing, universe, today, reports, opens=None, highs=None, lows=None,
-                 reported=None, attention=None, kospi_idx=None, dart_sig=None):
+                 reported=None, attention=None, kospi_idx=None, dart_sig=None, breaks=None):
     """최근 급등주를 거슬러 보고(언제 어떤 신호가 먼저 있었나·우리가 언제 잡았나), 신호별로 급등을 앞섰는지 잰다."""
     net = logic.net_frame(flows_hist)
     caps = {c: v["cap"] for c, v in listing.items()}
@@ -646,7 +654,10 @@ def build_replay(base, closes, values, flows_hist, listing, universe, today, rep
     movers = []
     for c in logic.find_movers(closes, universe):
         try:
-            movers.append(logic.replay_mover(c, listing[c]["name"], closes, values, net, caps, cand_by_day, reports))
+            m = logic.replay_mover(c, listing[c]["name"], closes, values, net, caps, cand_by_day, reports)
+            if highs is not None and lows is not None and c in highs.columns:
+                m["vol"] = logic.move_vs_atr(highs[c], lows[c], closes[c], m["surge"], breaks[c] if breaks is not None else None)
+            movers.append(m)
         except Exception as e:
             log(f"  복기 {c} 실패: {type(e).__name__}: {e}")
     elig = {c for c, v in universe.items() if v["cap"] >= logic.RULES["min_cap"] and v["value"] >= logic.RULES["min_value"]}

@@ -1074,3 +1074,19 @@ def test_sector_rs_only_for_members_of_large_enough_index():
     assert logic.sector_rs("B", c, {"name": "화학", "members": members, "close": sec})["why"] == "업종 지수에 안 들어 있음"
     assert "5개뿐" in logic.sector_rs("A", c, {"name": "통신", "members": {"A", "1", "2", "3", "4"}, "close": sec})["why"]
     assert logic.sector_rs("A", c, None) is None
+
+
+def test_move_vs_atr_uses_only_pre_surge_range():
+    days = [f"d{i:02d}" for i in range(40)]
+    c = pd.Series([100.0] * 39 + [130.0], index=days)
+    h, lo = c + 1, c - 1                       # 급등 전 하루 변동폭 2 (2%)
+    m = logic.move_vs_atr(h, lo, c, "d39")
+    assert m == {"atr_pct": 2.0, "rise": 30.0, "x": 15.0}
+    assert logic.move_vs_atr(h, lo, c, "d00") is None and logic.move_vs_atr(h, lo, c, "zz") is None
+
+
+def test_scorecard_extra_vol_buckets():
+    es = [{"date": "20261001", "group": "scalp", "x5": 1.0, "atr_pct": v} for v in (2.0, 4.0, 4.5, 6.0, 9.0)]
+    es.append({"date": "20261001", "group": "scalp_rest", "x5": -2.0, "atr_pct": 9.5})
+    rows = {r["label"]: r["n"] for r in logic.scorecard_extra(es)["vol"]["rows"]}
+    assert rows == {"하루 3% 미만": 1, "3~5%": 2, "5~8%": 1, "8% 넘음": 2}

@@ -2621,6 +2621,22 @@ def atr_wilder(high, low, close, n=14, breaks_s=None, min_len=None):
     return atr
 
 
+def move_vs_atr(high, low, close, surge, breaks_s=None):
+    """급등 시작 전날 종가 → 지금 종가 상승률이 급등 전 평소 하루 변동폭(ATR14, %)의 몇 배인가.
+    같은 +20%라도 평소 1% 움직이던 종목과 6% 움직이던 종목은 무게가 다르다. ATR은 급등 전 자료로만."""
+    idx = list(close.index)
+    if surge not in idx or idx.index(surge) < 1:
+        return None
+    i = idx.index(surge)
+    atr = atr_wilder(high.iloc[:i], low.iloc[:i], close.iloc[:i], breaks_s=breaks_s.iloc[:i] if breaks_s is not None else None)
+    base, now = close.iloc[i - 1], close.iloc[-1]
+    if not atr or not base or base != base or now != now:
+        return None
+    pct = atr / base * 100
+    rise = (now / base - 1) * 100
+    return {"atr_pct": r1(pct), "rise": r1(rise), "x": r1(rise / pct)}
+
+
 def entry_risk(ref, stop, atr):
     """기준 가격에서 정리선까지 거리 (%와 평소 변동폭의 몇 배). 최대 손실이나 예상 손실이 아니다."""
     if not ref or ref <= 0:
@@ -2785,7 +2801,8 @@ def scorecard(history, closes, index_closes, regimes=None, opens=None, bench=Non
                 mid = len(ranked) % 2 and ranked.index(x) == len(ranked) // 2
                 meta = {"origin": origins.get(date), "half": None if mid else half.get(code), "rank": x.get("r"),
                         "mult": x.get("value_mult", x.get("mul")),
-                        "rs20": ((x.get("rs") or {}).get("r20") or {}).get("diff")}
+                        "rs20": ((x.get("rs") or {}).get("r20") or {}).get("diff"),
+                        "atr_pct": x.get("atr_pct") or (x.get("risk") or {}).get("atr_pct")}
                 for n in HORIZONS:
                     if i0 + n >= len(days) or code not in closes.columns:
                         continue
@@ -2842,6 +2859,7 @@ def scorecard(history, closes, index_closes, regimes=None, opens=None, bench=Non
 
 
 MULT_BUCKETS = ((3, 5, "3~5배"), (5, 8, "5~8배"), (8, 15, "8~15배"), (15, 1e9, "15배 넘음"))
+VOL_BUCKETS = ((0, 3, "하루 3% 미만"), (3, 5, "3~5%"), (5, 8, "5~8%"), (8, 1e9, "8% 넘음"))   # 평소 하루 변동폭(ATR14 ÷ 종가)
 MIN_N = 30   # 이보다 적으면 비교 판단을 하지 않는다 (근거 부족)
 
 
@@ -2912,6 +2930,12 @@ def scorecard_extra(entries, pool_dates=(), horizon=5, since=None, min_n=MIN_N):
             mult[lb].append(e[key])
     out["mult"] = {"rows": [{"label": lb, **(summarize_returns(v, v) or {"n": 0})} for lb, v in mult.items()],
                    "verdict": "few" if min(len(v) for v in mult.values()) < min_n else "info"}
+    vol = {lb: [] for _, _, lb in VOL_BUCKETS}
+    for e in ok:
+        if base(e["group"]) == "scalp" and e.get("atr_pct"):
+            vol[next(lb for lo, hi, lb in VOL_BUCKETS if lo <= e["atr_pct"] < hi)].append(e[key])
+    out["vol"] = {"rows": [{"label": lb, **(summarize_returns(v, v) or {"n": 0})} for lb, v in vol.items()],
+                  "verdict": "few" if min(len(v) for v in vol.values()) < min_n else "info"}
     per = {}
     for e in ok:
         g = e["group"]
