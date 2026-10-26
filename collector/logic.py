@@ -1481,7 +1481,8 @@ def sector_tilt(moves, sectors):
 
 # ---------------------------------------------------------------- 급등주 복기·신호 검증
 
-SURGE = {"r5": 20.0, "d1": 15.0, "day": 8.0, "fwd": 5, "hit": 15.0, "lookback": 15}
+# 급등 = 하루에 +20% 이상 (5일 누적으로 오른 건 급등으로 보지 않음 — 하루에 몰린 특이한 움직임만 복기)
+SURGE = {"d1": 20.0, "fwd": 5, "hit": 20.0, "lookback": 15}
 
 
 def net_frame(flows_hist):
@@ -1515,7 +1516,7 @@ def replay_mover(code, name, closes, values, net, caps, cand_by_day, reports=Non
     sig, ret, mult = _signal_frames(closes[[code]], values[[code]], net[[code]] if code in net.columns else pd.DataFrame(), caps)
     days = list(closes.index[-rules["lookback"]:])
     r = ret[code]
-    recent = [d for d in days[-10:] if r.get(d, 0) >= rules["day"]]
+    recent = [d for d in days[-5:] if r.get(d, 0) >= rules["d1"]]
     surge = recent[0] if recent else max(days[-5:], key=lambda d: r.get(d, 0))
     si = days.index(surge)
     timeline = []
@@ -1552,14 +1553,13 @@ def replay_mover(code, name, closes, values, net, caps, cand_by_day, reports=Non
 
 
 def find_movers(closes, universe, rules=SURGE, min_cap=None, top=20):
-    """최근 급등주: 5일 +20%↑ 또는 최근 5일 중 하루 +15%↑ (시총 기준 이상만).
-    순서는 5일 상승률과 하루 최대 상승률 중 큰 값 — 5일 상승률로만 줄 세우면 오늘 상한가처럼 하루에 몰린 급등이 잘려 나갔음."""
+    """최근 급등주: 최근 5영업일 중 하루라도 +20% 이상 오른 종목 (시총 기준 이상만), 그날 상승률이 큰 순서.
+    가격이 끊긴 날(권리락 등)은 종가 비교가 틀어지므로 하루 +30.5% 넘는 값은 급등으로 치지 않는다."""
     min_cap = min_cap if min_cap is not None else RULES["min_cap"]
-    r5 = (closes.iloc[-1] / closes.iloc[-6] - 1) * 100
-    d1 = (closes.pct_change(fill_method=None).iloc[-5:] * 100).max()
-    codes = [c for c in closes.columns if c in universe and universe[c]["cap"] >= min_cap
-             and (r5.get(c, 0) >= rules["r5"] or d1.get(c, 0) >= rules["d1"])]
-    return sorted(codes, key=lambda c: -max(r5.get(c, 0), d1.get(c, 0)))[:top]
+    d = closes.pct_change(fill_method=None).iloc[-5:] * 100
+    d1 = d.where(d <= 30.5).max()
+    codes = [c for c in closes.columns if c in universe and universe[c]["cap"] >= min_cap and d1.get(c, 0) >= rules["d1"]]
+    return sorted(codes, key=lambda c: -d1.get(c, 0))[:top]
 
 
 def signal_validation(closes, values, net, caps, eligible, rules=SURGE):
@@ -1572,7 +1572,9 @@ def signal_validation(closes, values, net, caps, eligible, rules=SURGE):
     sig["streak3+quiet_vol"] = sig["streak3"] & sig["quiet_vol"]
     sig["streak3+flow_big"] = sig["streak3"] & sig["flow_big"]
     f = rules["fwd"]
-    fwd_max = (cl[::-1].rolling(f, min_periods=f).max()[::-1].shift(-1) / cl - 1) * 100
+    # 그 뒤 f일 안에 '하루 +hit% 이상' 오른 날이 있었나 (급등 정의와 같게: 누적이 아니라 하루)
+    dr = (cl.pct_change(fill_method=None) * 100).where(lambda x: x <= 30.5)
+    fwd_max = dr[::-1].rolling(f, min_periods=f).max()[::-1].shift(-1)
     days = [d for d in net.index if d in cl.index and cl.index.get_loc(d) + f < len(cl.index)]
     if not days:
         return None

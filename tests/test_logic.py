@@ -681,18 +681,19 @@ def test_manager_enrich_skill_and_tilt():
 def test_replay_mover_and_signal_validation():
     n = 40
     days = [f"d{i:02d}" for i in range(n)]
-    base = [100.0] * 30 + [100, 101, 100, 101, 100, 112, 125, 130, 131, 132]   # d35에 +12% 급등
+    base = [100.0] * 30 + [100, 101, 100, 101, 100, 125, 128, 130, 131, 132]   # d35에 하루 +25% 급등
     closes = pd.DataFrame({"A": base, "B": [50.0] * n}, index=days)
     values = pd.DataFrame({"A": [10 * EOK] * 31 + [25 * EOK] * 9, "B": [10 * EOK] * n}, index=days)
     netd = pd.DataFrame({"A": [0] * 30 + [-1, 2, 2, 2, 2, 5, 5, 1, 1, 1], "B": [1, -1] * 20}, index=days) * EOK
     caps = {"A": 1000 * EOK, "B": 1000 * EOK}
     uni = {"A": {"cap": 1000 * EOK}, "B": {"cap": 1000 * EOK}}
     assert logic.find_movers(closes, uni) == ["A"]
-    # 오늘 하루 +30%(5일로는 +13%)도 5일 +25%보다 뒤로 밀려 잘리지 않게: 둘 중 큰 값 순서
-    up = pd.DataFrame({"S": [100.0] * 34 + [100, 110, 120, 125, 125, 125], "D": [100.0] * 39 + [100.0]}, index=days)
+    # 급등 = 하루 +20%↑: 5일 동안 +25% 나눠 오른 S는 아님, 오늘 하루 +30%인 D는 급등. 하루 +30.5% 넘는 건(가격 끊김) 제외
+    up = pd.DataFrame({"S": [100.0] * 34 + [100, 110, 120, 125, 125, 125], "D": [100.0] * 40, "X": [100.0] * 39 + [50.0]}, index=days)
     up.iloc[-6:, 1] = [100, 100, 95, 90, 87, 113.1]
-    u2 = {"S": {"cap": 1000 * EOK}, "D": {"cap": 1000 * EOK}}
-    assert logic.find_movers(up, u2) == ["D", "S"] and logic.find_movers(up, u2, top=1) == ["D"]
+    up.iloc[-2:, 2] = [100.0, 200.0]
+    u2 = {k: {"cap": 1000 * EOK} for k in "SDX"}
+    assert logic.find_movers(up, u2) == ["D"]
     cand = {"d35": {"A": ["단타"]}}
     rp = logic.replay_mover("A", "가", closes, values, netd, caps, cand)
     assert rp["surge"] == "d35" and rp["verdict"] == "sameday"
@@ -706,11 +707,11 @@ def test_replay_mover_and_signal_validation():
 def test_replay_late_catch():
     n = 40
     days = [f"d{i:02d}" for i in range(n)]
-    closes = pd.DataFrame({"A": [100.0] * 34 + [110, 125, 130, 131, 132, 133]}, index=days)
+    closes = pd.DataFrame({"A": [100.0] * 35 + [125, 128, 130, 131, 132]}, index=days)
     values = pd.DataFrame({"A": [10 * EOK] * n}, index=days)
     netd = pd.DataFrame({"A": [0.0] * n}, index=days)
-    rp = logic.replay_mover("A", "가", closes, values, netd, {"A": 1000 * EOK}, {"d35": {"A": ["단타"]}})
-    assert rp["surge"] == "d34" and rp["verdict"] == "late" and rp["lead"] == -1
+    rp = logic.replay_mover("A", "가", closes, values, netd, {"A": 1000 * EOK}, {"d36": {"A": ["단타"]}})
+    assert rp["surge"] == "d35" and rp["verdict"] == "late" and rp["lead"] == -1
 
 
 def test_theme_heat_rows():
