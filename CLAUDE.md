@@ -74,7 +74,7 @@
 - 신용잔고·반대매매는 금융투자협회 FreeSIS(`sources.kofia`)에서 받는다. T+1 공표라 기준일 전날 값이 최신.
 - 외국인 코스피200 선물 순매수는 다음 금융(`sources.daum_futures`), 종목 기업 정보는 네이버(`sources.naver_profile`).
 - `probe/` 시험은 `credit-probe` 워크플로에 스크립트 이름(`script`)을 넣어 돌린다 (이 컨테이너에선 증권 사이트 접속이 막힘).
-- `main()`은 `socket.setdefaulttimeout(60)`: pykrx·DART가 끊긴 연결에서 15분씩 멈추던 것을 60초 실패→재시도로.
+- `main()`은 `_limit_requests_timeout(60)`(+`socket.setdefaulttimeout`): requests는 timeout=None이면 무한정 기다려 pykrx·DART가 끊긴 연결에서 16분씩 멈췄음 → 60초 실패→재시도.
 - 네이버·CNN은 비공식 경로라 바뀌면 빠질 수 있다. 수집 실패는 `errors`에 남기고 나머지는 계속 진행한다.
 
 ## 화면 규칙

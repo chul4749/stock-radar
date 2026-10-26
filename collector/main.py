@@ -42,9 +42,26 @@ def safe(name, fn, errors):
         return None
 
 
+def _limit_requests_timeout(sec):
+    import requests
+    if getattr(requests.Session.request, "_radar_timeout", False):
+        return
+    orig = requests.Session.request
+
+    def request(self, method, url, **kw):
+        if kw.get("timeout") is None:
+            kw["timeout"] = sec
+        return orig(self, method, url, **kw)
+
+    request._radar_timeout = True
+    requests.Session.request = request
+
+
 def main(argv):
-    # 시간 제한 없이 부르는 라이브러리(pykrx 등)가 끊긴 연결에서 15분 넘게 멈추던 것 막기: 응답 없으면 60초에 실패 → 재시도
+    # 시간 제한 없이 부르는 라이브러리(pykrx 등)가 끊긴 연결에서 15분 넘게 멈추던 것 막기: 응답 없으면 60초에 실패 → 재시도.
+    # requests는 timeout=None이면 socket 기본값도 무시하고 무한정 기다리므로, Session.request에서 직접 기본값을 넣는다
     socket.setdefaulttimeout(60)
+    _limit_requests_timeout(60)
     errors = []
     wanted = pick_base_date(argv[1] if len(argv) > 1 else None)
 
