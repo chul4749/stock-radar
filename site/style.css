@@ -355,6 +355,9 @@ table.fin .est { color: var(--faint); }
 .gloss dt { color: var(--text); font-weight: 600; margin-top: 10px; }
 .gloss dd { margin: 2px 0 0; line-height: 1.55; }
 .checks li.no::before { content: "✗"; color: var(--faint); }
+.checks.info li::before, .checks.info li.no::before { content: none; }
+.checks.info li span:first-child small { display: block; font-size: 11px; color: var(--sub); }
+.checks.info li.no span:last-child { white-space: normal; text-align: right; }
 .checks li.no span:last-child { color: var(--sub); }
 .wake { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 13px; }
 .wake .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
@@ -364,6 +367,25 @@ table.fin .est { color: var(--faint); }
 .exit { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 13px; }
 .exit .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .exit > small { display: block; color: var(--sub); margin-top: 2px; line-height: 1.5; }
+.track, .rs { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 13px; line-height: 1.5; }
+.track .row, .rs .row, .risk .row, .chg .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.rs .row small, .risk .row small, .chg .row small { color: var(--sub); }
+.track .tag { margin: 0 4px 0 0; }
+.tsc, .tf { display: block; margin-top: 3px; font-size: 12px; color: var(--sub); overflow-wrap: anywhere; }
+.tsc b, .tf b { color: inherit; }
+.tsc b.up, .tf b.up { color: var(--up); }
+.tsc b.down, .tf b.down { color: var(--down); }
+.risk { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); font-size: 13px; }
+.risk .checks { margin-top: 4px; }
+.rk-now, .rk-out { margin: 6px 0 0; font-size: 13px; }
+.rk-in { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; color: var(--sub); }
+.rk-in input { width: 9em; max-width: 50%; padding: 5px 8px; font: inherit; font-size: 14px; color: var(--text); background: var(--card); border: 1px solid var(--line); border-radius: 8px; }
+.rk-note { margin: 6px 0 0 !important; }
+.chg { margin: 0 0 10px; padding: 8px 12px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); font-size: 13px; }
+.chg p { margin: 4px 0 0; }
+.chg details { margin-top: 6px; }
+.plain.drop li { padding: 6px 0; border-top: 1px dashed var(--line); line-height: 1.5; overflow-wrap: anywhere; }
+.plain.drop li:first-child { border-top: 0; }
 .earnwarn { margin-top: 6px; padding: 6px 8px; border-radius: 8px; background: var(--fear-bg); color: var(--text); font-size: 12px; line-height: 1.5; }
 .earnwarn a { color: inherit; }
 .earnok { margin-top: 4px; font-size: 12px; color: var(--faint); }

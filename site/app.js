@@ -101,7 +101,7 @@ const INFO = {
   inverse: "지수가 떨어지면 돈을 버는 상품(ETF)입니다. 예: 코스피가 1% 내리면 약 1% 오름.\n주의: 매일 다시 계산되는 구조라, 지수가 오르락내리락하며 제자리여도 손해가 쌓입니다. 2배 상품은 더 심합니다. 그래서 '확실히 내리는 짧은 구간'에만 맞고, 이미 많이 떨어진 뒤 따라 들어가면 반등에 크게 당하기 쉽습니다.",
   score_swing: "강도: 이 종목이 조건에 얼마나 강하게 걸렸는지 0~100점입니다. 지금까지 같은 탭에 걸린 종목들 중 어디쯤인지로 매겨서, 세 탭을 같은 눈금으로 비교할 수 있습니다.\n스윙 계산: 회사 크기에 비해 최근 5일 큰손이 얼마나 많이 샀는지 + 며칠 연속 샀는지.\n강도가 높다고 오른다는 보장은 없습니다. '어떤 종목부터 볼지' 순서로만 쓰세요.",
   score_scalp: "강도: 이 종목이 조건에 얼마나 강하게 걸렸는지 0~100점입니다. 지금까지 같은 탭에 걸린 종목들 중 어디쯤인지로 매깁니다.\n단타 계산 (100점 만점을 나눠 가짐):\n· 큰손 확인 50%: 오늘 거래 중 큰손이 산 비중 (20% 이상이면 만점)\n· 거래 증가 25%: 평소보다 거래가 몇 배 늘었나 (8배면 만점, 15배 넘게 과열되면 오히려 감점)\n· 상승폭 25%: 5~15% 오르면 만점, 상한가 근처까지 튀면 감점\n너무 과열된 종목은 다음 날 꺾이는 경우가 많아서 이렇게 만들었습니다.",
-  report: "증권사 애널리스트가 이 회사를 분석해 쓴 보고서입니다. 리포트가 나온다는 건 시장의 관심이 이 회사로 오기 시작했다는 신호예요.\n· '오랜만에 다뤄짐': 석 달 넘게 리포트가 없다가 최근 2주 안에 새로 나온 경우. 아직 사람들이 많이 몰리기 전이라 가장 앞선 신호로 봅니다\n· 목표가: 애널리스트가 생각하는 적정 주가. 다만 증권사 목표가는 대체로 높게 잡히는 편이라 '지금보다 +50%'를 그대로 믿진 마세요\n· 목표가를 올렸는지 내렸는지가 숫자 자체보다 더 중요합니다\n정말 도움이 되는지는 성적표 '조건별 성적'의 리포트 줄에서 확인합니다.",
+  report: "증권사 애널리스트가 이 회사를 분석해 쓴 보고서입니다. 참고 정보예요 — 리포트가 나왔다고 오른다는 게 확인된 건 아닙니다.\n· '오랜만에 다뤄짐': 석 달 넘게 리포트가 없다가 최근 2주 안에 새로 나온 경우. 관심이 오기 시작했을 수 있다는 정도로만 보세요\n· 목표가: 애널리스트가 생각하는 적정 주가. 다만 증권사 목표가는 대체로 높게 잡히는 편이라 '지금보다 +50%'를 그대로 믿진 마세요\n· 목표가를 올렸는지 내렸는지가 숫자 자체보다 더 중요합니다\n정말 도움이 되는지는 성적표 '조건별 성적'의 리포트 줄에서 확인합니다.",
   heat: "줄마다 테마 하나, 칸마다 하루입니다. 오른쪽 끝이 가장 최근이에요.\n· 큰손 돈: 그날 그 테마 ETF가 담은 종목들에 기관+외국인이 넣은 돈. 빨강 = 들어옴, 파랑 = 빠짐, 진할수록 많음 (테마 덩치 대비라 큰 테마·작은 테마를 같은 눈으로 봄)\n· ETF 가격: 그날 대표 ETF 등락. 빨강 = 오름, 파랑 = 내림\n읽는 법: 한 줄이 오른쪽으로 갈수록 빨개지면 돈이 그쪽으로 옮겨 가는 중이에요. '큰손 돈'은 빨간데 'ETF 가격'은 아직 파랗거나 옅으면 돈이 먼저 들어오고 가격은 아직인 곳(미리 볼 곳)입니다.",
   themes: "업종·테마마다 ETF를 짝지어, '돈이 어디로 가나 → 그럼 어떤 ETF'를 보여 줍니다.\n· 큰손 5일: 그 ETF가 실제로 담은 종목(구성 상위 10개)에 기관+외국인이 5일 동안 넣은 돈\n· 넓이: 그 종목들 중 20일 평균 가격 위에 있는 비율 (한두 종목만 오르는지, 다 같이 오르는지)\n· 리포트: 그 종목들에 최근 2주 나온 증권사 리포트 수 ('오랜만'은 석 달 만에 나온 것)\n판정:\n· 돈이 먼저 들어오는 중: 큰손은 사는데 ETF 가격은 아직 평균 아래 — 미리 볼 후보 (선취매에 가까움). 단, 돈이 덩치 대비 0.1% 이상·4일 이상 고르게·여러 종목에 나눠 들어오고(한 종목이 60% 넘으면 안 됨), 가격이 더 무너지지 않을 때만 (아니면 '지켜보기')\n· 돈도 들어오고 흐름도 좋음: 이미 오르는 중\n· 과열: 20일 새 20% 넘게 올라 따라 사기 조심\n· 가격은 강한데 큰손은 파는 중: 주의\n정말 맞는지는 성적표 '테마 판정별 성적'에서 확인합니다.",
   mgr_skill: "운용사마다 직접 고른 액티브 ETF가 최근 60일 동안 KODEX 200(코스피 대표 200종목)보다 얼마나 더 벌었는지 평균입니다. +면 시장보다 잘 고른 곳.\n'요즘 잘하는 곳'이 산 종목을 조금 더 무겁게 봅니다. 다만 60일은 짧아서 운이 섞입니다.",
@@ -113,13 +113,16 @@ const INFO = {
   follow: "급등한 날(하루 +15%↑ 등) 뒤 며칠이 어떻게 흘렀는지 최근 약 80영업일 실제 기록을 셉니다. 시총·거래대금 기준 이상 종목만.\n· 다음 날도 오름: 급등 다음 날 종가가 또 올랐던 비율\n· 3일 안 또 급등: 다음 3일 중 하루라도 +8% 넘게 오른 비율\n· 하루 쉬고 다시: 다음 날은 보합·하락이었다가 2~3일째 +5% 넘게 오른 비율 (하루 건너 이어지는 모양)\n'평소' 줄은 아무 날·아무 종목이나 같은 방법으로 센 값이라, 급등 줄이 평소보다 높아야 '급등은 이어지는 편'이라고 말할 수 있어요.\n아래 표는 우리 자료가 장 마감 뒤에 나오니 실제로 살 수 있는 '다음 날 아침 첫 가격'에 사서 3·5영업일째 종가에 판 결과입니다 (거래 비용 뺌). 이어지는 경우가 많아도 다음 날 아침 첫 가격가 이미 높게 시작하면 남는 게 적을 수 있어서 따로 봅니다.",
   follow_split: "급등한 날(+8% 이상)을 그날의 모양으로 나눠, 어떤 경우가 그 뒤에 더 잘 이어졌는지 봅니다.\n· 종가가 고가 근처: 장 끝까지 힘이 남아 있었음 / 고가에서 밀림: 오르다 팔려 내려옴\n· 첫 급등 vs 이미 오른 뒤: 전 5일 동안 +10% 넘게 올라 있었는지\n· 거래 배수: 그날 거래대금이 20일 평균의 몇 배인지\n· 큰손: 그날 기관+외국인이 샀는지 팔았는지 (최근 약 25일만 있어 건수가 적음)\n· 시총: 3천억 기준 (지금 시총으로 나눔)\n건수가 적은 줄은 우연일 수 있어 참고만 하세요.",
   signal_check: "거꾸로도 확인합니다: 그 신호가 뜬 종목들 중 실제로 5일 안에 +15% 넘게 오른 비율이 얼마인지, 아무 신호 없이 고른 종목(평소)보다 몇 배인지.\n급등주에만 신호가 있었던 게 아니라 평범한 종목에도 흔하게 뜨는 신호라면 '평소의 몇 배'가 1에 가까워서 쓸모가 없습니다.",
-  exit: "언제 팔지 미리 정해 두는 기준입니다. 처음 투자할 때 가장 어려운 게 '언제 파느냐'라서, 사기 전에 정해 두면 손실이 커지는 걸 막을 수 있습니다.\n· 스윙: 종가가 20일 평균 가격 아래로 마감하면 정리 (오르는 흐름이 깨짐)\n· 단타: 걸린 날의 저가를 깨고 마감하면 정리 (급등 힘이 빠짐)\n· 저평가: 최근 10일 최저가를 깨고 마감하면 정리 (아직 바닥이 아니었음)\n괄호 안 %는 지금 가격에서 그 기준까지 거리입니다. 이 기준을 실제로 지켰다면 성적이 어땠는지는 성적표의 '정리 기준을 지켰다면'에서 확인합니다.",
+  exit: "언제 팔지 미리 정해 두는 기준입니다. 정리선은 걸린 날 값으로 고정하고, 마감 가격이 그 아래면 다음 날 아침 첫 가격에 정리하는 규칙입니다.\n· 스윙: 걸린 날의 20일 평균 가격 (오르는 흐름이 깨짐)\n· 단타: 걸린 날의 저가 (급등 힘이 빠짐)\n· 저평가: 걸린 날까지 최근 10일 최저가 (아직 바닥이 아니었음)\n괄호 안 %는 기준 가격에서 정리선까지 거리입니다. 정리선이 손실 한도를 보장하지는 않아요 — 밤사이 나쁜 소식으로 다음 날 아침 크게 낮게 시작하면(갭 하락) 정리선보다 훨씬 낮은 가격에 팔립니다. 이 규칙을 실제로 지켰다면 어땠는지는 성적표의 '정리 기준을 지켰다면'에서 확인합니다.",
+  rs: "같은 기간 종목 주가 상승률에서, 그 종목이 속한 시장 지수(코스피 종목은 코스피, 코스닥 종목은 코스닥) 상승률을 뺀 값입니다. 날짜는 같은 영업일끼리 맞춥니다.\n예: 20일 동안 종목 +10%, 코스닥 +4% → +6%p (시장보다 강함). %p는 '수익률끼리 뺀 차이'라는 뜻이에요.\n기간 중 거래가 없던 날(신규 상장·거래 정지)이나 권리락·분할로 가격이 끊긴 날이 있으면 계산하지 않습니다.\n참고 정보일 뿐 점수·필터에는 넣지 않았고, 앞으로 더 오른다는 근거로 확인된 것도 아닙니다 — 성적표 '시장보다 강했던 후보가 나았나'에서 확인 중.",
+  risk: "들어가기 전에 '정리선까지 얼마나 남았나'를 보는 칸입니다.\n· 기준 가격: 기준일 마감 가격 (실시간 가격이 아님)\n· 평소 하루 변동폭(ATR14): 최근 14일 동안 하루에 보통 얼마나 오르내렸나. 고가−저가와 전날 마감 대비 벌어진 폭 중 큰 값을 매일 재서 부드럽게 평균(와일더 방식)\n· 정리선까지 평소 변동폭의 약 N배: 1배 안쪽이면 평범한 하루 움직임만으로도 닿을 수 있는 거리\n이 숫자는 최대 손실이나 예상 손실이 아닙니다. 다음 날 아침 갭 하락이면 정리선보다 낮게 팔릴 수 있어요. '검토 진입가'에 가격을 넣으면 그 가격 기준으로 다시 계산합니다 (주문 기능 없음).",
+  track: "어제(바로 전 기록) 화면 상위 10개와 비교한 것입니다.\n· 새로 들어옴 / 유지: 어제도 상위 10개에 있었나\n· 점수 변화: 점수를 만드는 항목(큰손·거래·상승폭 등)마다 얼마나 바뀌었는지 — 실제 계산 값에서만 나눈 것이라, 적힌 원인 말고 다른 이유를 지어내지 않습니다\n· 우리 기록상 처음: 우리가 가진 기록 중 이 탭에 처음 걸린 날 (기록을 시작하기 전 일은 모름). 그 사이 권리락·분할로 가격이 끊겼으면 '추적 불가'",
   earn_season: "회사들은 분기가 끝나면 정해진 기한 안에 실적을 발표합니다 (1분기 5/15, 반기 8/14, 3분기 11/14, 1년 결산 3/31까지).\n발표 전에는 결과를 모르니, 좋든 나쁘든 발표 날 주가가 크게 움직일 수 있습니다. 조건에 맞아 산 종목도 실적 한 번에 기준이 깨질 수 있어 미리 알려 드립니다.\n'발표 예고 공시'는 회사가 실적 발표 날짜를 미리 알린 경우입니다.",
   morning: "새벽에 끝난 미국 시장 결과로 오늘 아침 한국 시장 분위기를 미리 짐작해 봅니다.\n· 한국 ETF(EWY): 미국에 상장된 한국 주식 묶음이라 밤사이 외국인 시각이 가장 잘 보입니다 (가장 크게 반영)\n· 나스닥·미국 반도체: 삼성전자·SK하이닉스 같은 큰 종목과 같이 움직이는 경우가 많음\n· 공포지수(VIX)·환율: 오르면 부담\n짐작일 뿐이고, 장이 열리면 다르게 움직일 수 있습니다.",
   wake: "싼 종목도 시장이 관심을 안 주면 몇 년이고 싼 채로 남습니다 (가치 함정). 특히 한국 시장에서 흔합니다.\n그래서 '다시 주목받기 시작했나'를 따로 봅니다:\n· 큰손(기관+외국인)이 최근 5일 동안 샀나\n· 최근 3일 안에 기사·공시 같은 소식이 있나\n· 거래가 평소보다 늘었나\n· 최근 10일 바닥에서 5% 이상 올라왔나\n· 최근 2주 안에 증권사 리포트가 나왔나 (오랫동안 없다가 나오면 더 의미 있음)\n2개 이상이면 '움직일 계기가 생긴' 쪽입니다. 점수(강도)에는 넣지 않았고, 정말 성적이 나은지는 성적표의 '저평가 조건별 성적'에서 확인합니다.",
   score_value: "강도: 이 종목이 조건에 얼마나 강하게 걸렸는지 0~100점입니다. 지금까지 같은 탭에 걸린 종목들 중 어디쯤인지로 매깁니다.\n저평가 계산 (100점 만점을 나눠 가짐):\n· 낙폭 25%: 최근 고점보다 많이 빠졌나 (50% 빠지면 만점)\n· 싸짐 15%: 평소(1년)보다 얼마나 싸게 거래되나\n· PER 35%: 버는 돈에 비해 싼가 (PER 5 이하면 만점)\n· 이익 25%: 이익이 줄지 않고 버티거나 늘었나\n'싸면서 돈은 잘 버는 회사'가 위로 오게 했습니다.",
   futures: "외국인이 '코스피 선물'을 산 금액에서 판 금액을 뺀 값입니다.\n선물은 '앞으로 지수가 오를지 내릴지'에 거는 상품이라, 외국인의 방향 생각이 잘 드러납니다.\n· 며칠 연속 사면(+): 지수가 오를 쪽으로 보는 중\n· 며칠 연속 팔면(−): 내릴 쪽으로 보는 중\n한국 장의 방향을 먼저 알려 주는 지표로 많이 봅니다.",
-  signals: "많이 떨어진 뒤 '이제 사도 될까?'를 세 단계로 확인합니다.\n1단계 투매 진정: 마구 팔던 게 잦아드는지 (신저가 종목·강제 매도 감소, 출렁임 감소)\n2단계 수급 전환: 큰손이 다시 사기 시작하는지 (외국인 선물·주식 순매수, 분위기 회복)\n3단계 추세 확인: 지수가 다시 오르는 흐름인지 (20일 평균 가격 회복)\n바닥은 아무도 정확히 못 맞힙니다. 그래서 한 번에 다 사지 말고 단계마다 나눠서(1/3 → 2/3 → 나머지) 들어가는 방법을 안내합니다.",
+  signals: "많이 떨어진 뒤 시장이 회복하고 있는지를 세 단계로 확인합니다.\n1단계 투매 진정: 마구 팔던 게 잦아드는지 (신저가 종목·강제 매도 감소, 출렁임 감소)\n2단계 수급 전환: 큰손이 다시 사기 시작하는지 (외국인 선물·주식 순매수, 분위기 회복)\n3단계 추세 확인: 지수가 다시 오르는 흐름인지 (20일 평균 가격 회복)\n지금 상태를 보여 줄 뿐이고, 단계마다 얼마를 사라는 안내는 하지 않습니다 (그런 나눠 사기 규칙이 실제로 나았는지 확인한 적이 없어서).",
   transition: "지금 장(예: 하락장)이 다음 장(예: 횡보·전환)으로 바뀌려면 무엇이 필요한지, 지금 얼마나 남았는지입니다.\n핵심은 코스피가 20일 평균선(최근 20일 종가 평균) 위로 올라서느냐입니다. 평균선까지 2% 안쪽으로 가까워지면 '전환 임박'이 뜹니다.",
   loan: "개인이 증권사에서 돈을 빌려 산 주식 금액(빚투)입니다.\n· 많이 쌓여 있을수록: 주가가 빠질 때 강제로 팔리는 물량이 커질 수 있음\n하루 늦게 발표되는 자료입니다.",
   forced: "빌려서 산 주식 대금을 제때 못 갚아 증권사가 강제로 판 금액(반대매매)입니다.\n· 갑자기 늘면: 좋은 종목까지 같이 떨어지는 투매가 나오는 중\n· 줄어들면: 투매가 잦아드는 중\n하루 늦게 발표되는 자료입니다.",
@@ -253,7 +256,8 @@ function renderThermo() {
       <ul class="th-cmp">${cmp}</ul>
     </div>
     ${infoBox("thermo")}
-    <details class="rules"${state.expAll ? " open" : ""}><summary>무엇으로 계산했나 (${th.parts.length}개 지표)</summary><p class="hint">오른쪽은 각 지표를 0(공포)~100(탐욕) 점수로 바꾼 값이고, 막대 아래 작은 글씨가 지표의 원래 숫자입니다. 온도는 이 점수들의 평균인데, '코스피 20일 추세'와 '신고가 vs 신저가'는 둘 다 주가 하락을 보는 지표라 반 무게로 넣었습니다(급락장에서 공포 쪽으로 겹쳐 쏠리지 않게).${vixEx(th)}</p>${parts}</details>
+    <p class="hint">여러 지표를 하나로 묶은 보조 요약이에요. 판단은 아래 지표와 장세를 같이 보세요.${th.missing && th.missing.length ? ` 오늘 자료를 못 받아 빠진 지표: <b>${th.missing.map(esc).join(", ")}</b>` : ""}</p>
+    <details class="rules"${state.expAll ? " open" : ""}><summary>무엇으로 계산했나 (${th.parts.length}개 지표${th.missing && th.missing.length ? `, ${th.missing.length}개 빠짐` : ""})</summary><p class="hint">오른쪽은 각 지표를 0(공포)~100(탐욕) 점수로 바꾼 값이고, 막대 아래 작은 글씨가 지표의 원래 숫자입니다. 온도는 이 점수들의 평균인데, '코스피 20일 추세'와 '신고가 vs 신저가'는 둘 다 주가 하락을 보는 지표라 반 무게로 넣었습니다(급락장에서 공포 쪽으로 겹쳐 쏠리지 않게).${vixEx(th)}</p>${parts}</details>
   </div>`;
 }
 
@@ -555,11 +559,11 @@ function renderFilter() {
     const why = state.tab === "value"
       ? (f.value_total == null ? "이 날짜는 저평가 필터가 생기기 전 기록입니다." : "많이 떨어지면서도 이익이 버틴 종목이 없었습니다.")
       : `기사 걸린 종목 ${f.news_count.matched_3d}개 중 0개`;
-    $("#cards").innerHTML = `<div class="empty">이 날은 조건을 모두 통과한 종목이 없습니다.<br><small>${why}</small></div>`;
+    $("#cards").innerHTML = changesBox() + `<div class="empty">이 날은 조건을 모두 통과한 종목이 없습니다.<br><small>${why}</small></div>`;
     return;
   }
-  const more = total > list.length ? `<p class="hint">통과 ${total}개 중 점수 상위 ${list.length}개</p>` : "";
-  $("#cards").innerHTML = list.map(card).join("") + more;
+  const more = total > list.length ? `<p class="hint">통과 ${total}개 중 점수 상위 ${list.length}개 (나머지도 기록엔 모두 남김)</p>` : "";
+  $("#cards").innerHTML = changesBox() + list.map(card).join("") + more;
 }
 
 function bars(daily) {
@@ -580,51 +584,66 @@ function bars(daily) {
 
 /* ---------------- 오늘 한눈에 (페이지 맨 위 요약) ---------------- */
 
+// 시장 회복 확인 단계: 상태만 (예전 기록 파일의 '1/3만 사기' 같은 안내 문구는 쓰지 않음)
+const SIG_STATE = ["회복 확인 전 — 투매가 아직 안 멈춤", "1단계 확인 — 투매가 잦아드는 중", "2단계까지 확인 — 큰손 돈이 다시 들어오기 시작", "3단계까지 확인 — 지수가 다시 오르는 흐름"];
+
 function renderToday() {
   const d = state.data, t = d.temperature, rg = t.regime, th = t.thermo, f = d.filter;
-  const rows = [];
-  if (th) rows.push(["시장 온도", `<b style="color:${THERMO_COLOR(th.score)}">${th.score}점 ${esc(th.label)}</b> <small>(0 몹시 겁먹음 ~ 100 과열)</small>`]);
+  const rows = [], more = [];
+  if (rg || th) {
+    const miss = th && th.missing && th.missing.length ? ` <small>· 지표 ${th.parts.length}개로 계산 (빠짐: ${th.missing.map(esc).join(", ")})</small>` : "";
+    rows.push(["시장 상태", `${rg ? `<b>${esc(rg.label)}</b> <small>코스피 20일 ${signed(rg.trend.chg20, 1, "%")}</small>` : ""}${th ? `${rg ? "<br>" : ""}온도 <b style="color:${THERMO_COLOR(th.score)}">${th.score}점 ${esc(th.label)}</b> <small>(0 몹시 겁먹음 ~ 100 과열, 보조 요약)</small>${miss}` : ""}`]);
+  }
+  const sg = t.signals, tn = t.transition;
+  if (sg) rows.push(["시장 회복 확인", sg.applies ? `<b style="color:${SIG_COLOR[sg.level]}">${sg.level}/3단계</b> <small>${esc(SIG_STATE[sg.level])}</small>` : `<span class="na">상승 추세라 해당 없음</span>`]);
+  // 어제와 달라진 후보 (전체 기록을 남기기 전 날짜는 연속일로 대신)
+  const chg = f.changes;
+  if (chg && ["swing", "scalp", "value"].some((g) => chg[g] && chg[g].prev_date)) {
+    rows.push(["어제와 달라진 후보", ["swing", "scalp", "value"].filter((g) => chg[g] && chg[g].counts).map((g) => {
+      const c = chg[g].counts;
+      return `${TAB_NAME[g]} <b>새로 ${c.new}</b> · 빠짐 ${c.dropped}`;
+    }).join("<br>") + ` <small>(${ymd(chg.swing.prev_date || chg.scalp.prev_date).slice(5)} 상위 10개와 비교)</small>`]);
+  } else if (["swing", "scalp", "value"].some((g) => (f[g] || []).some((x) => x.streak_days != null))) {
+    const fresh = ["swing", "scalp", "value"].map((g) => [g, (f[g] || []).filter((x) => x.streak_days === 1).length]).filter(([, n]) => n);
+    rows.push(["새로 걸림", fresh.length ? fresh.map(([g, n]) => `${TAB_NAME[g]} ${n}개`).join(" · ") : `<span class="na">없음 (모두 어제도 있던 종목)</span>`]);
+  }
+  const tops = ["swing", "scalp", "value"].filter((g) => (f[g] || []).length).map((g) => {
+    const x = f[g][0], st = x.track ? (x.track.st === "new" ? " · 새로" : x.track.st === "kept" ? " · 유지" : "") : "";
+    return `<button class="more pick" type="button" data-code="${x.code}">${esc(x.name)}</button><small>${TAB_NAME[g]} 1위${x.score_pct != null ? ` · 강도 ${x.score_pct}` : ""}${st}</small>`;
+  });
+  if (tops.length) rows.push(["먼저 볼 후보", `<span class="picks">${tops.map((p) => `<span>${p}</span>`).join("")}</span>`]);
+  const hits = Object.keys(state.watch).filter((c) => ["swing", "scalp", "value"].some((g) => (f[g] || []).some((y) => y.code === c)));
+  if (Object.keys(state.watch).length) rows.push(["관심 종목", hits.length ? `<b>${hits.map((c) => esc(state.watch[c])).join(", ")}</b> 오늘 걸림` : `<span class="na">오늘 걸린 종목 없음</span>`]);
   if (rg) {
     const by = (grade) => ["swing", "scalp", "value"].filter((g) => rg.fit[g].grade === grade).map((g) => TAB_NAME[g]);
     const good = by("good"), bad = by("bad");
-    rows.push(["장세", `<b>${esc(rg.label)}</b> <small>코스피 20일 ${signed(rg.trend.chg20, 1, "%")}${rg.trend_key && rg.key === "panic" ? ` · 추세만 보면 ${REGIME_NAME[rg.trend_key]}` : ""}</small>`]);
     const desc = (names) => names.map((n) => `${n} <small>(${TAB_DESC[n]})</small>`).join("<br>");
-    rows.push(["잘 맞는 방식", good.length ? `<b class="good">${desc(good)}</b>` : `<span class="na">없음 — 기다리는 게 나은 장</span>`]);
-    if (bad.length) rows.push(["피할 방식", `<b class="bad">${desc(bad)}</b>`]);
-    rows.push(["인버스", esc(rg.inverse.label)]);
-    const sg = d.temperature.signals, tn = d.temperature.transition;
-    if (sg) rows.push(["사도 되는 신호", `<b style="color:${SIG_COLOR[sg.level]}">${sg.level}단계</b> <small>${esc(sg.guide)}</small>`]);
-    if (tn) rows.push(["장의 전환", tn.gap20 > 0 ? `${esc(tn.from)}에서 벗어나려면 코스피가 <b>${num(tn.gap20, 1)}%</b> 더 올라야 함 <small>(20일 평균 가격까지)</small>${tn.near ? ` <span class="tag new">전환 임박</span>` : ""}` : `코스피가 20일 평균 가격 위로 올라섬`]);
+    more.push(["잘 맞는 방식", good.length ? `<b class="good">${desc(good)}</b>` : `<span class="na">없음 — 기다리는 게 나은 장</span>`]);
+    if (bad.length) more.push(["피할 방식", `<b class="bad">${desc(bad)}</b>`]);
+    more.push(["인버스", esc(rg.inverse.label)]);
+    if (tn) more.push(["장의 전환", tn.gap20 > 0 ? `${esc(tn.from)}에서 벗어나려면 코스피가 <b>${num(tn.gap20, 1)}%</b> 더 올라야 함 <small>(20일 평균 가격까지)</small>${tn.near ? ` <span class="tag new">전환 임박</span>` : ""}` : `코스피가 20일 평균 가격 위로 올라섬`]);
   }
-  const tops = ["swing", "scalp", "value"].filter((g) => (f[g] || []).length).map((g) => {
-    const x = f[g][0];
-    return `<button class="more pick" type="button" data-code="${x.code}">${esc(x.name)}</button><small>${TAB_NAME[g]}${x.score_pct != null ? ` ${x.score_pct}점` : ""}</small>`;
-  });
-  const fresh = ["swing", "scalp", "value"].map((g) => [g, (f[g] || []).filter((x) => x.streak_days === 1).length]).filter(([, n]) => n);
-  if (["swing", "scalp", "value"].some((g) => (f[g] || []).some((x) => x.streak_days != null)))
-    rows.push(["새로 걸림", fresh.length ? fresh.map(([g, n]) => `${TAB_NAME[g]} ${n}개`).join(" · ") : `<span class="na">없음 (모두 어제도 있던 종목)</span>`]);
-  const vals = state.data.filter.value || [];
+  const vals = f.value || [];
   if (vals.length && vals[0].wake) {
     const woke = vals.filter((x) => x.wake.met >= 2);
-    rows.push(["주목받는 저평가", woke.length ? `<b>${woke.length}개</b> <small>${woke.slice(0, 3).map((x) => esc(x.name)).join(", ")}</small>` : `<span class="na">없음 (싼데 아무도 안 보는 중)</span>`]);
+    more.push(["주목받는 저평가", woke.length ? `<b>${woke.length}개</b> <small>${woke.slice(0, 3).map((x) => esc(x.name)).join(", ")}</small>` : `<span class="na">없음 (싼데 아무도 안 보는 중)</span>`]);
   }
-  const ths = (state.data.themes || {}).themes || [];
+  const ths = (d.themes || {}).themes || [];
   if (ths.length) {
-    const early = ths.filter((t) => t.key === "early").map((t) => t.name), strong = ths.filter((t) => t.key === "strong").map((t) => t.name);
-    rows.push(["테마 ETF", early.length || strong.length
+    const early = ths.filter((x) => x.key === "early").map((x) => x.name), strong = ths.filter((x) => x.key === "strong").map((x) => x.name);
+    more.push(["테마 ETF", early.length || strong.length
       ? `${early.length ? `<b class="good">미리 볼 곳: ${early.slice(0, 3).map(esc).join("·")}</b>` : ""}${early.length && strong.length ? "<br>" : ""}${strong.length ? `오르는 중: ${strong.slice(0, 3).map(esc).join("·")}` : ""}`
       : `<span class="na">돈이 들어오는 테마 없음</span>`]);
   }
-  const mgm = ((state.data.managers || {}).moves || {})["20"];
+  const mgm = ((d.managers || {}).moves || {})["20"];
   if (mgm) {
     const many = mgm.buys.filter((r) => r.n >= 2);
-    rows.push(["운용사들이 산 종목", many.length ? `<b>${many.slice(0, 3).map((r) => esc(r.name)).join(", ")}</b> <small>(20일, 2곳 이상 ${many.length}개)</small>` : `<span class="na">여러 곳이 같이 산 종목 없음</span>`]);
+    more.push(["운용사들이 산 종목", many.length ? `<b>${many.slice(0, 3).map((r) => esc(r.name)).join(", ")}</b> <small>(20일, 2곳 이상 ${many.length}개)</small>` : `<span class="na">여러 곳이 같이 산 종목 없음</span>`]);
   }
-  if (tops.length) rows.push(["탭별 1위", `<span class="picks">${tops.map((p) => `<span>${p}</span>`).join("")}</span>`]);
-  const hits = Object.keys(state.watch).filter((c) => ["swing", "scalp", "value"].some((g) => (f[g] || []).some((y) => y.code === c)));
-  if (Object.keys(state.watch).length) rows.push(["관심 종목", hits.length ? `<b>${hits.map((c) => esc(state.watch[c])).join(", ")}</b> 오늘 걸림` : `<span class="na">오늘 걸린 종목 없음</span>`]);
-  $("#today-body").innerHTML = verdictBox() + (rows.length ? `<div class="today">${rows.map(([k, v]) => `<div class="tr"><span class="k">${k}</span><span class="v">${v}</span></div>`).join("")}</div>` +
-    `<p class="hint">아래 칸들의 결론만 모은 것입니다. 매수·매도 추천이 아닙니다.</p>` : "");
+  const tbl = (rs) => `<div class="today">${rs.map(([k, v]) => `<div class="tr"><span class="k">${k}</span><span class="v">${v}</span></div>`).join("")}</div>`;
+  $("#today-body").innerHTML = verdictBox() + (rows.length ? tbl(rows) : "") +
+    (more.length ? `<details class="rules"><summary>더 보기 — 맞는 방식·장의 전환·테마·운용사</summary>${tbl(more)}</details>` : "") +
+    `<p class="hint">아래 칸들의 결론만 모은 것입니다. 매수·매도 추천이 아닙니다.</p>`;
 }
 
 const TAB_DESC = { "스윙": "오르는 종목을 며칠~몇 주 들고 가기", "단타": "하루 이틀 짧게", "저평가": "싸진 종목을 나눠 사서 기다리기" };
@@ -636,8 +655,9 @@ function verdictBox() {
   const mood = th.score < 25 ? "몹시 겁먹은" : th.score < 45 ? "겁먹은" : th.score < 55 ? "차분한" : th.score < 75 ? "들뜬" : "과열된";
   let act;
   if (rg.key === "up") act = "평소처럼 — 오르는 흐름 종목(스윙) 위주로 보세요";
-  else if (sg && sg.applies) act = ["새로 사기보다 기다리는 날 — 꼭 산다면 아주 조금만", "사도 쓸 돈의 1/3까지만, 나눠서", "쓸 돈의 2/3까지, 나눠서", "평소처럼 — 오르는 흐름 종목 위주"][sg.level];
-  else act = rg.key === "range" ? "방향이 없는 장 — 짧게(단타)나 싼 종목(저평가) 위주로 조금씩" : "조심해서 — 나눠서 천천히";
+  else if (sg && sg.applies) act = ["시장 회복 확인 전 — 새로 사기보다 지켜보는 날", "회복 1단계(투매 진정)만 확인 — 서두를 근거는 아직 없음",
+    "회복 2단계(큰손 돈 복귀)까지 확인 — 3단계(지수 추세)는 아직", "회복 3단계까지 확인 — 오르는 흐름 종목 위주로"][sg.level];
+  else act = rg.key === "range" ? "방향이 없는 장 — 짧게(단타)나 싼 종목(저평가) 위주로 조금씩" : "조심해서 — 천천히";
   const look = [];
   const early = ((d.themes || {}).themes || []).filter((x) => x.key === "early").map((x) => x.name);
   if (early.length) look.push(`돈이 먼저 들어오는 업종: ${early.slice(0, 3).map(esc).join("·")}`);
@@ -655,7 +675,7 @@ function verdictBox() {
     ${change.length ? `<p class="vc">🔁 바뀌는 조건: ${change.join(" · ")}</p>` : ""}</div>`;
 }
 
-/* ---------------- 장의 전환 · 사도 되는 신호 ---------------- */
+/* ---------------- 장의 전환 · 시장 회복 확인 단계 ---------------- */
 
 const SIG_COLOR = ["var(--faint)", "var(--g1)", "var(--g3)", "var(--g4)"];
 
@@ -670,9 +690,9 @@ function renderTurn() {
   const strip = ds.length > 1 ? `<div class="rgstrip"><div class="cells">${ds.map((d) => `<i style="background:${SIG_COLOR[lv[d]]}" title="${ymd(d)} ${lv[d]}단계"></i>`).join("")}</div><small>최근 ${ds.length}일 신호 단계 (회색 0 → 초록 3)</small></div>` : "";
   const stageCards = sig.stages.map((st, i) => `<li class="${st.pass ? "fit-good" : i === sig.level ? "fit-ok" : ""}"><div class="row"><b>${i + 1}단계 · ${esc(st.name)}</b><span>${st.met}/${st.checks.length} ${st.pass ? "통과" : `(${st.need}개 필요)`}</span></div>${checkList(st.checks)}</li>`).join("");
   const sigBox = `<div class="sum ${sig.level >= 2 ? "calm" : sig.level === 1 ? "neutral" : "fear"}">
-      <div class="row"><span class="t">사도 되는 신호 ${infoBtn("signals")}</span><span class="lv">${sig.level}단계</span></div>
+      <div class="row"><span class="t">시장 회복 확인 단계 ${infoBtn("signals")}</span><span class="lv">${sig.level}/3단계</span></div>
       <div class="lamps">${lights}</div>
-      <p class="guide">${esc(sig.guide)}</p><p>${esc(sig.next)}</p>${sig.applies ? "" : `<p><small>지금은 이미 상승 추세라 이 신호보다 아래 '장의 전환'(꺾임 경고)을 보세요.</small></p>`}
+      <p class="guide">${esc(SIG_STATE[sig.level])}</p><p>${esc(sig.next)}</p>${sig.applies ? "" : `<p><small>지금은 이미 상승 추세라 이 신호보다 아래 '장의 전환'(꺾임 경고)을 보세요.</small></p>`}
       ${strip}${infoBox("signals")}</div>`;
   // 장의 전환: 다음 장세까지 남은 조건
   const gap = Math.max(-10, Math.min(10, tr.gap20));
@@ -681,7 +701,7 @@ function renderTurn() {
       <p>코스피가 20일 평균선보다 ${tr.gap20 > 0 ? `${num(tr.gap20, 1)}% 아래` : `${num(-tr.gap20, 1)}% 위`}, 60일 평균선보다 ${tr.gap60 > 0 ? `${num(tr.gap60, 1)}% 아래` : `${num(-tr.gap60, 1)}% 위`}</p>
       ${gauge}${checkList(tr.items)}<p><small>전환 조건 ${tr.met}/${tr.items.length}</small></p>${infoBox("transition")}</div>`;
   box.innerHTML = sigBox + `<ul class="fit sigstages">${stageCards}</ul>` + turnBox +
-    `<p class="hint">급락 뒤 바닥은 보통 '투매 진정 → 수급 전환 → 추세 확인' 순서로 확인됩니다. 단계마다 나눠서 들어가는 가이드이고, 매수 추천이 아닙니다.</p>`;
+    `<p class="hint">급락 뒤 회복은 보통 '투매 진정 → 수급 전환 → 추세 확인' 순서로 확인됩니다. 지금 상태를 보여 줄 뿐, 단계마다 얼마를 사라는 안내나 매수 추천이 아닙니다.</p>`;
 }
 
 /* ---------------- 지금 장세와 시나리오 ---------------- */
@@ -852,15 +872,18 @@ function valueCard(x) {
   return `<article class="card">
     ${cardHead(x)}
     ${whyLine(x)}
-    ${scoreRow(x)}
+    ${trackLine(x)}
+    ${rsLine(x)}
     <div class="nums">
       <div><small>60일 고점 대비</small><b class="down">-${num(x.drop_60d, 1)}%</b></div>
       <div><small>PBR (1년 중앙)</small><b>${num(x.pbr, 2)} <small style="display:inline;font-size:12px;color:var(--sub)">(${num(x.pbr_med, 2)})</small></b></div>
       <div><small>5일 기관+외국인</small><b class="${cls(x.flow5_eok)}">${signed(x.flow5_eok, 0, "억")}</b></div>
     </div>
+    ${x.flow && x.flow.daily ? `<div class="l" style="font-size:12px;color:var(--sub)">최근 5일 기관+외국인 순매수 (억)</div>${bars(x.flow.daily)}` : ""}
+    ${exitBlock(x)}
+    ${scoreRow(x)}
     <ul class="checks">${x.checks.map((c) => `<li><span>${esc(c.label)}</span><span>${esc(c.value)}</span></li>`).join("")}</ul>
     ${wakeBlock(x.wake)}
-    ${exitBlock(x)}
     ${reportBlock(x)}
     ${qualityRow(x)}
     ${news ? `<ul class="news">${news}</ul>` : `<p class="hint" style="margin:8px 0 0">최근 3일 관련 기사 없음</p>`}
@@ -878,7 +901,7 @@ function reportBlock(x) {
   const op = d.opinion && d.opinion !== "없음" ? OPINION[d.opinion.toLowerCase()] || d.opinion : null;
   const goal = d.goal ? `목표가 <b>${num(d.goal)}원</b>${d.prev_goal && d.prev_goal !== d.goal ? ` <small class="${cls(d.goal - d.prev_goal)}">(${d.goal > d.prev_goal ? "올림" : "내림"}, 전 ${num(d.prev_goal)})</small>` : ""}${x.close ? ` · 지금보다 <b class="${cls(d.goal - x.close)}">${signed((d.goal / x.close - 1) * 100, 0, "%")}</b>` : ""}` : "";
   const more = rp.items.slice(1).map((r) => `<li><a href="https://m.stock.naver.com/research/company/${r.id}" target="_blank" rel="noopener">${esc(r.title)}</a><small>${esc(r.broker)} ${ymd(r.date).slice(5)}</small></li>`).join("");
-  return `<div class="rep"><div class="row"><b>증권사 리포트 ${rp.n}건 <small>(2주)</small>${infoBtn("report")}</b>${rp.fresh ? `<span class="tag fresh">오랜만에 다뤄짐</span>` : ""}</div>${infoBox("report")}
+  return `<div class="rep"><div class="row"><b>증권사 리포트 ${rp.n}건 <small>(2주) · 참고 정보</small>${infoBtn("report")}</b>${rp.fresh ? `<span class="tag fresh" title="오르는 신호로 확인된 것은 아님">오랜만에 다뤄짐</span>` : ""}</div>${infoBox("report")}
     <a href="https://m.stock.naver.com/research/company/${top.id}" target="_blank" rel="noopener">${esc(top.title)}</a>
     <small>${esc(top.broker)} ${ymd(top.date).slice(5)}${op ? ` · 의견 ${esc(op)}` : ""}</small>
     ${goal ? `<div class="goal">${goal}</div>` : ""}
@@ -895,10 +918,97 @@ function exitBlock(x) {
   } else if (es && es.state === "done") {
     earn = `<div class="earnok">${esc(es.label)} 실적 발표함 (${ymd(es.date).slice(5)})</div>`;
   }
-  if (!e) return earn ? `<div class="exit">${earn}</div>` : "";
+  if (!e) return (earn ? `<div class="exit">${earn}</div>` : "") + riskBlock(x);
   return `<div class="exit"><div class="row"><b>정리 기준${infoBtn("exit")}</b><span><b>${num(e.stop)}원</b> 아래 마감 시 <small class="down">(${signed(e.gap, 1, "%")})</small></span></div>${infoBox("exit")}
-    <small><span class="rule">원칙</span>${esc(e.rule)} — ${esc(e.why)}. 들고 가는 기간 ${esc(e.hold)}.</small>${earn}</div>`;
+    <small><span class="rule">원칙</span>${esc(e.rule)} — ${esc(e.why)}. 들고 가는 기간 ${esc(e.hold)}.</small>${earn}${riskBlock(x)}</div>`;
 }
+
+// 진입 위험: 기준일 마감 가격에서 정리선까지 거리와 평소 하루 변동폭(ATR14)의 몇 배인지. 최대·예상 손실이 아님
+function riskText(ref, stop, atr) {
+  if (!ref || !stop) return "";
+  if (ref <= stop) return `<b class="down">이미 정리선(${num(stop)}원) 아래 가격</b>`;
+  const d = (ref - stop) / ref * 100;
+  return `정리선까지 <b class="down">−${num(d, 1)}%</b>${atr ? ` · 평소 하루 변동폭의 <b>약 ${num((ref - stop) / atr, 1)}배</b>` : ""}`;
+}
+function riskBlock(x) {
+  const r = x.risk;
+  if (!r) return "";
+  const asof = ymd(state.data.base_date).slice(5);
+  const stop = r.stop, atr = r.atr;
+  return `<div class="risk" data-stop="${stop || ""}" data-atr="${atr || ""}"><div class="row"><b>진입 위험${infoBtn("risk")}</b><small>기준: ${asof} 마감 가격 (실시간 아님)</small></div>${infoBox("risk")}
+    <ul class="checks info"><li><span>기준 가격 (${asof} 마감)</span><span>${num(r.ref)}원</span></li>
+    ${atr ? `<li><span>평소 하루 변동폭 (ATR14)</span><span>${num(atr)}원 (${num(r.atr_pct, 1)}%)</span></li>` : `<li class="no"><span>평소 하루 변동폭</span><span>계산 안 함 (기간 부족·가격 끊김)</span></li>`}</ul>
+    ${stop ? `<p class="rk-now">${riskText(r.ref, stop, atr)}</p>
+    <label class="rk-in">검토 진입가 <input type="number" inputmode="numeric" min="0" step="1" placeholder="${num(r.ref)}" aria-label="검토 진입가 (원)"> 원</label>
+    <p class="rk-out" hidden></p>` : ""}
+    <p class="hint rk-note">정리선이 손실 한도를 보장하진 않아요 — 다음 날 아침 갭 하락이면 정리선보다 낮게 팔릴 수 있어요.</p></div>`;
+}
+document.addEventListener("input", (e) => {
+  const inp = e.target.closest(".rk-in input");
+  if (!inp) return;
+  const box = inp.closest(".risk"), out = box.querySelector(".rk-out");
+  const p = Number(inp.value), stop = Number(box.dataset.stop), atr = Number(box.dataset.atr) || null;
+  out.hidden = !(p > 0);
+  if (p > 0) out.innerHTML = `${num(p)}원에 들어간다면: ${riskText(p, stop, atr)}`;
+});
+
+// 어제와 비교: 새로 들어옴/유지, 점수 변화와 그 원인(점수 재료에서만), 우리 기록상 처음 걸린 날
+function scoreNum(v) { return num(v, state.tab === "swing" ? 2 : 1); }
+function firstLine(f, holds) {
+  if (f === undefined) return "";
+  const basis = ((state.data.filter.changes || {}).basis || "우리 기록").replace(/ 중$/, "");
+  if (f === null) return `<small class="tf">${esc(basis)} 중 처음 걸림: 오늘</small>`;
+  const tail = f.chg != null ? ` → 지금 <b class="${cls(f.chg)}">${signed(f.chg, 1, "%")}</b> <small>(주가 자체)</small>`
+    : f.why ? ` → <span class="na">추적 불가 (${esc(f.why)})</span>` : "";
+  return `<small class="tf">${esc(basis)} 중 처음: ${ymd(f.date).slice(5)} · 그때 ${num(f.price)}원${tail}${holds != null ? ` · ${holds ? "지금도 조건 통과" : "지금은 조건 깨짐"}` : ""}</small>`;
+}
+function causeList(sc) {
+  if (!sc) return "";
+  const c = sc.causes.slice(0, 3).map((k) => `${esc(k.label)} <b class="${cls(k.d)}">${signed(k.d, state.tab === "swing" ? 2 : 1, "")}</b> <small>(${esc(String(k.from))}→${esc(String(k.to))})</small>`);
+  return `<div class="tsc">점수 ${scoreNum(sc.prev)} → ${scoreNum(sc.now)} <b class="${cls(sc.d)}">(${signed(sc.d, state.tab === "swing" ? 2 : 1, "")})</b>${c.length ? ` — ${c.join(" · ")}` : " — 점수 재료 변화 없음"}</div>`;
+}
+function trackLine(x) {
+  const t = x.track;
+  if (!t) return "";
+  const ch = (state.data.filter.changes || {})[state.tab] || {};
+  const pd = ch.prev_date ? ymd(ch.prev_date).slice(5) : "";
+  let head;
+  if (t.st === "unknown") head = `<span class="tag">비교 불가</span> 전 기록이 없어 어제와 비교할 수 없어요`;
+  else if (t.st === "kept") head = `<span class="tag stay">유지</span> ${pd} ${t.prev_rank}위 → 오늘 ${t.rank}위`;
+  else head = `<span class="tag new">새로 들어옴</span> ${t.prev_rank ? `${pd}에도 조건은 통과, ${t.prev_rank}위라 화면 밖` : t.prev_known === false ? `${pd} 상위 10개엔 없었음 <small>(그 밑 순위는 기록 전)</small>` : `${pd}엔 조건 통과 못 함`}`;
+  return `<div class="track"><div class="row"><span>${head}</span>${infoBtn("track")}</div>${infoBox("track")}${causeList(t.score)}${firstLine(t.first, true)}</div>`;
+}
+// 시장 대비 힘 (상대강도) 20·60영업일: 참고 정보, 점수·필터엔 안 씀
+function rsLine(x) {
+  const r = x.rs;
+  if (!r) return "";
+  const mk = (x.market || "").startsWith("KOSDAQ") ? "코스닥" : "코스피";
+  const one = (n) => {
+    const v = r["r" + n];
+    if (!v) return "";
+    if (v.diff == null) return `<li class="no"><span>${n}일</span><span>계산 안 함 — ${esc(v.why || "자료 없음")}</span></li>`;
+    return `<li><span>${n}일 <small>주가 ${signed(v.stock, 1, "%")} · ${mk} ${signed(v.mkt, 1, "%")}</small></span><span><b class="${cls(v.diff)}">${v.diff >= 0 ? "시장보다 강함" : "시장보다 약함"} ${signed(v.diff, 1, "%p")}</b></span></li>`;
+  };
+  return `<div class="rs"><div class="row"><b>시장 대비 힘${infoBtn("rs")}</b><small>참고 · 점수엔 안 씀</small></div>${infoBox("rs")}<ul class="checks info">${one(20)}${one(60)}</ul></div>`;
+}
+
+// 탭 위 요약: 어제와 비교해 몇 개가 새로 들어오고 빠졌나, 빠진 종목은 왜 (순위 밖 vs 조건 깨짐)
+function changesBox() {
+  const all = state.data.filter.changes;
+  const ch = all && all[state.tab];
+  if (!ch) return "";
+  if (!ch.prev_date) return `<div class="chg"><small>어제와 비교: 전 기록이 없어 비교할 수 없어요.</small></div>`;
+  const c = ch.counts || {}, pd = ymd(ch.prev_date).slice(5);
+  const why = (d) => d.why === "rank" ? `<span class="na">순위 밖으로 밀림</span> — 오늘 ${d.rank}위 (조건은 여전히 통과)`
+    : d.why === "filter" ? `<span class="down">조건 깨짐</span>: ${d.broken.map(esc).join(" · ")}`
+    : `<span class="na">추적 불가</span> (오늘 자료가 없거나 깨진 조건을 못 찾음)`;
+  const px = (d) => d.close && d.prev_close ? ` <small>· ${pd} 마감 ${num(d.prev_close)}원 → 오늘 ${num(d.close)}원 (${signed((d.close / d.prev_close - 1) * 100, 1, "%")})</small>` : "";
+  const list = (ch.dropped || []).map((d) => `<li><b>${esc(d.name || d.code)}</b> <small>${pd} ${d.prev_rank}위</small><br>${why(d)}${px(d)}${d.score ? `<br>${causeList(d.score)}` : ""}${d.first !== undefined ? `<br>${firstLine(d.first, d.why === "rank" ? true : d.why === "filter" ? false : null)}` : ""}</li>`).join("");
+  return `<div class="chg"><div class="row"><b>${pd}와 비교</b><small>화면 상위 10개 기준${ch.gap ? " · 바로 전 영업일 기록이 없어 그 전 기록과 비교" : ""}</small></div>
+    <p>새로 들어옴 <b>${c.new ?? 0}</b> · 유지 <b>${c.kept ?? 0}</b> · 빠짐 <b>${c.dropped ?? 0}</b></p>
+    ${list ? `<details class="rules"><summary>빠진 종목 ${ch.dropped.length}개 — 왜 빠졌나</summary><ul class="plain drop">${list}</ul></details>` : ""}</div>`;
+}
+
 
 // 싼 종목이 다시 주목받기 시작했나 (가치 함정 거르기용, 점수엔 안 들어감)
 function wakeBlock(w) {
@@ -920,9 +1030,6 @@ function whyLine(x) {
     bits.push(`최근 고점보다 ${num(x.drop_60d, 0)}% 빠짐`, `버는 돈에 비해 싼 편(PER ${num(x.per, 1)})`);
     if (x.wake) bits.push(x.wake.met >= 2 ? "다시 주목받기 시작" : "아직 관심 적음");
   }
-  const rp = x.reports, d = rp && rp.detail;
-  if (rp && rp.fresh) bits.push("증권사가 오랜만에 다룸");
-  else if (d && d.goal && d.prev_goal && d.goal > d.prev_goal) bits.push("목표가 올라감");
   if (x.managers && x.managers.buy && x.managers.buy.length) bits.push(`운용사 ${x.managers.buy.length}곳이 삼`);
   return `<p class="why">${bits.map(esc).join(" · ")}</p>`;
 }
@@ -931,7 +1038,7 @@ function cardHead(x) {
   return `<div class="hd">
       <a class="nm" data-code="${x.code}" href="https://m.stock.naver.com/domestic/stock/${x.code}" target="_blank" rel="noopener">${esc(x.name)}<span class="mk">${esc(x.market)} ${x.code}${x.sector ? " · " + esc(x.sector) : ""}</span></a>
       <div class="px">${starBtn(x)}<b>${num(x.close)}</b><span class="${cls(x.change)}">${signed(x.change, 1, "%")}</span></div>
-    </div>${streakTag(x)}${mgrTag(x.managers)}${dsTag(x.dart_sig)}${x.search_rank ? `<span class="tag known" title="네이버 증권에서 많이 검색한 상위 100개 안. 이미 많이 알려져 미리 사 두는 기회는 지났을 수 있음">검색 ${x.search_rank}위 · 이미 알려짐</span>` : ""}${x.overlap ? `<span class="tag both">두 관점 겹침</span>` : ""}`;
+    </div>${streakTag(x)}${mgrTag(x.managers)}${dsTag(x.dart_sig)}${x.search_rank ? `<span class="tag known" title="네이버 증권 검색 상위 100개 안. 사람들이 많이 찾아본다는 뜻일 뿐, 순위만으로 늦었다고 볼 근거는 없음">관심 집중 · 검색 ${x.search_rank}위</span>` : ""}${x.overlap ? `<span class="tag both">두 관점 겹침</span>` : ""}`;
 }
 
 // OpenDART '사는' 공시 (최근 10영업일): 임원·주요주주 매수, 5% 큰손 장내매수, 자사주 취득 결정
@@ -1026,13 +1133,15 @@ function card(x) {
   return `<article class="card">
     ${cardHead(x)}
     ${whyLine(x)}
-    ${scoreRow(x)}
+    ${trackLine(x)}
+    ${rsLine(x)}
     <div class="nums">${nums.map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join("")}</div>
     <div class="l" style="font-size:12px;color:var(--sub)">최근 5일 기관+외국인 순매수 (억)</div>
     ${bars(fl.daily)}
+    ${exitBlock(x)}
+    ${scoreRow(x)}
     ${qualityRow(x)}
     <ul class="checks">${x.checks.map((c) => `<li><span>${esc(c.label)}</span><span>${esc(c.value)}</span></li>`).join("")}</ul>
-    ${exitBlock(x)}
     ${reportBlock(x)}
     <ul class="news">${news}</ul>
     ${detailBtn(x)}
@@ -1113,33 +1222,110 @@ function renderScore() {
       <div class="seg" role="tablist">${hs.map((h) => `<button type="button" data-scoreh="${h}" aria-selected="${h === scoreH}">${h}일 뒤</button>`).join("")}</div>
       ${bars}${asTable(`<table class="score">
       <thead><tr><th></th>${hs.map((h) => `<th>${h}일 뒤</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table>`)}</div>${warn}
+    ${originBlock(sc)}
     ${scoreCheckTable(sc.score_check)}
+    ${periodBlock(sc.extra)}
     ${stopTable(sc.stops)}
+    ${scopeBlock(sc.extra)}
+    ${rsScoreBlock(sc.extra)}
+    ${multBlock(sc.extra)}
     ${themeScoreTable(sc.themes)}
     ${moverScoreTable(sc.movers)}
     ${featureTable(sc.features)}
     ${recent ? `<details class="rules"><summary>최근 기록 보기</summary><table class="score recent"><thead><tr><th>날짜</th><th>구분</th><th style="text-align:left">종목</th>${hs.map((h) => `<th>${h}일</th>`).join("")}</tr></thead><tbody>${recent}</tbody></table></details>` : ""}`;
 }
 
-// 정리 기준을 지켰다면: 그냥 들고 있기 vs 기준 아래로 마감한 날 팔기 (5일, 시장 지수 대비)
+// 판정 문구 (성적표 비교): few = 30건 미만, none = 차이가 운으로도 나올 폭 안
+const CMP_TXT = { few: "근거 부족 — 한쪽이라도 30건이 안 됨", none: "근거 부족 — 차이가 운으로도 나올 수 있는 폭 안", better: "위쪽이 나았음 (운으로 보기 어려운 차이)", worse: "오히려 아래쪽이 나았음 (운으로 보기 어려운 차이)", info: "참고 (비교 판정은 안 함)", unconfirmed: "개선 효과 미확인 — 검증 기간 기록 부족" };
+
+// 실제 기록 vs 다시 계산한 기록: 섞지 않고 따로
+function originBlock(sc) {
+  const ex = sc.extra;
+  if (!ex || !ex.origins) return "";
+  const o = ex.origins, live = (ex.by_origin || {}).live || {}, re = (ex.by_origin || {}).recalc || {};
+  const groups = ["swing", "scalp", "value"].map((g) => ({ label: TAB_NAME[g], sub: `실제 ${live[g] ? num(live[g].n) : 0}번 · 재계산 ${re[g] ? num(re[g].n) : 0}번`,
+    bars: [re[g] && { v: re[g].excess, base: true }, live[g] && { v: live[g].excess }].filter(Boolean) }));
+  const anyLive = Object.keys(live).length;
+  return `<h3 class="sub">실제 기록과 다시 계산한 기록 <small>${ex.horizon}일 뒤</small></h3>
+    <p class="hint">실제 기록 <b>${o.live}일</b> · 다시 계산 <b>${o.recalc}일</b>${o.unknown ? ` · 판별 불가 ${o.unknown}일` : ""}. 실제 기록 = 그날 장 마감 뒤 ~ 다음 날 장 시작 전에 만든 기록이라 그때 알 수 있던 정보만 들어 있어요. 다시 계산한 기록은 나중에 만든 거라 그날 보이던 뉴스·정보와 다를 수 있어요. 나중에 다시 계산해도 실제 기록은 덮어쓰지 않아요.</p>
+    ${anyLive ? `<div class="tile wide"><div class="chart-cap">${kindTag(true)}${ex.horizon}일 뒤 지수보다 몇 % 더 벌었나 — 실제 기록(색) vs 다시 계산(회색)</div>${colBars(groups, { vs: "지수보다 더 번(덜 번) %", legend: [["다시 계산", "faint"], ["실제 기록", "up"]] })}</div>`
+      : `<p class="hint">👉 실제 기록의 ${ex.horizon}일 뒤 성적은 아직 없어요 (실제 기록이 쌓이고 ${ex.horizon}영업일이 지나야 나와요). 위 성적은 모두 다시 계산한 기록이에요.</p>`}`;
+}
+
+// 점수 공식을 정한 기간 vs 그 뒤 검증 기간: 점수 위 절반 − 아래 절반
+function periodBlock(ex) {
+  const p = ex && ex.periods;
+  if (!p) return "";
+  const rows = ["swing", "scalp", "value"].filter((g) => p[g]).map((g) => {
+    const r = p[g], gap = (x) => x && x.hi && x.lo && x.hi.excess != null && x.lo.excess != null ? x.hi.excess - x.lo.excess : null;
+    const cell = (x, name) => x ? `${name}: 위−아래 <b class="${cls(gap(x))}">${signed(gap(x), 1, "%p")}</b> <small>(${num(Math.min(x.hi ? x.hi.n : 0, x.lo ? x.lo.n : 0))}건씩)</small>` : `${name}: 기록 없음`;
+    return `<li><b>${TAB_NAME[g]}</b>${r.since ? ` <small>지금 공식 ${ymd(r.since).slice(5)}부터</small>` : ` <small>공식 바꾼 적 없음</small>`}<br>${cell(r.set, r.since ? "공식 정할 때 본 기간" : "전체")}${r.since ? `<br>${cell(r.eval, "그 뒤 검증 기간")}` : ""}<br><small>👉 ${CMP_TXT[r.verdict] || r.verdict}</small></li>`;
+  }).join("");
+  return `<h3 class="sub">점수 공식이 나아졌나 <small>정한 기간과 검증 기간을 나눠서</small></h3>
+    <ul class="plain">${rows}</ul><p class="hint">공식을 만들 때 본 기간에서 잘 맞는 건 당연해서, 그 뒤 기간(검증 기간)만 따로 봐요. 검증 기간이 30건씩 쌓이기 전에는 '개선 효과 미확인'으로 둬요. %p = 수익률끼리 뺀 차이.</p>`;
+}
+
+// 화면 상위 10개 vs 조건 통과 전체 (전체 기록이 있는 날만)
+function scopeBlock(ex) {
+  const sp = ex && ex.scope;
+  if (!sp) return "";
+  const gs = ["swing", "scalp", "value"].filter((g) => sp[g]);
+  if (!gs.length) return `<h3 class="sub">화면 상위 10개 vs 조건 통과 전체</h3><p class="hint">조건을 통과한 후보 전체 기록은 오늘부터 쌓여요. ${ex.horizon}영업일이 지나면 비교가 나와요.</p>`;
+  return `<h3 class="sub">화면 상위 10개 vs 조건 통과 전체 <small>${ex.horizon}일 뒤</small></h3>
+    <div class="tile wide"><div class="chart-cap">${kindTag(true)}점수로 고른 상위 10개(색)가 조건 통과 전체(회색)보다 나았나</div>
+    ${colBars(gs.map((g) => ({ label: TAB_NAME[g], sub: `${sp[g].days}일 · 전체 ${sp[g].all ? num(sp[g].all.n) : 0}번${(sp[g].all ? sp[g].all.n : 0) < 30 ? " · ⚠ 기록 적음" : ""}`,
+      bars: [sp[g].all && { v: sp[g].all.excess, base: true }, sp[g].top && { v: sp[g].top.excess }].filter(Boolean) })), { vs: "지수보다 더 번(덜 번) %", legend: [["조건 통과 전체", "faint"], ["상위 10개", "up"]] })}</div>`;
+}
+
+// 같은 날 같은 탭 후보 중 시장 대비 힘(20일) 위 절반 vs 아래 절반
+function rsScoreBlock(ex) {
+  const r = ex && ex.rs;
+  if (!r) return "";
+  const gs = ["swing", "scalp", "value"].filter((g) => r[g]);
+  if (!gs.length) return "";
+  return `<h3 class="sub">시장보다 강했던 후보가 나았나 <small>같은 날·같은 탭 안, ${ex.horizon}일 뒤</small>${infoBtn("rs")}</h3>${infoBox("rs")}
+    <div class="tile wide"><div class="chart-cap">${kindTag(true)}20일 시장 대비 힘이 위 절반(색) vs 아래 절반(회색)</div>
+    ${colBars(gs.map((g) => ({ label: TAB_NAME[g], sub: CMP_TXT[r[g].verdict] || "", bars: [r[g].lo && { v: r[g].lo.excess, base: true }, r[g].hi && { v: r[g].hi.excess }].filter(Boolean) })),
+      { vs: "지수보다 더 번(덜 번) %", legend: [["힘 아래 절반", "faint"], ["힘 위 절반", "up"]] })}</div>
+    <p class="hint">상대강도는 가격만으로 계산해서 예전 후보도 그날까지의 가격으로 다시 쟀어요 (그날 알 수 있던 값). 결과와 상관없이 점수·필터엔 자동으로 넣지 않아요.</p>`;
+}
+
+// 단타 후보: 거래가 평소의 몇 배였나 구간별 그 뒤 성적 (점수 공식은 자동으로 안 바꿈)
+function multBlock(ex) {
+  const m = ex && ex.mult;
+  if (!m || !m.rows.some((r) => r.n)) return "";
+  return `<h3 class="sub">단타: 거래 배수별 그 뒤 성적 <small>${ex.horizon}일 뒤</small></h3>
+    <div class="tile wide"><div class="chart-cap">${kindTag(true)}거래대금이 20일 평균의 몇 배였나에 따라 나눔</div>
+    ${colBars(m.rows.filter((r) => r.n).map((r) => ({ label: r.label, sub: `${num(r.n)}번${r.n < 30 ? " · ⚠ 기록 적음" : ""}`, bars: [{ v: r.excess }] })), { vs: "지수보다 더 번(덜 번) %" })}</div>
+    <p class="hint">👉 ${CMP_TXT[m.verdict]}. 기록이 충분히 쌓여도 점수 공식은 자동으로 바꾸지 않고, 바꿀 땐 검증 기간을 따로 둬요.</p>`;
+}
+
+// 정리 기준을 지켰다면: 그냥 들고 있기 vs 정리선 아래 마감 → 다음 날 아침 첫 가격에 팔고 현금 (5일, 같은 날 사서 같은 날까지)
 function stopTable(st) {
   if (!st) return "";
-  const rows = ["swing", "scalp", "value"].filter((g) => st[g] && st[g]["5"] && st[g]["5"].hold).map((g) => {
+  const gs = ["swing", "scalp", "value"].filter((g) => st[g] && st[g]["5"] && st[g]["5"].hold);
+  if (!gs.length) return "";
+  const rows = gs.map((g) => {
     const a = st[g]["5"];
-    const c = (x) => `<td><b class="${cls(x.excess)}">${signed(x.excess, 1, "%p")}</b><br><small>상승 ${x.win}% · ${x.n}건</small></td>`;
+    const c = (x) => `<td><b class="${cls(x.excess)}">${signed(x.excess, 1, "%p")}</b><br><small>이긴 ${x.win}% · 나쁜 10% ${signed(x.low10, 1, "%")} · 최대 하락 ${num(x.dd, 1)}% · ${x.n}건</small></td>`;
     const gap = a.stop.excess != null && a.hold.excess != null ? a.stop.excess - a.hold.excess : null;
     const verdict = gap == null ? "–" : a.hold.n < 30 ? "기록 부족" : gap > 0.5 ? "지키는 게 나음" : gap < -0.5 ? "들고 있는 게 나음" : "차이 없음";
-    return `<tr><th>${TAB_NAME[g]}</th>${c(a.hold)}${c(a.stop)}<td><small>${a.hit}% 정리<br>${verdict}</small></td></tr>`;
+    return `<tr><th>${TAB_NAME[g]}</th>${c(a.hold)}${c(a.stop)}<td><small>${a.hit}% 정리${a.fill_gap != null ? `<br>정리선보다 ${signed(a.fill_gap, 1, "%")}에 팔림` : ""}<br>${verdict}</small></td></tr>`;
   }).join("");
-  if (!rows) return "";
-  return `<h3 class="sub">정리 기준을 지켰다면 <small>5일 기준, 시장 지수 대비</small></h3>
-    <div class="tile wide"><div class="chart-cap">${kindTag(true)}그냥 5일 들고 있기(회색) vs 카드의 “정리 가격” 아래로 마감하면 팔기(색) — 색 막대가 더 크면 기준을 지키는 게 나았던 것</div>
-    ${colBars(["swing", "scalp", "value"].filter((g) => st[g] && st[g]["5"] && st[g]["5"].hold).map((g) => {
+  const pair = (key, lab) => colBars(gs.map((g) => {
+    const a = st[g]["5"];
+    return { label: TAB_NAME[g], sub: a.hold.n < 30 ? "⚠ 기록 적음" : `${num(a.hold.n)}번`, bars: [{ v: key === "dd" ? -a.hold.dd : a.hold[key], base: true }, { v: key === "dd" ? -a.stop.dd : a.stop[key] }] };
+  }), { vs: lab, legend: [["그냥 5일 들고 있기", "faint"], ["정리선 지키기", "g3"]], color: (b) => b.base ? "faint" : "g3" });
+  return `<h3 class="sub">정리 기준을 지켰다면 <small>5일, 같은 날 사서 같은 날까지</small></h3>
+    <div class="tile wide"><div class="chart-cap">${kindTag(true)}평균: 그냥 5일 들고 있기(회색) vs 정리선 아래로 마감하면 다음 날 아침 첫 가격에 팔고 남은 기간 현금(색)</div>
+    ${colBars(gs.map((g) => {
       const a = st[g]["5"];
       return { label: TAB_NAME[g], sub: `${a.hold.n < 30 ? "⚠ 기록 적음 · " : ""}100번 중 ${a.hit}번 정리됨`, bars: [{ v: a.hold.excess, base: true }, { v: a.stop.excess }] };
-    }), { vs: "지수보다 더 번(덜 번) %", legend: [["그냥 5일 들고 있기", "faint"], ["정리 가격 지키기", "up"]] })}
-    ${asTable(`<table class="score"><thead><tr><th></th><th>그냥 5일 들고 있기</th><th>기준 깨지면 팔기</th><th></th></tr></thead><tbody>${rows}</tbody></table>`)}</div>
-    <p class="hint">정리 가격 = 카드마다 적힌 '이 아래로 마감하면 정리' 가격. 색 막대가 회색보다 크면(위로) 그 기준을 지키는 게 나았던 것.</p>`;
+    }), { vs: "지수보다 더 번(덜 번) %", legend: [["그냥 5일 들고 있기", "faint"], ["정리선 지키기", "up"]] })}
+    <div class="chart-cap">${kindTag(false)}가장 나빴던 10% 거래의 평균 — 덜 깊으면(0에 가까우면) 큰 손실을 더 잘 막은 것</div>${pair("low10", "주가가 오른(내린) %, 비용 뺌")}
+    <div class="chart-cap">${kindTag(false)}거래 하나 동안 가장 깊이 빠진 폭의 평균 (마감 가격 기준, 거래별 — 계좌 전체 최대 손실이 아님)</div>${pair("dd", "빠진 폭 %")}
+    ${asTable(`<table class="score"><thead><tr><th></th><th>그냥 5일 들고 있기</th><th>정리선 지키기</th><th></th></tr></thead><tbody>${rows}</tbody></table>`)}</div>
+    <p class="hint">정리선 = 카드마다 적힌 가격(걸린 날 값으로 고정). 깨진 다음 날 거래가 없으면 거래되는 첫 날 아침 가격으로, 끝날까지 못 팔면 끝날 마감 가격으로 셈해요 — 빈 자료가 유리한 가격이 되지 않게. 보유 중 권리락·분할로 가격이 끊긴 거래는 양쪽 모두에서 뺐어요.</p>`;
 }
 
 // 그동안 급등주를 얼마나 미리 잡았나, 급등 전에 어떤 신호가 자주 먼저 보였나
@@ -1303,7 +1489,7 @@ function moverCard(m) {
 function renderReplay() {
   const rp = state.data.replay, el = $("#replay-body");
   if (!el) return;
-  if (!rp) { el.innerHTML = `<div class="empty">이 날짜는 복기 자료가 없습니다.</div>`; return; }
+  if (!rp) { el.innerHTML = `<div class="empty">이 날짜는 복기 자료가 없습니다.</div>`; if ($("#research-body")) $("#research-body").innerHTML = ""; return; }
   const v = rp.validation;
   const vtable = v ? `<table class="score"><thead><tr><th>신호</th><th>급등한 종목 (100개 중)</th><th>평소의 몇 배</th></tr></thead><tbody>
     <tr><th>아무 신호 없이 (평소)</th><td>${num(v.base, 1)}%</td><td><small>${num(v.base_n)}건</small></td></tr>
@@ -1352,7 +1538,10 @@ function renderReplay() {
     })() : ""}` : "";
   el.innerHTML = `<p class="hint">최근 5일 동안 크게 오른 종목(5일 +${rp.rules.r5}% 또는 하루 +${rp.rules.d1}%)을 거꾸로 따라가 봅니다. 급등 전에 어떤 신호가 며칠 먼저 있었는지, 우리가 언제 잡았는지 보여 줘요.${infoBtn("replay")}</p>${infoBox("replay")}<p class="hint kdleg">${kindTag(false)} = 그 종목 주가가 실제로 오르내린 % · ${kindTag(true)} = 같은 기간 지수나 다른 종목보다 몇 % 더(덜) 올랐나 (숫자 아래에 무엇과 비교했는지 적혀 있어요)</p>
     ${rp.movers.length ? `<ul class="fit movers">${rp.movers.slice(0, 4).map(moverCard).join("")}</ul>` : `<p class="hint">최근 5일 급등주가 없습니다.</p>`}
-    ${rp.movers.length > 4 ? `<details class="rules"><summary>급등주 ${rp.movers.length - 4}개 더 보기</summary><ul class="fit movers">${rp.movers.slice(4).map(moverCard).join("")}</ul></details>` : ""}${holdBlock(rp.follow && rp.follow.hold)}${ft}${vt}`;
+    ${rp.movers.length > 4 ? `<details class="rules"><summary>급등주 ${rp.movers.length - 4}개 더 보기</summary><ul class="fit movers">${rp.movers.slice(4).map(moverCard).join("")}</ul></details>` : ""}
+    <p class="hint">급등 뒤 흐름·가진 종목이 급등했을 때·신호 검증은 아래 <a href="#research">연구 자료</a>로 옮겼어요.</p>`;
+  const rb = $("#research-body");
+  if (rb) rb.innerHTML = `<p class="hint kdleg">${kindTag(false)} = 그 종목 주가가 실제로 오르내린 % · ${kindTag(true)} = 같은 기간 지수나 다른 종목보다 몇 % 더(덜) 올랐나</p>${holdBlock(rp.follow && rp.follow.hold)}${ft}${vt}`;
 }
 
 /* 가진 종목이 급등했을 때: 급등일 종가 기준 그 뒤 10일 (언제 가장 높았나·팔기 방법 비교) */
@@ -2178,11 +2367,14 @@ function renderRules() {
     <li>단타: 0~100점 가중평균 — 큰손 확인(거래대금 중 기관+외국인 순매수 비중 0%→0, 20%→100) 50%, 거래 증가(평소의 3배→0, 8배→100, 15배 넘으면 깎여 30배에 0) 25%, 상승폭(2%→0, 5~15%→100, 29%→0) 25%</li>
     <li>저평가: 0~100점 가중평균 — 낙폭(20%→0, 50%→100) 25%, 1년 중앙 PBR 대비 할인(20%→0, 70%→100) 15%, PER(15→0, 5→100) 35%, 이익(EPS 1년 전의 0.8배→0, 1.5배→100, 추정 EPS 있으면 반반) 25%</li>
     <li>카드의 강도는 이 계산값이 지금까지 같은 탭 후보들 중 몇 % 위치인지 (세 탭 공통 0~100)</li></ul>
-    <h3>정리 기준 (카드 아래)</h3>
-    <ul><li>스윙: 종가가 20일 평균 가격 아래로 마감 · 단타: 걸린 날 저가 아래로 마감 · 저평가: 최근 10일 최저가 아래로 마감</li>
-    <li>성적표 '정리 기준을 지켰다면'은 다음 날 아침 첫 가격에 사서, 5일 안에 종가가 기준 아래로 마감한 날 그 종가에 판 것으로 계산</li>
-    <li>증권사 리포트: 네이버 리서치 종목분석 목록(150일 보관). 최근 2주 리포트 수, 그 전 석 달 동안 없었으면 '오랜만에 다뤄짐'. 가장 최근 리포트의 투자의견·목표가</li>
-    <li>'검색 N위 · 이미 알려짐': 네이버 증권 검색 상위 100. 좋은 신호가 아니라 '이미 사람들이 몰림' 표시</li>
+    <h3>정리 기준 · 진입 위험 (카드 아래)</h3>
+    <ul><li>정리선은 걸린 날 값으로 고정: 스윙 = 걸린 날의 20일 평균 가격 · 단타 = 걸린 날 저가 · 저평가 = 걸린 날까지 최근 10일 최저가. 마감 가격이 그 아래면 다음 날 아침에 정리</li>
+    <li>성적표 '정리 기준을 지켰다면': 다음 날 아침 첫 가격에 사서, 마감 가격이 정리선 아래인 날이 나오면 그다음 날 아침 첫 가격에 팔고 끝날까지 현금. 그다음 날 거래가 없으면(거래 정지) 거래되는 첫 날 아침 가격, 끝날까지 못 팔면 끝날 마감 가격. '그냥 들고 있기'와 같은 날 사서 같은 날까지 잼</li>
+    <li>평소 하루 변동폭 ATR14: 매일 max(고가−저가, |고가−전날 종가|, |저가−전날 종가|)를 와일더 방식으로 평균 (첫 값 = 14일 평균, 그 뒤 (전 값×13 + 오늘)÷14). 거래 없던 날·가격 끊긴 날 뒤부터, 28일 이상 이어져야 계산</li>
+    <li>시장 대비 힘(상대강도): 20·60영업일 종목 수익률 − 같은 날짜 사이 그 시장 지수 수익률. 점수·필터엔 안 씀</li>
+    <li>후보 기록: 조건을 통과한 후보는 화면 수(10개)와 상관없이 전부 최소 기록(순위·점수 재료·종가·상대강도)을 남김. 장 마감 뒤 ~ 다음 날 장 시작 전에 만든 기록만 '실제 기록'으로 따로 보관하고, 나중에 다시 계산해도 덮어쓰지 않음</li>
+    <li>증권사 리포트 (참고 정보): 네이버 리서치 종목분석 목록(150일 보관). 최근 2주 리포트 수, 그 전 석 달 동안 없었으면 '오랜만에 다뤄짐'. 가장 최근 리포트의 투자의견·목표가. 오르는 신호로 확인된 것은 아님</li>
+    <li>'관심 집중 · 검색 N위': 네이버 증권 검색 상위 100. 많이 찾아본다는 표시일 뿐, 순위만으로 늦었다고 판단하지 않음 (속설 검증 '모두가 볼 때는 늦었다'에서 확인 중)</li>
     <li>테마별 ETF: collector/etf.py 표(23개 테마, ETF 51개, 레버리지·인버스 제외). 테마 강도는 ETF 구성 상위 10종목의 5일 큰손 순매수(3일 이상 순매수면 '돈이 들어옴', '먼저 들어옴'은 시총 대비 0.1% 이상·4일 이상·하루 60% 이하·한 종목 60% 이하·ETF 5일 −3% 이상·20일 평균에서 −10% 안쪽), 20일 평균 위 비율(60% 이상이면 넓음), ETF가 20일 평균 위·KODEX 200보다 강한지, 20일 +20% 넘으면 과열</li>
     <li>운용사 방향: 국내 주식형 액티브 ETF 30개(collector/etf.py ACTIVE)의 오늘 구성과 5·20영업일 전 구성 비교. 담은 주식 수(설정 단위당) 10% 이상 변하면 늘림·줄임, 새로 생기면 새로 담음. 모든 종목이 같은 비율로 바뀌면(설정 단위 변경) 그 비율을 빼고 봄. 성적표 '운용사 매수'는 20일 동안 2곳 이상이 같이 산 종목</li>
     <li>실적 시즌(1분기 4/1~5/15, 반기 7/1~8/14, 3분기 10/1~11/14, 결산 1/1~3/31)에는 DART에서 분기·반기·사업보고서나 잠정실적을 아직 안 낸 후보에 경고 표시</li></ul>`;
@@ -2255,7 +2447,7 @@ init();
 
 // 지금 보고 있는 구역을 바로 가기 줄에 표시. 섹션 → 바로 가기 묶음
 const JUMP_OF = { morning: "today", today: "today", filter: "filter", turn: "turn", temp: "turn", regime: "turn",
-  sectors: "sectors", themes: "sectors", managers: "sectors", replay: "replay", myths: "myths", score: "score", glossary: "score" };
+  sectors: "sectors", themes: "sectors", managers: "sectors", replay: "replay", score: "score", research: "research", myths: "research", glossary: "research" };
 function updateJump() {
   const bar = document.querySelector(".bar");
   if (!bar) return;

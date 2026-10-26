@@ -164,7 +164,7 @@ def test_scorecard_returns_and_excess():
     hist = [("d0", {"swing": [{"code": "A", "name": "가", "close": 100.0}], "scalp": [], "value": []}),
             ("d6", {"swing": [{"code": "A", "name": "가", "close": 120.0}], "scalp": [], "value": []})]
     stats, recent, feats, _, _ = logic.scorecard(hist, closes, kospi, cost=0)
-    assert stats["swing"]["1"] == {"n": 1, "avg": 10.0, "win": 100, "excess": 10.0}
+    assert stats["swing"]["1"] == {"n": 1, "avg": 10.0, "win": 100, "excess": 10.0, "low10": None}
     assert stats["swing"]["5"]["avg"] == 20.0 and stats["swing"]["5"]["excess"] == 15.0
     assert "20" not in stats["swing"]
     assert recent[0]["date"] == "d6" and "r1" not in recent[0]
@@ -620,7 +620,7 @@ def test_stop_scorecard_hold_matches_scorecard():
                                  for c in "ABCDE" if (i + ord(c)) % 3]}) for i in range(22, 60)]
     st, *_ = logic.scorecard(hist, cl, k, opens=op, bench=bench)
     sp = logic.stop_scorecard(hist, cl, cl * 0.98, opens=op, bench=bench, horizons=(5,), index_closes=k)
-    assert sp["swing"]["5"]["hold"] == st["swing"]["5"]
+    assert {k: v for k, v in sp["swing"]["5"]["hold"].items() if k not in ("dd", "dd10")} == st["swing"]["5"]
 
 
 def test_holdings_diff_and_manager_moves():
@@ -873,3 +873,187 @@ def test_myth_check_dart_events():
     it = {x["key"]: x for x in out["items"]}
     assert it["insider"]["n"] == 40 and "by_mk" in it["insider"]
     assert "buyback" not in it   # 해당 종목 없음 → 항목 안 만듦
+
+
+# ---------------------------------------------------------------- 후보 변화 · 상대강도 · 진입 위험 · 기록 출처
+
+def test_record_origin_and_classify():
+    from datetime import datetime as dt
+    assert logic.record_origin("20261023", dt(2026, 10, 23, 18, 25)) == "live"
+    assert logic.record_origin("20261023", dt(2026, 10, 26, 8, 59)) == "live"      # 금요일 기록 → 월요일 장 전까지
+    assert logic.record_origin("20261023", dt(2026, 10, 26, 9, 0)) == "recalc"
+    assert logic.record_origin("20261023", dt(2026, 10, 23, 15, 0)) == "recalc"     # 장중에 만든 건 실제 마감 기록이 아님
+    assert logic.classify_record({"generated_at": "2026-10-22T19:32+09:00"}, "20261022") == "live"
+    assert logic.classify_record({"generated_at": "2026-10-26T13:15+09:00"}, "20261023") == "recalc"
+    assert logic.classify_record({"backfill": True, "generated_at": "2026-10-22T19:32+09:00"}, "20261022") == "recalc"
+    assert logic.classify_record({}, "20261022") == "unknown"
+    assert logic.classify_record({"record": {"origin": "live"}}, "20261022") == "live"
+    assert logic.strategy_ver().startswith("s3w1v2-")
+
+
+def test_atr_wilder_matches_hand_calc():
+    import numpy as np
+    n = 40
+    rng = np.random.default_rng(1)
+    c = pd.Series(100 + np.cumsum(rng.normal(0, 1, n)))
+    h, lo = c + rng.uniform(0.5, 2, n), c - rng.uniform(0.5, 2, n)
+    tr = [max(h[i] - lo[i], abs(h[i] - c[i - 1]), abs(lo[i] - c[i - 1])) for i in range(1, n)]
+    atr = sum(tr[:14]) / 14
+    for v in tr[14:]:
+        atr = (atr * 13 + v) / 14
+    assert abs(logic.atr_wilder(h, lo, c) - atr) < 1e-9
+    # 가격이 끊긴 날 뒤부터만 쓰고, 그러면 기간이 짧아 None
+    br = pd.Series(False, index=c.index)
+    br.iloc[20] = True
+    assert logic.atr_wilder(h, lo, c, breaks_s=br) is None
+    assert logic.atr_wilder(h, lo, c, breaks_s=br, min_len=14) is not None
+
+
+def test_price_breaks_and_rel_strength():
+    days = [f"2026{i:04d}" for i in range(101, 131)]
+    cl = pd.DataFrame({"A": [100.0 * 1.01 ** i for i in range(30)], "B": [100.0] * 30}, index=days)
+    cl.iloc[25:, 1] = 50.0                         # B: 25일째 1:2 분할 → 종가는 반토막, 거래소 등락률은 0
+    chg = (cl / cl.shift(1) - 1) * 100
+    chg.iloc[25, 1] = 0.0
+    br = logic.price_breaks(cl, chg)
+    assert br["B"].iloc[25] and not br["A"].any()
+    junk = chg.copy()
+    junk.iloc[10] = 0.0                            # 그날 등락률이 통째로 0 (자료 이상) → 끊긴 날로 보지 않음
+    assert not logic.price_breaks(cl, junk)["A"].iloc[10]
+    idx = pd.Series([1000.0 * 1.005 ** i for i in range(30)], index=days)
+    v, why = logic.rel_strength(cl["A"], idx, br["A"], 20)
+    assert v["from"] == days[-21] and abs(v["stock"] - (1.01 ** 20 - 1) * 100) < 0.06
+    assert abs(v["diff"] - (v["stock"] - v["mkt"])) < 0.11 and v["diff"] > 0
+    assert logic.rel_strength(cl["B"], idx, br["B"], 20) == (None, "기간 중 가격이 끊김 (권리락·분할 등)")
+    assert logic.rel_strength(cl["A"], idx, br["A"], 60)[1] == "기간 부족"
+    gap = cl["A"].copy()
+    gap.iloc[-3] = float("nan")
+    assert "거래 없는 날" in logic.rel_strength(gap, idx, None, 20)[1]
+    # 날짜가 정확히 맞아야: 지수에 시작일이 없으면 계산하지 않음
+    assert logic.rel_strength(cl["A"], idx.drop(days[-21]), None, 20)[1] == "지수 자료 없음"
+
+
+def test_entry_risk():
+    r = logic.entry_risk(10000, 9500, 250)
+    assert r == {"ref": 10000, "atr": 250, "atr_pct": 2.5, "stop": 9500, "dist": 5.0, "mult": 2.0}
+    assert "mult" not in logic.entry_risk(10000, 9500, None)
+
+
+def test_score_change_sums_to_total():
+    a = {"mult": 4.0, "chg": 3.0, "nr": 0.05}
+    b = {"mult": 6.0, "chg": 8.0, "nr": 0.02}
+    ch = logic.score_change("scalp", b, a)
+    assert abs(sum(c["d"] for c in ch["causes"]) - ch["d"]) < 0.3
+    assert {c["key"] for c in ch["causes"]} == {"flow", "volume", "move"}
+    sw = logic.score_change("swing", {"ratio": 0.2, "streak": 4}, {"ratio": 0.1, "streak": 2})
+    assert abs(sum(c["d"] for c in sw["causes"]) - sw["d"]) < 0.002 and sw["now"] == 0.36
+    v0 = {"drop": 30, "pbr_r": 0.5, "per": 8, "eps_r": 1.0, "fwd": None}
+    assert logic.score_change("value", v0, v0)["causes"] == []
+
+
+def test_candidate_changes_new_kept_dropped():
+    mk = lambda c, s, mult=4.0: {"code": c, "name": c, "close": 100.0, "score": s, "value_mult": mult, "value_eok": 100.0,
+                                 "change": 3.0, "flow": {"foreign_today": 5, "inst_today": 5}}
+    prev_top = [mk("A", 50), mk("B", 40), mk("C", 30)]
+    today = [mk("A", 60, 6.0), mk("D", 55), mk("E", 20)]
+    today_pool = logic.pool_record("scalp", today)
+    prev_pool = logic.pool_record("scalp", prev_top + [mk("D", 10)])
+    index = {"B": {"sz": "11", "nw": 2, "sc": "101", "c": 90}, "C": None}
+    labels = {"scalp": ["거래", "상승", "큰손"]}
+    dropped = logic.candidate_changes("scalp", today, prev_top, prev_pool, today_pool, index, labels, top=2)
+    tr = {x["code"]: x["track"] for x in today[:2]}
+    assert tr["A"]["st"] == "kept" and tr["A"]["prev_rank"] == 1 and tr["A"]["score"]["causes"][0]["key"] == "volume"
+    assert tr["D"]["st"] == "new" and tr["D"]["prev_rank"] == 4      # 어제도 조건 통과, 화면 밖 4위
+    assert "track" not in today[2]
+    by = {d["code"]: d for d in dropped}
+    assert by["B"]["why"] == "filter" and by["B"]["broken"] == ["상승"] and by["B"]["close"] == 90
+    assert by["C"]["why"] == "unknown"                                # 오늘 자료 없음 → 추적 불가
+    dropped = logic.candidate_changes("scalp", [mk("A", 60)], prev_top[:1] + [mk("E", 5)], None,
+                                      logic.pool_record("scalp", [mk("A", 60), mk("E", 20)]), {}, labels, top=1)
+    assert dropped == [{"code": "E", "name": "E", "prev_rank": 2, "prev_close": 100.0, "why": "rank", "rank": 2,
+                        "score": dropped[0]["score"]}]
+    # 어제 전체 기록이 없으면 '어제 순위 밖이었나'는 모름
+    t2 = [mk("Z", 9)]
+    logic.candidate_changes("scalp", t2, prev_top, None, logic.pool_record("scalp", t2), {}, labels)
+    assert t2[0]["track"] == {"st": "new", "rank": 1, "prev_known": False}
+
+
+def test_failed_conditions_gates():
+    labels = {"swing": ["a", "b", "c", "d", "e"], "value": ["v1", "v2", "v3", "v4", "v5"]}
+    assert logic.failed_conditions("swing", {"sz": "01", "nw": 0, "sw": "11011", "x": ["관리종목"]}, labels) == [
+        "위험 공시·투자 주의로 제외: 관리종목", "시총 500억·거래대금 10억 이상 아님", "최근 3일 기사·공시 없음", "c"]
+    assert logic.failed_conditions("value", {"sz": "11", "vr": "적자이거나 재무 자료 없음"}, labels) == ["적자이거나 재무 자료 없음"]
+    assert logic.failed_conditions("value", {"sz": "11"}, labels) is None
+
+
+def test_first_seen():
+    recs = [("20261001", {"swing": [{"code": "A", "close": 100}]}),
+            ("20261002", {"pools": {"scalp": [{"c": "B", "p": 50}]}, "scalp": []})]
+    assert logic.first_seen("A", "swing", recs) == {"date": "20261001", "price": 100}
+    assert logic.first_seen("B", "scalp", recs) == {"date": "20261002", "price": 50}
+    assert logic.first_seen("B", "swing", recs) is None
+
+
+def test_stop_scorecard_next_open_and_cash():
+    days = [f"d{i:02d}" for i in range(30)]
+    base = [100.0] * 30
+    cl = pd.DataFrame({"A": base[:]}, index=days)
+    op = cl.copy()
+    # 걸린 날 d24 (스윙 정리선 = 20일 평균 100). d26 마감 95 (선 아래) → d27 시가 90에 팔고 현금, 끝(d29)엔 120
+    cl.loc["d26", "A"] = 95.0
+    op.loc["d27", "A"] = 90.0
+    cl.loc["d27":, "A"] = 120.0
+    hist = [("d24", {"swing": [{"code": "A", "name": "A", "close": 100.0}]})]
+    sp = logic.stop_scorecard(hist, cl, cl, opens=op, horizons=(5,), cost=0)["swing"]["5"]
+    assert sp["hold"]["avg"] == 20.0 and sp["stop"]["avg"] == -10.0 and sp["hit"] == 100
+    assert sp["fill_gap"] == -10.0                     # 정리선 100보다 10% 낮게 팔림 (갭 하락)
+    assert sp["stop"]["dd"] == 10.0 and sp["hold"]["dd"] == 5.0
+    # 다음 날 시가가 비면(거래 정지) 그다음 거래되는 날 시가에
+    op.loc["d27", "A"] = float("nan")
+    op.loc["d28", "A"] = 80.0
+    assert logic.stop_scorecard(hist, cl, cl, opens=op, horizons=(5,), cost=0)["swing"]["5"]["stop"]["avg"] == -20.0
+    # 마지막 날에 깨지면 둘 다 그날 종가 (같은 끝 날)
+    cl2 = pd.DataFrame({"A": base[:]}, index=days)
+    cl2.loc["d29", "A"] = 90.0
+    sp2 = logic.stop_scorecard(hist, cl2, cl2, opens=cl2, horizons=(5,), cost=0)["swing"]["5"]
+    assert sp2["hold"]["avg"] == sp2["stop"]["avg"] == -10.0 and sp2["hit"] == 0
+    # 보유 중 가격이 끊긴 거래는 양쪽 모두에서 뺌
+    br = pd.DataFrame({"A": [False] * 30}, index=days)
+    br.loc["d27", "A"] = True
+    assert logic.stop_scorecard(hist, cl, cl, opens=op, horizons=(5,), cost=0, breaks=br) == {}
+
+
+def test_scorecard_extra_splits():
+    es = []
+    for i in range(40):
+        d = f"2026{1001 + i // 4:04d}"
+        es.append({"date": d, "group": "scalp", "x5": 1.0 + (i % 2), "origin": "live" if i < 20 else "recalc",
+                   "half": "hi" if i % 2 else "lo", "mult": 4.0, "rs20": float(i % 4)})
+        es.append({"date": d, "group": "scalp_rest", "x5": -1.0, "origin": "live", "mult": 20.0})
+    ex = logic.scorecard_extra(es, pool_dates={e["date"] for e in es}, since={"scalp": "20261006"})
+    assert ex["by_origin"]["live"]["scalp"]["n"] == 20 and ex["by_origin"]["recalc"]["scalp"]["n"] == 20
+    assert ex["scope"]["scalp"]["top"]["n"] == 40 and ex["scope"]["scalp"]["all"]["n"] == 80
+    assert ex["mult"]["verdict"] == "few"
+    rows = {r["label"]: r for r in ex["mult"]["rows"]}
+    assert rows["3~5배"]["n"] == 40 and rows["15배 넘음"]["n"] == 40
+    assert ex["rs"]["scalp"]["verdict"] == "few"                     # 위·아래 각각 30건 미만
+    p = ex["periods"]["scalp"]
+    assert p["since"] == "20261006" and p["set"]["hi"]["n"] == 10 and p["verdict"] == "unconfirmed"
+
+
+def test_live_record_kept_apart_from_recalc(tmp_path, monkeypatch):
+    import json as js
+    from collector import main
+    monkeypatch.setattr(main, "DATA", str(tmp_path))
+    monkeypatch.setattr(main, "LIVE", str(tmp_path / "live"))
+    day = {"generated_at": "2026-10-28T10:00+09:00", "filter": {"swing": [{"code": "B"}]}}
+    (tmp_path / "20261026.json").write_text(js.dumps(day))
+    rec, origin = main.load_record("20261026")
+    assert origin == "recalc" and rec["filter"]["swing"][0]["code"] == "B"
+    out = {"generated_at": "2026-10-26T18:30+09:00", "record": {"origin": "live"},
+           "filter": {"swing": [{"code": "A", "profile": {}, "reports": {"n": 1, "detail": {"x": 1}}}], "scalp": [], "value": [],
+                      "swing_total": 1, "scalp_total": 0, "value_total": 0, "pools": {}, "score_ver": 3}}
+    main.write_live("20261026", out)
+    rec, origin = main.load_record("20261026")      # 날짜 파일이 나중에 다시 계산돼도 실제 기록을 쓴다
+    x = rec["filter"]["swing"][0]
+    assert origin == "live" and x["code"] == "A" and "profile" not in x and x["reports"] == {"n": 1}

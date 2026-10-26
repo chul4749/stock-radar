@@ -90,7 +90,16 @@ def main(argv):
     opens = pd.DataFrame({d: daily[d]["시가"] for d in used_days}).T.astype(float).replace(0, float("nan"))
     lows = pd.DataFrame({d: daily[d]["저가"] for d in used_days}).T.astype(float).replace(0, float("nan"))
     highs = pd.DataFrame({d: daily[d]["고가"] for d in used_days}).T.astype(float).replace(0, float("nan"))
-    log(f"  {len(used_days)}일, {time.time() - t:.0f}초")
+    # 권리락·분할 등으로 가격이 끊긴 날 (종가 변화 ≠ 거래소 등락률): 상대강도·변동폭·성적표에서 그 구간을 뺀다
+    chg = pd.DataFrame({d: daily[d]["등락률"] for d in used_days}).T.astype(float) if all("등락률" in daily[d] for d in used_days) else None
+    breaks = logic.price_breaks(closes, chg)
+    log(f"  {len(used_days)}일, {time.time() - t:.0f}초, 가격 끊긴 종목 {int(breaks.any().sum())}개")
+    # 종목이 속한 시장 지수 (상대강도·성적표 비교 기준): 같은 영업일 index 로 맞춘다
+    bench = {}
+    for mk, ticker in (("KOSPI", "1001"), ("KOSDAQ", "2001")):
+        oc = safe(f"{mk} 시가·종가", lambda: sources.index_open_close(ticker, used_days[0], base), errors)
+        if oc is not None:
+            bench[mk] = oc
 
     t = step("종목별 수급")
     last5 = used_days[-5:]
@@ -226,9 +235,11 @@ def main(argv):
             time.sleep(0.2)
         return profiles[code]
 
-    for x in value:
-        profile(x["code"])
-    logic.apply_forward_eps(value, profiles)
+    # 추정 EPS는 '지금' 값이라 과거 기준일을 다시 계산할 땐 쓰지 않는다 (그날은 몰랐던 정보)
+    if not backfill:
+        for x in value:
+            profile(x["code"])
+        logic.apply_forward_eps(value, profiles)
     # 전 종목 재무(검색 화면용, fin/ — data-cache 브랜치에 보관): 아직 없는 종목은 전부, 이미 있으면 오래된 것부터 FIN_BATCH개.
     # 여러 개를 동시에 받되 FIN_BUDGET초가 넘으면 남은 건 다음 날로 (예전 기준일을 다시 계산할 땐 안 받음)
     fin_cache = load_fin_cache()
@@ -254,11 +265,11 @@ def main(argv):
         logic.enrich(group, closes, sectors, quality)
     for x in value[:10]:   # 저평가도 상세 화면에서 일별 수급을 보이게
         x["flow"] = logic.flow_detail(x["code"], flows_daily, flows_5d, pension_5d)
-    # 종목 상세(눌렀을 때)용 기업 정보: 화면에 나가는 후보만, 네이버 지금 시점 값
-    for x in scalp[:10] + swing[:10] + value[:10]:
+    # 종목 상세(눌렀을 때)용 기업 정보: 화면에 나가는 후보만, 네이버 지금 시점 값 (과거 기준일엔 안 붙임)
+    for x in ([] if backfill else scalp[:10] + swing[:10] + value[:10]):
         if profile(x["code"]):
             x["profile"] = profiles[x["code"]]
-    # 증권사 리포트(주목도: 오랜만에 다뤄지기 시작했나)와 네이버 검색 상위(이미 알려짐)
+    # 증권사 리포트(참고 정보: 오랜만에 다뤄지기 시작했나)와 네이버 검색 상위(관심 집중 표시)
     reports = update_reports(base, errors)
     search_top = [] if backfill else (safe("검색 상위", sources.naver_search_top, errors) or [])
     attention = update_attention(base, search_top)
@@ -286,6 +297,16 @@ def main(argv):
             if x["code"] in closes.columns:
                 x["exit"] = logic.exit_level(g, closes[x["code"]], lows[x["code"]] if x["code"] in lows.columns else None)
             x["earn_season"] = logic.earnings_status(x["code"], base, season, reported)
+    # 상대강도(20·60일, 종목이 속한 시장 지수 대비)와 평소 하루 변동폭(ATR14): 조건 통과 후보 전체. 점수·필터엔 안 씀
+    for g, items in (("scalp", scalp), ("swing", swing), ("value", value)):
+        for x in items:
+            c = x["code"]
+            if c not in closes.columns:
+                continue
+            mk = bench.get(logic.mkt_of(x.get("market")))
+            x["rs"] = logic.rs_pair(closes[c], mk[1] if mk else None, breaks[c])
+            atr = logic.atr_wilder(highs[c], lows[c], closes[c], breaks_s=breaks[c]) if c in highs.columns else None
+            x["risk"] = logic.entry_risk(float(closes[c].iloc[-1]), (x.get("exit") or {}).get("stop"), atr)
     log(f"  기업 정보 {len(profiles) - failed}/{len(profiles)}")
     save_fin_cache(fin_cache, profiles, base)
     if profiles and failed == len(profiles):
@@ -381,8 +402,44 @@ def main(argv):
         x["managers"] = mg_of.get(x["code"])
     log(f"  액티브 ETF {len(managers['etfs'])}개, 20일 매수 {len(mg20['buys'])}종목(2곳 이상 {sum(1 for r in mg20['buys'] if r['n'] >= 2)}) · 매도 {len(mg20['sells'])}종목")
 
+    # 전체 종목 검색용 요약 (탈락 종목의 깨진 조건에도 씀)
+    picked = {}
+    for g, items in (("swing", swing), ("scalp", scalp), ("value", value)):
+        for x in items:
+            picked.setdefault(x["code"], []).append(g)
+    idx = logic.stock_index(universe_all, {c: r for c, r in risk.items()}, closes, values, flows_daily, flows_5d,
+                            news_today, news_3d, fund_now, fund_hist, sectors, picked)
+    # 검색 팝업·카드 (기록 파일 저장 전에 붙여야 카드에 나감): 최근 10영업일 OpenDART '사는' 공시 (임원·주요주주 매수, 5% 큰손 장내매수, 자사주 취득 결정)
+    recent_ds = {}
+    for x in (dart_sig or {}).get("events") or []:
+        if x.get("code") and used_days[-10] <= x["date"] <= base:
+            recent_ds.setdefault(x["code"], []).append({"k": x["kind"], "d": x["date"], "w": x.get("who"), "r": x.get("rate")})
+    for c, v in recent_ds.items():
+        if c in idx["stocks"]:
+            idx["stocks"][c]["ds"] = v[-5:]
+    for g, items in (("scalp", scalp), ("swing", swing), ("value", value)):
+        for x in items:
+            if x["code"] in recent_ds:
+                x["dart_sig"] = recent_ds[x["code"]][-5:]
+    # 조건 통과 후보 전체의 최소 기록 + 어제와 비교 (새로 들어옴·유지·빠짐) + 우리 기록상 처음 걸린 날
+    groups_now = {"scalp": scalp, "swing": swing, "value": value}
+    pools = {}
+    for g, items in groups_now.items():
+        extra = {x["code"]: {"rs20": ((x.get("rs") or {}).get("r20") or {}).get("diff"),
+                             "rs60": ((x.get("rs") or {}).get("r60") or {}).get("diff"),
+                             "atr": (x.get("risk") or {}).get("atr")} for x in items}
+        pools[g] = logic.pool_record(g, items, extra)
+    made = datetime.now(KST)
+    origin = "recalc" if backfill else logic.record_origin(base, made)
+    changes = build_changes(base, used_days, groups_now, pools, idx, closes, breaks)
+    record = {"origin": origin, "strategy_ver": logic.strategy_ver(), "strategy": logic.STRATEGY,
+              "data_asof": {"price": f"{base} 15:30 마감", "flows": last5[-1], "news_until": made.isoformat(timespec="minutes"),
+                            "dart": None if dart_failed else base, "profile": None if backfill else made.strftime("%Y%m%d"),
+                            "reports": (reports or {}).get("updated"), "search": made.strftime("%Y%m%d") if search_top else None}}
+
     out = {
         "version": 1,
+        "record": record,
         "base_date": base,
         "generated_at": datetime.now(KST).isoformat(timespec="minutes"),
         "backfill": backfill,
@@ -400,6 +457,8 @@ def main(argv):
             "all_scores": {g: [x["score"] for x in items] for g, items in (("scalp", scalp), ("swing", swing), ("value", value))},
             "score_ver": 3,
             "excluded": excluded,
+            "pools": pools,
+            "changes": changes,
         },
         "sectors": sector_flow,
         "themes": themes,
@@ -411,28 +470,12 @@ def main(argv):
     path = os.path.join(DATA, f"{base}.json")
     with open(path, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"), default=_json_default)
+    # 실제 기록(장 마감 뒤 ~ 다음 날 장 시작 전에 만든 것)은 live/ 에 따로 남긴다. 다시 계산한 기록은 여기에 절대 쓰지 않는다
+    if origin == "live":
+        write_live(base, out)
     dates = reindex.write_index()
     write_prices(base, closes, listing, temp.get("index") or {})
-    # 전체 종목 검색용: 조건별 통과 여부 (가장 최근 기준일만)
-    picked = {}
-    for g, items in (("swing", swing), ("scalp", scalp), ("value", value)):
-        for x in items:
-            picked.setdefault(x["code"], []).append(g)
-    idx = logic.stock_index(universe_all, {c: r for c, r in risk.items()}, closes, values, flows_daily, flows_5d,
-                            news_today, news_3d, fund_now, fund_hist, sectors, picked)
     write_chart_shards(base, closes, logic.net_frame(flows_hist), idx["stocks"], highs, lows, values)
-    # 검색 팝업·카드: 최근 10영업일 OpenDART '사는' 공시 (임원·주요주주 매수, 5% 큰손 장내매수, 자사주 취득 결정)
-    recent_ds = {}
-    for x in (dart_sig or {}).get("events") or []:
-        if x.get("code") and x["date"] >= used_days[-10]:
-            recent_ds.setdefault(x["code"], []).append({"k": x["kind"], "d": x["date"], "w": x.get("who"), "r": x.get("rate")})
-    for c, v in recent_ds.items():
-        if c in idx["stocks"]:
-            idx["stocks"][c]["ds"] = v[-5:]
-    for g, items in (("scalp", scalp), ("swing", swing), ("value", value)):
-        for x in items:
-            if x["code"] in recent_ds:
-                x["dart_sig"] = recent_ds[x["code"]][-5:]
     for c, m in mg_of.items():   # 검색 화면에도 '운용사가 20일 동안 산·판' 표시
         if c in idx["stocks"]:
             idx["stocks"][c]["mg"] = m
@@ -444,59 +487,91 @@ def main(argv):
     kospi = safe("코스피 기간", lambda: sources.index_history("1001", used_days[0], base), errors)
     if kospi is not None:
         kospi.index = [d.strftime("%Y%m%d") for d in kospi.index]
-        history, regimes, backfill_dates, signal_levels, theme_recs, mover_recs = [], {}, [], {}, [], {}
-        # 장세는 그날 저장된 시장 온도 + 그날까지의 코스피로 다시 판정 (예전 기록에도 같은 규칙 적용)
-        long_vals = kospi_long if kospi_long is not None else None
-        long_days = [d.strftime("%Y%m%d") for d in long_vals.index] if long_vals is not None else []
-        for d in dates:
-            with open(os.path.join(DATA, f"{d}.json"), encoding="utf-8") as f:
-                rec = json.load(f)
-            flt = rec["filter"]
-            # 기준일 이틀 뒤 이후에 계산된 기록 = 나중에 다시 계산한 날 (그날 실제로 보던 뉴스와 다를 수 있음)
-            made = (rec.get("generated_at") or "")[:10].replace("-", "")
-            if rec.get("backfill") or (made and (datetime.strptime(made, "%Y%m%d") - datetime.strptime(d, "%Y%m%d")).days >= 2):
-                backfill_dates.append(d)
-            groups = {g: flt.get(g, []) for g in ("swing", "scalp", "value")}
-            # 운용사 여러 곳(2곳 이상)이 20일 동안 같이 산 종목도 같은 방식으로 성적을 본다
-            picks = (rec.get("managers") or {}).get("picks")
-            if picks:
-                groups["mgr"] = picks
-            # 리포트 기록은 150일 치가 있으니, 리포트를 저장하기 전 날짜의 후보에도 그날 기준으로 다시 붙여 조건별 성적에 쓴다
-            for x in (y for items in groups.values() for y in items):
-                if x.get("reports") is None and reports:
-                    x["reports"] = logic.report_attention(x["code"], reports, d)
-            history.append((d, groups))
-            theme_recs.append((d, rec.get("themes")))
-            if d in long_days:
-                upto = [float(v) for v in long_vals.values[:long_days.index(d) + 1]]
-                rg = logic.market_regime(upto, rec.get("temperature") or {})
-                if rg:
-                    regimes[d] = rg["key"]
-            for m in (rec.get("replay") or {}).get("movers") or []:
-                mover_recs[(m["code"], m["surge"])] = m   # 같은 급등은 여러 날 나와도 한 번 (가장 나중 기록)
-            sig = (rec.get("temperature") or {}).get("signals")
-            if sig:
-                signal_levels[d] = sig["level"]
-        # 다음 날 시가에 사서 종목이 속한 시장 지수와 비교 (코스닥 종목은 코스닥 지수)
-        bench = {}
-        for mk, ticker in (("KOSPI", "1001"), ("KOSDAQ", "2001")):
-            oc = safe(f"{mk} 시가·종가", lambda: sources.index_open_close(ticker, used_days[0], base), errors)
-            if oc is not None:
-                bench[mk] = oc
-        stats, recent, features, by_regime, score_check = logic.scorecard(
-            history, closes, kospi, regimes, opens=opens, bench=bench or None)
-        stops = logic.stop_scorecard(history, closes, lows, opens=opens, bench=bench or None, index_closes=kospi)
-        card = {"generated_at": out["generated_at"], "base_date": base, "days": len(history), "stops": stops,
-                "themes": logic.theme_scorecard(theme_recs),
-                "movers": logic.mover_scorecard(list(mover_recs.values())),
-                "horizons": list(logic.HORIZONS), "stats": stats, "recent": recent, "features": features,
-                "by_regime": by_regime, "regimes": regimes, "score_check": score_check,
-                "method": {"entry": "다음 날 시가", "bench": "종목이 속한 시장 지수", "cost": logic.COST, "dedup": True},
-                "backfill_dates": backfill_dates, "signal_levels": signal_levels}
-        with open(os.path.join(DATA, "scorecard.json"), "w", encoding="utf-8") as f:
-            json.dump(card, f, ensure_ascii=False, separators=(",", ":"), default=_json_default)
-        log(f"  기록 {len(history)}일, 통계 {json.dumps(stats, ensure_ascii=False)}")
+        build_scorecard(base, dates, closes, opens, lows, kospi, kospi_long, reports, bench, breaks, out["generated_at"])
     return 0
+
+
+def build_scorecard(base, dates, closes, opens, lows, kospi, kospi_long, reports, bench, breaks, generated_at):
+    """기록 파일 전체로 성적표(scorecard.json)를 만든다. 후보는 실제 기록(live/)이 있으면 그것을 쓴다."""
+    history, regimes, backfill_dates, signal_levels, theme_recs, mover_recs = [], {}, [], {}, [], {}
+    origins, rest, pool_dates, versions = {}, [], [], {}
+    pos = {d: i for i, d in enumerate(closes.index)}
+    # 장세는 그날 저장된 시장 온도 + 그날까지의 코스피로 다시 판정 (예전 기록에도 같은 규칙 적용)
+    long_vals = kospi_long if kospi_long is not None else None
+    long_days = [d.strftime("%Y%m%d") for d in long_vals.index] if long_vals is not None else []
+    for d in dates:
+        with open(os.path.join(DATA, f"{d}.json"), encoding="utf-8") as f:
+            rec = json.load(f)
+        # 후보는 실제 기록(live/)이 있으면 그것으로 (날짜 파일은 나중에 다시 계산돼 바뀌었을 수 있음)
+        live, origins[d] = load_record(d)
+        if origins[d] != "live":
+            live = rec
+        flt = live["filter"]
+        versions[d] = (live.get("record") or {}).get("strategy_ver") or (f"score_ver {flt['score_ver']}" if flt.get("score_ver") else None)
+        # 기준일 이틀 뒤 이후에 계산된 기록 = 나중에 다시 계산한 날 (그날 실제로 보던 뉴스와 다를 수 있음)
+        made = (rec.get("generated_at") or "")[:10].replace("-", "")
+        if rec.get("backfill") or (made and (datetime.strptime(made, "%Y%m%d") - datetime.strptime(d, "%Y%m%d")).days >= 2):
+            backfill_dates.append(d)
+        groups = {g: flt.get(g, []) for g in ("swing", "scalp", "value")}
+        # 상대강도를 저장하기 전 기록도 그날까지의 종가로 다시 잰다 (가격만 쓰므로 그날 알 수 있던 값)
+        for g, items in groups.items():
+            for x in items:
+                if "rs" not in x and d in pos and x["code"] in closes.columns:
+                    mk = bench.get(logic.mkt_of(x.get("market")))
+                    i0 = pos[d]
+                    x["rs"] = {"r20": logic.rel_strength(closes[x["code"]].iloc[:i0 + 1], mk[1] if mk else None,
+                                                         breaks[x["code"]].iloc[:i0 + 1], 20)[0] or {}}
+        # 전체 최소 기록이 있는 날: 11위 밑 후보도 성적을 따로 잰다 (화면 상위 10개 vs 조건 통과 전체)
+        if flt.get("pools"):
+            pool_dates.append(d)
+            top_codes = {g: {x["code"] for x in groups[g]} for g in groups}
+            rest.append((d, {f"{g}_rest": [{"code": r["c"], "name": r["n"], "close": r["p"], "market": r.get("m"), "r": r["r"],
+                                            "mul": r.get("mul"), "rs": {"r20": {"diff": r.get("rs20")}}}
+                                           for r in flt["pools"].get(g) or [] if r["c"] not in top_codes.get(g, set())]
+                             for g in ("swing", "scalp", "value")}))
+        # 운용사 여러 곳(2곳 이상)이 20일 동안 같이 산 종목도 같은 방식으로 성적을 본다
+        picks = ((live.get("managers") or {}).get("picks") if origins[d] == "live" else None) or (rec.get("managers") or {}).get("picks")
+        if picks:
+            groups["mgr"] = picks
+        # 리포트 기록은 150일 치가 있으니, 리포트를 저장하기 전 날짜의 후보에도 그날 기준으로 다시 붙여 조건별 성적에 쓴다
+        for x in (y for items in groups.values() for y in items):
+            if x.get("reports") is None and reports:
+                x["reports"] = logic.report_attention(x["code"], reports, d)
+        history.append((d, groups))
+        theme_recs.append((d, rec.get("themes")))
+        if d in long_days:
+            upto = [float(v) for v in long_vals.values[:long_days.index(d) + 1]]
+            rg = logic.market_regime(upto, rec.get("temperature") or {})
+            if rg:
+                regimes[d] = rg["key"]
+        for m in (rec.get("replay") or {}).get("movers") or []:
+            mover_recs[(m["code"], m["surge"])] = m   # 같은 급등은 여러 날 나와도 한 번 (가장 나중 기록)
+        sig = (rec.get("temperature") or {}).get("signals")
+        if sig:
+            signal_levels[d] = sig["level"]
+    # 다음 날 시가에 사서 종목이 속한 시장 지수와 비교 (코스닥 종목은 코스닥 지수). bench 는 위에서 받음
+    entries = []
+    stats, recent, features, by_regime, score_check = logic.scorecard(
+        history, closes, kospi, regimes, opens=opens, bench=bench or None, breaks=breaks, origins=origins, entries_out=entries)
+    if rest:
+        logic.scorecard(rest, closes, kospi, opens=opens, bench=bench or None, breaks=breaks, origins=origins, entries_out=entries)
+    stops = logic.stop_scorecard(history, closes, lows, opens=opens, bench=bench or None, index_closes=kospi, breaks=breaks)
+    extra = logic.scorecard_extra(entries, pool_dates)
+    extra["origins"] = {o: sum(1 for v in origins.values() if v == o) for o in ("live", "recalc", "unknown")}
+    extra["versions"] = versions
+    card = {"generated_at": generated_at, "base_date": base, "days": len(history), "stops": stops,
+            "themes": logic.theme_scorecard(theme_recs),
+            "movers": logic.mover_scorecard(list(mover_recs.values())),
+            "horizons": list(logic.HORIZONS), "stats": stats, "recent": recent, "features": features,
+            "by_regime": by_regime, "regimes": regimes, "score_check": score_check,
+            "method": {"entry": "다음 날 시가", "bench": "종목이 속한 시장 지수", "cost": logic.COST, "dedup": True,
+                       "stop": "정리선 아래 마감 → 다음 날 시가에 팔고 끝날까지 현금", "breaks": "보유 중 가격이 끊긴 거래는 뺌"},
+            "extra": extra, "origins": origins,
+            "backfill_dates": backfill_dates, "signal_levels": signal_levels}
+    with open(os.path.join(DATA, "scorecard.json"), "w", encoding="utf-8") as f:
+        json.dump(card, f, ensure_ascii=False, separators=(",", ":"), default=_json_default)
+    log(f"  기록 {len(history)}일, 통계 {json.dumps(stats, ensure_ascii=False)}")
+    return card
 
 
 def update_season(base, dart_days, name_to_code, errors):
@@ -872,6 +947,78 @@ def save_fin_cache(cache, profiles, base):
         with open(os.path.join(d, f"{k}.json"), "w", encoding="utf-8") as f:
             json.dump({"date": base, "stocks": v}, f, ensure_ascii=False, separators=(",", ":"))
     log(f"  재무 캐시 저장 {len(cache)}개")
+
+
+LIVE = os.path.join(DATA, "live")
+
+
+def write_live(base, out):
+    """실제 기록 보관: 그날 화면에 나간 후보(무거운 기사·기업 정보는 뺌)와 전체 최소 기록, 출처·버전·자료 시점."""
+    flt = out["filter"]
+    slim = lambda items: [{**{k: v for k, v in x.items() if k not in ("profile", "reports")},
+                           **({"reports": {k: v for k, v in x["reports"].items() if k != "detail"}} if x.get("reports") else {})}
+                          for x in items]
+    rec = {"base_date": base, "generated_at": out["generated_at"], "record": out["record"],
+           "filter": {**{g: slim(flt[g]) for g in ("scalp", "swing", "value")},
+                      **{f"{g}_total": flt[f"{g}_total"] for g in ("scalp", "swing", "value")},
+                      "pools": flt["pools"], "score_ver": flt["score_ver"]},
+           "managers": {"picks": (out.get("managers") or {}).get("picks")}}
+    os.makedirs(LIVE, exist_ok=True)
+    with open(os.path.join(LIVE, f"{base}.json"), "w", encoding="utf-8") as f:
+        json.dump(rec, f, ensure_ascii=False, separators=(",", ":"), default=_json_default)
+
+
+def load_record(d):
+    """기준일 d의 기록: 실제 기록(live/)이 있으면 그것, 없으면 날짜 파일. → (기록, 출처)."""
+    lp = os.path.join(LIVE, f"{d}.json")
+    path = lp if os.path.exists(lp) else os.path.join(DATA, f"{d}.json")
+    with open(path, encoding="utf-8") as f:
+        rec = json.load(f)
+    return rec, ("live" if path == lp else logic.classify_record(rec, d))
+
+
+def build_changes(base, used_days, groups_now, pools, idx, closes, breaks, top=10):
+    """어제(바로 전 기록) 대비 후보 변화와 우리 기록상 처음 걸린 날. 오늘 후보에 x['track']을 붙이고 탭별 요약을 돌려준다."""
+    names = sorted(n[:8] for n in os.listdir(DATA) if n[:8].isdigit() and n.endswith(".json") and n[:8] < base)
+    records = []
+    for d in names:
+        try:
+            records.append((d, load_record(d)[0].get("filter") or {}))
+        except (OSError, ValueError):
+            continue
+    pos = {d: i for i, d in enumerate(closes.index)}
+
+    def since(code, fs, now):
+        """처음 걸린 날 종가 → 지금 종가. 그 사이 가격이 끊겼거나(권리락·분할) 확인할 시세가 없으면 추적 불가."""
+        if not fs or fs["date"] >= base or not fs.get("price") or now is None:
+            return fs
+        if fs["date"] not in pos or code not in breaks.columns:
+            return {**fs, "why": "그날 시세가 받아 둔 기간 밖이라 확인 불가"}
+        if bool(breaks[code].iloc[pos[fs["date"]] + 1:].fillna(False).any()):
+            return {**fs, "why": "그 사이 가격이 끊김 (권리락·분할 등)"}
+        return {**fs, "chg": logic.r1((now / fs["price"] - 1) * 100)}
+
+    out = {"basis": f"우리가 가진 기록 {len(records)}일 중"}
+    if not records:
+        for g, items in groups_now.items():
+            for x in items[:top]:
+                x["track"] = {"st": "unknown", "rank": items.index(x) + 1}
+            out[g] = {"prev_date": None, "dropped": []}
+        return out
+    prev_d, prev_f = records[-1]
+    gap = len(used_days) >= 2 and prev_d != used_days[-2]
+    for g, items in groups_now.items():
+        prev_pool = (prev_f.get("pools") or {}).get(g) if "pools" in prev_f else None
+        dropped = logic.candidate_changes(g, items, prev_f.get(g) or [], prev_pool, pools[g], idx["stocks"], idx["labels"], top)
+        for x in items[:top]:
+            x["track"]["first"] = since(x["code"], logic.first_seen(x["code"], g, records), float(x["close"]))
+        for y in dropped:
+            now = (idx["stocks"].get(y["code"]) or {}).get("c")
+            y["first"] = since(y["code"], logic.first_seen(y["code"], g, records), now)
+        out[g] = {"prev_date": prev_d, "gap": gap, "dropped": dropped,
+                  "counts": {"new": sum(1 for x in items[:top] if x["track"]["st"] == "new"),
+                             "kept": sum(1 for x in items[:top] if x["track"]["st"] == "kept"), "dropped": len(dropped)}}
+    return out
 
 
 def write_latest(name, base, obj):

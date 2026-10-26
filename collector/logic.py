@@ -2,6 +2,8 @@
 
 화면에는 '조건에 맞는 종목'만 보여 준다. 매수·매도 판단 문구는 만들지 않는다.
 """
+import hashlib
+import json
 import math
 import re
 from datetime import datetime, timedelta
@@ -39,6 +41,11 @@ def score_percentiles(items, past_scores):
             x["score_pct"] = pct_rank(pool, x["score"])
             x["score_pool"] = len(pool)
     return items
+
+
+def mkt_of(market):
+    """비교할 시장 지수 이름: 코스닥 글로벌 세그먼트도 코스닥 지수와 비교한다."""
+    return "KOSDAQ" if (market or "").startswith("KOSDAQ") else market
 
 
 def r1(x):
@@ -188,6 +195,11 @@ def thermo_label(score):
     return THERMO_LABELS[-1][1:]
 
 
+THERMO_PARTS = (("korea_vol", "국내 변동성"), ("vix", "미국 VIX"), ("cnn", "미국 투자심리 (CNN)"), ("breadth", "신고가 vs 신저가"),
+                ("momentum", "코스피 20일 추세"), ("flows", "큰손 수급 (코스피)"), ("credit", "자금시장 (하이일드)"),
+                ("forced", "반대매매 (강제 매도)"))
+
+
 def thermometer(t):
     """국내 시장 온도계: 0 = 극단적 공포, 100 = 극단적 탐욕. CNN 방식처럼 여러 지표를 같은 무게로 평균.
 
@@ -233,7 +245,9 @@ def thermometer(t):
         return None
     score = round(sum(p["score"] * p["weight"] for p in parts) / sum(p["weight"] for p in parts))
     label, tone = thermo_label(score)
-    return {"score": score, "label": label, "tone": tone, "parts": parts}
+    got = {p["key"] for p in parts}
+    missing = [name for key, name in THERMO_PARTS if key not in got]   # 그날 자료를 못 받아 평균에서 빠진 지표
+    return {"score": score, "label": label, "tone": tone, "parts": parts, "missing": missing}
 
 
 def summarize_temperature(t):
@@ -533,7 +547,7 @@ def screen(universe, closes, values, flows_daily, flows_5d, pension_5d, news_tod
             checks = swing_checks(close, m20, m60, m20_prev, rise5, days_pos, ratio, rules)
             if all(c["ok"] for c in checks):
                 score = ratio * (1 + streak / 5)
-                swing.append({**base, "checks": checks, "score": round(score, 3),
+                swing.append({**base, "checks": checks, "score": round(score, 3), "ratio": round(ratio, 4),
                               "rise_5d": r1(rise5), "news": news_3d[code][:4]})
 
     scalp.sort(key=lambda x: -x["score"])
@@ -560,8 +574,9 @@ VALUE_RULES = {
 VALUE_WEIGHTS = {"drop": 0.25, "cheap": 0.15, "per": 0.35, "eps": 0.25}
 
 
-def value_score(drop, pbr_ratio, per, eps_ratio, fwd_ratio=None):
-    """→ (0~100 점수, 항목별 0~100). fwd_ratio = 올해 추정 EPS / 지금 EPS (있으면 이익 항목에 반반 섞음)."""
+def value_score(drop, pbr_ratio, per, eps_ratio, fwd_ratio=None, exact=False):
+    """→ (0~100 점수, 항목별 0~100). fwd_ratio = 올해 추정 EPS / 지금 EPS (있으면 이익 항목에 반반 섞음).
+    exact=True 면 항목 값을 반올림하지 않는다 (어제 대비 변화를 항목별로 나눌 때)."""
     clip = lambda v: max(0.0, min(1.0, v))
     eps_part = clip((eps_ratio - 0.8) / 0.7)         # EPS 1년 전의 0.8배 → 0, 1.5배 이상 → 100
     if fwd_ratio is not None:
@@ -573,7 +588,7 @@ def value_score(drop, pbr_ratio, per, eps_ratio, fwd_ratio=None):
         "eps": eps_part,
     }
     score = sum(VALUE_WEIGHTS[k] * v for k, v in parts.items()) * 100
-    return round(score, 1), {k: round(v * 100) for k, v in parts.items()}
+    return round(score, 1), {k: (v * 100 if exact else round(v * 100)) for k, v in parts.items()}
 
 
 # 단타 점수: 거래량이 폭발하고 크게 튄 '주목받는 종목'은 이후 성적이 나쁜 경향(개인의 주목 매수, Barber·Odean 2008)이
@@ -581,7 +596,7 @@ def value_score(drop, pbr_ratio, per, eps_ratio, fwd_ratio=None):
 SCALP_WEIGHTS = {"flow": 0.5, "volume": 0.25, "move": 0.25}
 
 
-def scalp_score(mult, change, net_ratio):
+def scalp_score(mult, change, net_ratio, exact=False):
     """mult = 거래대금/20일 평균, change = 등락률(%), net_ratio = 기관+외국인 순매수 / 거래대금 → (0~100, 항목별 0~100)."""
     clip = lambda v: max(0.0, min(1.0, v))
     vol = clip(math.log(max(mult, 1e-9) / 3) / math.log(8 / 3))   # 3배 → 0, 8배 이상 → 100
@@ -595,7 +610,7 @@ def scalp_score(mult, change, net_ratio):
         move = clip((29 - change) / 14)                            # 15% → 100, 상한가 근처 29% → 0
     parts = {"flow": clip(net_ratio / 0.2), "volume": vol, "move": move}  # 순매수 비중 0% → 0, 20% 이상 → 100
     score = sum(SCALP_WEIGHTS[k] * v for k, v in parts.items()) * 100
-    return round(score, 1), {k: round(v * 100) for k, v in parts.items()}
+    return round(score, 1), {k: (v * 100 if exact else round(v * 100)) for k, v in parts.items()}
 
 
 def rescore(group, x):
@@ -1132,7 +1147,7 @@ def entry_signals(t):
     lows_avg = sum(lows[-6:-1]) / 5 if len(lows) >= 6 else None
     big5 = ((fl.get("foreign") or {}).get("d5") or 0) + ((fl.get("inst") or {}).get("d5") or 0) if fl else None
     stages = [
-        {"name": "투매 진정", "need": 2, "guide": "1/3만 나눠서", "checks": [
+        {"name": "투매 진정", "need": 2, "checks": [
             chk("바닥을 새로 뚫는 종목(신저가)이 최근 5일 평균보다 적음", lows_avg is not None and lows[-1] < lows_avg,
                 f"{lows[-1]} / 평균 {lows_avg:.0f}" if lows_avg is not None else "–"),
             chk("빚 때문에 강제로 팔리는 물량(반대매매)이 평소(20일 평균) 이하", fo.get("avg20") and fo["value"] <= fo["avg20"],
@@ -1140,7 +1155,7 @@ def entry_signals(t):
             chk("출렁임(변동성)이 최근 10일 최고보다 10% 이상 줄어듦", kv_recent and kv["value"] <= max(kv_recent) * 0.9,
                 f"{kv['value']}% / 최고 {max(kv_recent)}%" if kv_recent else "–"),
         ]},
-        {"name": "수급 전환", "need": 2, "guide": "2/3까지", "checks": [
+        {"name": "수급 전환", "need": 2, "checks": [
             chk("외국인이 선물을 사는 쪽으로 돌아섬 (3일 연속 또는 5일 합계 순매수)",
                 fu and ((fu.get("streak") or 0) >= 3 or (fu.get("d5") or 0) > 0),
                 (f"{fu['streak']:+d}일째 · 5일 {fu.get('d5_eok') if fu.get('d5_eok') is not None else fu.get('d5'):+,}" +
@@ -1150,7 +1165,7 @@ def entry_signals(t):
             chk("시장 온도가 1주 전보다 올라감", week and th.get("score") is not None and th["score"] > week["score"],
                 f"{th.get('score')}점 / 1주 전 {week['score']}점" if week else "–"),
         ]},
-        {"name": "추세 확인", "need": 2, "guide": "상승장 루틴으로 (스윙 위주)", "checks": [
+        {"name": "추세 확인", "need": 2, "checks": [
             chk("코스피가 20일 평균 가격 위", tr["close"] > tr["ma20"], f"{tr['close']:,.0f} / {tr['ma20']:,.0f}"),
             chk("20일 평균 가격이 다시 오르는 중", tr["ma20_rising"], f"{tr['ma20_slope']:+.2f}%"),
         ]},
@@ -1163,8 +1178,9 @@ def entry_signals(t):
         if not st["pass"]:
             break
         level += 1
-    guides = ["아직 기다리기 — 겁먹고 파는 물량(투매)이 안 멈춤", "쓸 돈의 1/3만 나눠서 — 투매가 잦아드는 중",
-              "쓸 돈의 2/3까지 — 큰손 돈이 다시 들어오기 시작", "평소처럼 — 오르는 장 방식(스윙 위주), 저평가는 줄이기"]
+    # 상태만 말한다 (몇 분의 몇을 사라는 안내는 성적으로 확인한 적이 없어 뺌)
+    guides = ["회복 확인 전 — 겁먹고 파는 물량(투매)이 아직 안 멈춤", "1단계 확인 — 투매가 잦아드는 중",
+              "2단계까지 확인 — 큰손 돈이 다시 들어오기 시작", "3단계까지 확인 — 지수가 다시 오르는 흐름"]
     nxt = stages[level] if level < len(stages) else None
     return {"level": level, "guide": guides[level], "stages": stages,
             "next": (f"다음 단계 '{nxt['name']}'까지 {max(0, nxt['need'] - nxt['met'])}개 더" if nxt else "세 단계 모두 통과"),
@@ -2261,10 +2277,12 @@ def earnings_status(code, base, season, store):
 
 # ---------------------------------------------------------------- 언제 정리할지 (나가는 기준)
 
+# 정리선은 걸린 날 값으로 고정한다 (스윙도 매일 바뀌는 20일 평균이 아니라 걸린 날의 20일 평균). 성적표도 같은 규칙:
+# 마감 가격이 정리선 아래면 다음 날 아침 첫 가격에 판다
 EXIT_RULES = {
-    "swing": ("종가가 20일 평균 가격 아래로 마감하면 정리", "오르는 흐름이 깨졌다는 뜻", "보통 1~4주"),
-    "scalp": ("걸린 날 저가를 깨고 마감하면 정리", "급등을 만든 힘이 빠졌다는 뜻", "보통 1~3일, 길게 끌지 않기"),
-    "value": ("최근 10일 최저가를 깨고 마감하면 정리", "아직 바닥이 아니었다는 뜻", "몇 주~몇 달"),
+    "swing": ("걸린 날의 20일 평균 가격 아래로 마감하면 다음 날 아침에 정리 (선은 걸린 날 값으로 고정)", "오르는 흐름이 깨졌다는 뜻", "보통 1~4주"),
+    "scalp": ("걸린 날 저가 아래로 마감하면 다음 날 아침에 정리", "급등을 만든 힘이 빠졌다는 뜻", "보통 1~3일, 길게 끌지 않기"),
+    "value": ("걸린 날까지 최근 10일 최저가 아래로 마감하면 다음 날 아침에 정리", "아직 바닥이 아니었다는 뜻", "몇 주~몇 달"),
 }
 
 
@@ -2287,10 +2305,342 @@ def exit_level(group, close_s, low_s=None):
     return {"stop": round(stop), "gap": r1((stop / close - 1) * 100), "rule": rule, "why": why, "hold": hold}
 
 
-def stop_scorecard(history, closes, lows, opens=None, bench=None, horizons=(5, 20), cost=None, index_closes=None):
-    """정리 기준을 지켰다면: 그냥 N일 들고 있기 vs 기준 아래로 마감한 날 종가에 팔기 (둘 다 시장 지수 대비).
+# ---------------------------------------------------------------- 기록 출처 · 전략 버전
 
-    정리 가격은 그날까지의 종가·저가로 다시 계산한다 (예전 기록에도 같은 규칙 적용).
+# 점수 공식 번호 (공식을 바꾸면 올림). 기준값(RULES 등)까지 묶은 짧은 해시를 같이 남겨 '어떤 규칙으로 고른 기록인가'를 구분한다
+STRATEGY = {"scalp": 3, "swing": 1, "value": 2}
+# 지금 공식을 처음 쓴 기준일: 그 전 기록은 공식을 만들 때 본 기간(규칙을 정한 기간), 그 뒤가 검증 기간
+STRATEGY_SINCE = {"scalp": "20261022", "value": "20261022", "swing": None}
+
+
+def strategy_ver():
+    src = json.dumps([RULES, VALUE_RULES, SCALP_WEIGHTS, VALUE_WEIGHTS, WAKE_RULES, {k: v[0] for k, v in EXIT_RULES.items()}],
+                     sort_keys=True, default=str)
+    return f"s{STRATEGY['scalp']}w{STRATEGY['swing']}v{STRATEGY['value']}-" + hashlib.sha1(src.encode()).hexdigest()[:6]
+
+
+def _next_weekday(d):
+    d += timedelta(days=1)
+    while d.weekday() >= 5:
+        d += timedelta(days=1)
+    return d
+
+
+def record_origin(base, made):
+    """기준일 장 마감(15:30) 뒤 ~ 다음 영업일 장 시작(09:00) 전에 만든 기록만 '실제 기록'(live).
+    그 뒤에 만든 건 나중에 다시 계산한 기록(recalc). 공휴일은 모르므로 다음 평일로 본다(창이 짧아지는 쪽 = 보수적).
+    made: KST datetime (naive 면 KST 로 본다)."""
+    b = datetime.strptime(base, "%Y%m%d")
+    made = made.replace(tzinfo=None)
+    start = b.replace(hour=15, minute=30)
+    end = _next_weekday(b).replace(hour=9, minute=0)
+    return "live" if start <= made < end else "recalc"
+
+
+def classify_record(rec, base):
+    """저장된 기록의 출처: live / recalc / unknown(판별 불가 — 만든 시각이 없음)."""
+    meta = rec.get("record") or {}
+    if meta.get("origin") in ("live", "recalc"):
+        return meta["origin"]
+    if rec.get("backfill"):
+        return "recalc"
+    made = rec.get("generated_at")
+    if not made:
+        return "unknown"
+    try:
+        return record_origin(base, datetime.fromisoformat(made))
+    except ValueError:
+        return "unknown"
+
+
+# ---------------------------------------------------------------- 후보 변화 추적
+
+SCORE_PART_NAMES = {
+    "scalp": {"flow": "큰손 확인 (오늘 순매수 비중)", "volume": "거래 증가", "move": "오늘 상승폭"},
+    "swing": {"flow": "5일 큰손 순매수 (덩치 대비)", "streak": "연속 순매수 일수"},
+    "value": {"drop": "낙폭", "cheap": "평소보다 쌈 (PBR)", "per": "PER", "eps": "이익"},
+}
+
+
+def score_inputs(group, x):
+    """점수를 다시 계산할 수 있는 최소 재료 (기록 파일의 후보·최소 기록 둘 다에서)."""
+    if x.get("k") is not None:
+        return x["k"]
+    fl = x.get("flow") or {}
+    if group == "scalp":
+        if not x.get("value_mult") or not x.get("value_eok") or x.get("change") is None:
+            return None
+        net = (fl.get("foreign_today") or 0) + (fl.get("inst_today") or 0)
+        return {"mult": x["value_mult"], "chg": x["change"], "nr": round(max(0, net) / x["value_eok"], 4)}
+    if group == "swing":
+        st = fl.get("streak")
+        if st is None or x.get("score") is None:
+            return None
+        ratio = x.get("ratio") if x.get("ratio") is not None else x["score"] / (1 + st / 5)
+        return {"ratio": round(ratio, 4), "streak": st, "pos": fl.get("days_pos"), "rise5": x.get("rise_5d")}
+    if group == "value":
+        if not all(x.get(k) is not None for k in ("drop_60d", "pbr", "pbr_med", "per", "eps_ratio")) or not x["pbr_med"]:
+            return None
+        return {"drop": x["drop_60d"], "pbr_r": round(x["pbr"] / x["pbr_med"], 3), "per": x["per"], "eps_r": x["eps_ratio"],
+                "fwd": x.get("eps_fwd_ratio")}
+    return None
+
+
+def score_from_inputs(group, k, exact=False):
+    """→ (지금 공식 점수, 항목별 값). 스윙 항목은 0~100이 아니라 실제 값 (순매수 비중 %, 연속일)."""
+    if not k:
+        return None, None
+    if group == "scalp":
+        return scalp_score(k["mult"], k["chg"], k["nr"], exact)
+    if group == "swing":
+        return round(k["ratio"] * (1 + k["streak"] / 5), 3), {"flow": k["ratio"], "streak": k["streak"]}
+    if group == "value":
+        return value_score(k["drop"], k["pbr_r"], k["per"], k["eps_r"], k.get("fwd"), exact)
+    return None, None
+
+
+def score_change(group, k_now, k_prev):
+    """어제 대비 점수 변화와 그 몫 (항목별로 나눠 더하면 전체 변화와 같다). 원인은 점수 재료에서만 — 지어내지 않는다."""
+    s1, p1 = score_from_inputs(group, k_now, True)
+    s0, p0 = score_from_inputs(group, k_prev, True)
+    if s1 is None or s0 is None:
+        return None
+    names = SCORE_PART_NAMES[group]
+    if group == "swing":
+        r0, r1_, t0, t1 = p0["flow"], p1["flow"], p0["streak"], p1["streak"]
+        parts = {"flow": (r1_ - r0) * (1 + t0 / 5), "streak": r1_ * (t1 - t0) / 5}
+        raw = {"flow": (f"{r0:.2f}%", f"{r1_:.2f}%"), "streak": (f"{t0}일", f"{t1}일")}
+    else:
+        w = SCALP_WEIGHTS if group == "scalp" else VALUE_WEIGHTS
+        parts = {key: w[key] * (p1[key] - p0[key]) for key in w}
+        raw = {key: (round(p0[key]), round(p1[key])) for key in w}
+    fmt = {"scalp": {"flow": lambda k: f"{k['nr'] * 100:.0f}%", "volume": lambda k: f"{k['mult']:.1f}배",
+                     "move": lambda k: f"{k['chg']:+.1f}%"},
+           "value": {"drop": lambda k: f"-{k['drop']:.0f}%", "cheap": lambda k: f"{k['pbr_r']:.2f}배",
+                     "per": lambda k: f"{k['per']:.1f}", "eps": lambda k: f"{k['eps_r']:.2f}배"}}.get(group)
+    if fmt:   # 점수 항목(0~100) 말고 실제 값: 순매수 비중·거래 배수·등락률 / 낙폭·PBR 배율·PER·EPS 배율
+        raw = {key: (fmt[key](k_prev), fmt[key](k_now)) for key in fmt}
+    causes = sorted(({"key": key, "label": names[key], "d": round(v, 3 if group == "swing" else 1),
+                      "from": raw[key][0], "to": raw[key][1]} for key, v in parts.items() if abs(v) > 1e-9),
+                    key=lambda c: -abs(c["d"]))
+    return {"prev": s0, "now": s1, "d": round(s1 - s0, 3 if group == "swing" else 1), "causes": causes}
+
+
+def pool_record(group, items, extra=None):
+    """조건을 통과한 후보 전체의 최소 기록 (화면엔 상위 10개만 내보내도 전부 남긴다)."""
+    extra = extra or {}
+    out = []
+    for i, x in enumerate(items, 1):
+        r = {"c": x["code"], "n": x["name"], "m": x.get("market"), "r": i, "s": x.get("score"),
+             "p": round(float(x["close"])), "k": score_inputs(group, x), "nw": len(x.get("news") or [])}
+        if group == "scalp":
+            r["mul"] = x.get("value_mult")
+        r.update(extra.get(x["code"]) or {})
+        out.append(r)
+    return out
+
+
+def failed_conditions(group, rec, labels, rules=None, vrules=None):
+    """전 종목 요약(stock_index)의 한 줄로 그 탭에서 깨진 조건 문구들. None = 판단할 자료 없음."""
+    rules, vrules = rules or RULES, vrules or VALUE_RULES
+    if rec is None:
+        return None
+    out = []
+    if rec.get("x"):
+        out.append("위험 공시·투자 주의로 제외: " + ", ".join(rec["x"]))
+    sz = rec.get("sz") or "00"
+    if group == "value":
+        if sz[1] != "1":
+            out.append(f"시총 {vrules['min_cap'] / EOK:,.0f}억·거래대금 {vrules['min_value'] / EOK:,.0f}억 이상 아님")
+        if rec.get("vr"):
+            out.append(rec["vr"])
+        bits = rec.get("va")
+    else:
+        if sz[0] != "1":
+            out.append(f"시총 {rules['min_cap'] / EOK:,.0f}억·거래대금 {rules['min_value'] / EOK:,.0f}억 이상 아님")
+        nw = rec.get("nw") or 0
+        if group == "scalp" and nw < 2:
+            out.append("오늘 기사·공시 없음")
+        if group == "swing" and nw < 1:
+            out.append("최근 3일 기사·공시 없음")
+        bits = rec.get("sc" if group == "scalp" else "sw")
+    if bits is None and not out:
+        return None
+    out += [lb for lb, b in zip(labels.get(group) or [], bits or "") if b == "0"]
+    return out
+
+
+def candidate_changes(group, today, prev_top, prev_pool, today_pool, index=None, labels=None, top=10):
+    """어제 상위 top 개와 비교해 오늘 화면 후보를 새로 들어옴 / 유지로 나누고, 빠진 종목은 왜 빠졌는지.
+
+    today: 오늘 후보 전체(점수순), prev_top: 어제 기록 파일의 상위 후보, prev_pool: 어제 전체 최소 기록(없으면 None)
+    today_pool: 오늘 전체 최소 기록, index: 오늘 전 종목 요약 stocks (깨진 조건용)
+    오늘 상위 후보에는 x["track"] 을 붙이고, 빠진 종목 목록을 돌려준다.
+    """
+    prev_rank = {y["code"]: i for i, y in enumerate(prev_top, 1)}
+    prev_by = {y["code"]: y for y in prev_top}
+    pool_prev = {r["c"]: r for r in prev_pool} if prev_pool is not None else None
+    pool_now = {r["c"]: r for r in today_pool}
+    for i, x in enumerate(today[:top], 1):
+        c = x["code"]
+        tr = {"st": "kept" if c in prev_rank else "new", "rank": i}
+        if c in prev_rank:
+            tr["prev_rank"] = prev_rank[c]
+            old = score_inputs(group, prev_by[c])
+        elif pool_prev is not None and c in pool_prev:
+            tr["prev_rank"] = pool_prev[c]["r"]     # 어제도 조건은 통과했지만 화면 밖 순위
+            old = pool_prev[c].get("k")
+        else:
+            old = None
+            if pool_prev is None:
+                tr["prev_known"] = False             # 어제 전체 기록이 없어 '어제 순위 밖이었나'는 모름
+        ch = score_change(group, score_inputs(group, x), old) if old else None
+        if ch:
+            tr["score"] = ch
+        x["track"] = tr
+    dropped = []
+    now_codes = {x["code"] for x in today[:top]}
+    for c, rk in prev_rank.items():
+        if c in now_codes:
+            continue
+        y = prev_by[c]
+        d = {"code": c, "name": y.get("name"), "prev_rank": rk, "prev_close": y.get("close")}
+        rec = (index or {}).get(c)
+        if c in pool_now:
+            d["why"], d["rank"] = "rank", pool_now[c]["r"]
+            ch = score_change(group, pool_now[c].get("k"), score_inputs(group, y))
+            if ch:
+                d["score"] = ch
+        else:
+            broken = failed_conditions(group, rec, labels or {})
+            if broken:
+                d["why"], d["broken"] = "filter", broken
+            else:
+                d["why"] = "unknown"                 # 오늘 자료가 없거나 깨진 조건을 못 찾음 → 추적 불가
+        if rec:
+            d["close"] = rec.get("c")
+        dropped.append(d)
+    return dropped
+
+
+def first_seen(code, group, records):
+    """우리가 가진 기록 중 이 탭에 처음 걸린 날과 그날 종가. records: [(기준일, filter dict)] 오래된 순."""
+    for d, flt in records:
+        for y in flt.get(group) or []:
+            if y["code"] == code:
+                return {"date": d, "price": y.get("close")}
+        for r in (flt.get("pools") or {}).get(group) or []:
+            if r["c"] == code:
+                return {"date": d, "price": r.get("p")}
+    return None
+
+
+# ---------------------------------------------------------------- 상대강도 · 평소 변동폭(ATR)
+
+def price_breaks(closes, chg, tol=1.0):
+    """종가로 잰 등락률과 거래소 등락률(권리락·분할 등을 반영한 기준가 대비)이 tol %p 넘게 다르면 가격이 끊긴 날 (True).
+    거래소 등락률이 없으면 하루 ±30.5% 넘는 움직임(가격 제한폭 밖)을 끊긴 날로 본다."""
+    raw = (closes / closes.shift(1) - 1) * 100
+    if chg is None:
+        return raw.abs() > 30.5
+    chg = chg.reindex(index=closes.index, columns=closes.columns)
+    off = (raw - chg).abs() > tol
+    # 하루에 5% 넘는 종목이 어긋나면 권리락이 아니라 그날 등락률 자료가 이상한 것 → 그날은 제한폭 기준만
+    bad_day = off.sum(axis=1) > 0.05 * closes.notna().sum(axis=1).clip(lower=1)
+    off.loc[bad_day] = False
+    return off | (raw.abs() > 30.5)
+
+
+def rel_strength(close_s, idx_close, breaks_s=None, n=20):
+    """n영업일 종목 수익률 − 같은 날짜 사이 그 시장 지수 수익률 (%p).
+    close_s: 종목 종가 Series(index=YYYYMMDD, 마지막이 기준일), idx_close: 지수 종가 Series(같은 index).
+    → ({stock, mkt, diff, from}, None) 또는 (None, 이유)."""
+    if close_s is None or len(close_s) < n + 1:
+        return None, "기간 부족"
+    w = close_s.iloc[-n - 1:]
+    if w.isna().any() or (w <= 0).any():
+        return None, "기간 중 거래 없는 날 (신규 상장·거래 정지)"
+    if breaks_s is not None and bool(breaks_s.iloc[-n:].fillna(False).any()):
+        return None, "기간 중 가격이 끊김 (권리락·분할 등)"
+    d0, d1 = w.index[0], w.index[-1]
+    i0, i1 = idx_close.get(d0) if idx_close is not None else None, idx_close.get(d1) if idx_close is not None else None
+    if not i0 or not i1 or math.isnan(i0) or math.isnan(i1):
+        return None, "지수 자료 없음"
+    s = (w.iloc[-1] / w.iloc[0] - 1) * 100
+    m = (i1 / i0 - 1) * 100
+    return {"stock": r1(s), "mkt": r1(m), "diff": r1(s - m), "from": d0}, None
+
+
+def rs_pair(close_s, idx_close, breaks_s=None):
+    """20·60영업일 상대강도. 화면·기록용 (점수·필터엔 안 씀)."""
+    out = {}
+    for n in (20, 60):
+        v, why = rel_strength(close_s, idx_close, breaks_s, n)
+        out[f"r{n}"] = v if v else {"why": why}
+    return out
+
+
+def atr_wilder(high, low, close, n=14, breaks_s=None, min_len=None):
+    """평소 하루 변동폭 ATR(n). TR = max(고가−저가, |고가−전일 종가|, |저가−전일 종가|),
+    첫 값은 TR n개 평균, 그 뒤 (전 ATR×(n−1) + TR)/n (Wilder). 빈 날·가격 끊긴 날 뒤부터만 쓴다.
+    → ATR 값 또는 None (이어진 기간이 min_len(기본 2n)개 TR보다 짧음)."""
+    min_len = min_len or 2 * n
+    prev = close.shift(1)
+    tr = pd.concat([high - low, (high - prev).abs(), (low - prev).abs()], axis=1).max(axis=1, skipna=False)
+    bad = tr.isna()
+    if breaks_s is not None:
+        bad = bad | breaks_s.reindex(tr.index).fillna(False).astype(bool)
+    idx = [i for i, b in enumerate(bad.values) if b]
+    tr = tr.iloc[idx[-1] + 1:] if idx else tr
+    if len(tr) < min_len:
+        return None
+    atr = float(tr.iloc[:n].mean())
+    for v in tr.iloc[n:]:
+        atr = (atr * (n - 1) + float(v)) / n
+    return atr
+
+
+def entry_risk(ref, stop, atr):
+    """기준 가격에서 정리선까지 거리 (%와 평소 변동폭의 몇 배). 최대 손실이나 예상 손실이 아니다."""
+    if not ref or ref <= 0:
+        return None
+    out = {"ref": round(ref)}
+    if atr:
+        out["atr"], out["atr_pct"] = round(atr, 1), r1(atr / ref * 100)
+    if stop:
+        out["stop"] = round(stop)
+        out["dist"] = r1((ref - stop) / ref * 100)
+        if atr:
+            out["mult"] = round((ref - stop) / atr, 1)
+    return out
+
+
+def _drawdown(path):
+    """거래 하나 동안 가장 깊이 빠진 폭(%): 지나온 최고값 대비 (사는 가격에서 시작). 포트폴리오 MDD가 아니다."""
+    peak, dd = path[0], 0.0
+    for v in path:
+        peak = max(peak, v)
+        dd = max(dd, (1 - v / peak) * 100)
+    return dd
+
+
+def _tail(vals, frac=0.1, worst=True):
+    """나쁜 쪽 10% 평균 (10건 미만이면 None)."""
+    if len(vals) < 10:
+        return None
+    k = max(1, math.ceil(len(vals) * frac))
+    v = sorted(vals, reverse=not worst)[:k]
+    return r1(sum(v) / k)
+
+
+def stop_scorecard(history, closes, lows, opens=None, bench=None, horizons=(5, 20), cost=None, index_closes=None, breaks=None):
+    """정리 기준을 지켰다면: 그냥 N일 들고 있기 vs 정리선 아래로 마감한 다음 날 아침 첫 가격(시가)에 팔고 현금으로 기다리기.
+
+    - 둘 다 같은 날 사서(다음 날 시가) 같은 날(N영업일째)까지 잰다. 일찍 판 뒤엔 현금(0%)이라 시장 대비는 N일 시장 수익과 비교
+    - 정리선은 걸린 날까지의 종가·저가로 정하고 그 뒤 고정 (예전 기록에도 같은 규칙)
+    - 다음 날 시가가 비면(거래 정지 등) 그다음 거래되는 날 시가에 판다. N일째까지 못 팔면 N일째 종가 (실제로도 못 팔았을 것)
+    - 마감 가격이 빈 날은 정리선 판단을 못 하므로 건너뛴다. 기간 중 가격이 끊긴(권리락·분할) 거래는 양쪽 모두에서 뺀다
+    - 평균·이긴 비율 말고 나쁜 쪽 10% 평균, 거래 하나 동안 가장 깊이 빠진 폭(마감 가격 기준)도 같이
     """
     cost = COST if cost is None else cost
     days = list(closes.index)
@@ -2301,46 +2651,72 @@ def stop_scorecard(history, closes, lows, opens=None, bench=None, horizons=(5, 2
             continue
         i0 = pos[date]
         for g, items in groups.items():
+            if g not in EXIT_RULES:
+                continue
             for x in items:
                 code = x["code"]
                 if code not in closes.columns:
                     continue
-                # 셈 규칙(매수가·건너뛰기·같은 종목 N일 안 재등장은 한 번)은 scorecard 와 똑같이 맞춘다 → '그냥 보유'가 성적표와 같아야 함
-                ex = exit_level(g, closes[code].iloc[:i0 + 1], lows[code].iloc[:i0 + 1] if lows is not None and code in lows.columns else None)
+                cs = closes[code]
+                os_ = opens[code] if opens is not None and code in opens.columns else None
+                ex = exit_level(g, cs.iloc[:i0 + 1], lows[code].iloc[:i0 + 1] if lows is not None and code in lows.columns else None)
                 for n in horizons:
                     if i0 + n >= len(days):
                         continue
-                    c1 = closes[code].iloc[i0 + n]
-                    buy = opens[code].iloc[i0 + 1] if opens is not None and code in opens.columns else x["close"]
-                    if c1 is None or math.isnan(c1) or buy is None or math.isnan(buy) or not buy:
+                    c_end = cs.iloc[i0 + n]
+                    buy = os_.iloc[i0 + 1] if os_ is not None else x["close"]
+                    if c_end is None or math.isnan(c_end) or buy is None or math.isnan(buy) or not buy:
+                        continue
+                    if breaks is not None and code in breaks.columns and bool(breaks[code].iloc[i0 + 1:i0 + n + 1].fillna(False).any()):
                         continue
                     if (g, code, n) in last and i0 - last[(g, code, n)] < n:
                         continue
                     last[(g, code, n)] = i0
-                    path = closes[code].iloc[i0 + 1:i0 + n + 1]
-                    # 정리 가격이 없거나 중간 종가가 빈 날은 기준 판단 없이 그냥 보유로 센다
-                    k_out = None if not ex or path.isna().any() else next((k for k, v in enumerate(path, 1) if v < ex["stop"]), None)
-                    mk = bench.get(x.get("market")) if bench else None
-
-                    def excess(k):
-                        r = (closes[code].iloc[i0 + k] / buy - 1) * 100 - cost
-                        if mk is not None:
-                            k0, k1 = mk[0].get(days[i0 + 1]), mk[1].get(days[i0 + k])
-                        elif index_closes is not None:
-                            k0, k1 = index_closes.get(days[i0]), index_closes.get(days[i0 + k])
-                        else:
-                            k0 = k1 = None
-                        return r, (r - (k1 / k0 - 1) * 100) if k0 and k1 else None
-
-                    a = acc.setdefault(g, {}).setdefault(n, {"hold": [], "hold_x": [], "stop": [], "stop_x": [], "hit": 0})
-                    for kind, k in (("hold", n), ("stop", k_out or n)):
-                        r, e = excess(k)
+                    path = [buy] + [float(v) for v in cs.iloc[i0 + 1:i0 + n + 1] if not math.isnan(v)]
+                    sell, k_out, spath = float(c_end), None, path
+                    if ex:
+                        for k in range(1, n):
+                            v = cs.iloc[i0 + k]
+                            if math.isnan(v) or v >= ex["stop"]:
+                                continue
+                            for j in range(k + 1, n + 1):
+                                o = os_.iloc[i0 + j] if os_ is not None else None
+                                if o is not None and not math.isnan(o) and o > 0:
+                                    sell, k_out = float(o), k
+                                    spath = [buy] + [float(u) for u in cs.iloc[i0 + 1:i0 + k + 1] if not math.isnan(u)] + [sell]
+                                    break
+                            break
+                    mk = bench.get(mkt_of(x.get("market"))) if bench else None
+                    if mk is not None:
+                        k0, k1 = mk[0].get(days[i0 + 1]), mk[1].get(days[i0 + n])
+                    elif index_closes is not None:
+                        k0, k1 = index_closes.get(days[i0]), index_closes.get(days[i0 + n])
+                    else:
+                        k0 = k1 = None
+                    m = (k1 / k0 - 1) * 100 if k0 and k1 else None
+                    a = acc.setdefault(g, {}).setdefault(n, {"hold": [], "hold_x": [], "stop": [], "stop_x": [], "hit": 0,
+                                                             "hold_dd": [], "stop_dd": [], "gap": []})
+                    for kind, price, pth in (("hold", float(c_end), path), ("stop", sell, spath)):
+                        r = (price / buy - 1) * 100 - cost
                         a[kind].append(r)
-                        if e is not None:
-                            a[kind + "_x"].append(e)
-                    a["hit"] += 1 if k_out else 0
-    return {g: {str(n): {"hold": summarize_returns(a["hold"], a["hold_x"]), "stop": summarize_returns(a["stop"], a["stop_x"]),
-                         "hit": round(100 * a["hit"] / len(a["hold"])) if a["hold"] else None}
+                        if m is not None:
+                            a[kind + "_x"].append(r - m)
+                        a[kind + "_dd"].append(_drawdown(pth))
+                    if k_out:
+                        a["hit"] += 1
+                        a["gap"].append((sell / ex["stop"] - 1) * 100)   # 정리선보다 얼마나 낮게 팔렸나 (갭 하락)
+
+    def summ(a, kind):
+        s = summarize_returns(a[kind], a[kind + "_x"])
+        if s:
+            s["low10"] = _tail(a[kind])
+            s["dd"] = r1(sum(a[kind + "_dd"]) / len(a[kind + "_dd"]))
+            s["dd10"] = _tail(a[kind + "_dd"], worst=False)
+        return s
+
+    return {g: {str(n): {"hold": summ(a, "hold"), "stop": summ(a, "stop"),
+                         "hit": round(100 * a["hit"] / len(a["hold"])) if a["hold"] else None,
+                         "fill_gap": r1(sum(a["gap"]) / len(a["gap"])) if a["gap"] else None}
                 for n, a in by_n.items()} for g, by_n in acc.items()}
 
 
@@ -2350,7 +2726,8 @@ HORIZONS = (1, 5, 20)
 COST = 0.2  # 왕복 거래 비용(%): 매도 세금 + 수수료 대략
 
 
-def scorecard(history, closes, index_closes, regimes=None, opens=None, bench=None, cost=COST):
+def scorecard(history, closes, index_closes, regimes=None, opens=None, bench=None, cost=COST, breaks=None, origins=None,
+              entries_out=None):
     """과거 후보가 N영업일 뒤 얼마나 움직였나.
 
     history: [(기준일, {"scalp": [...], "swing": [...], "value": [...]})]
@@ -2362,8 +2739,12 @@ def scorecard(history, closes, index_closes, regimes=None, opens=None, bench=Non
     - 결과는 장 마감 뒤에 나오므로 다음 영업일 시가에 사서 N영업일째 종가에 판다 (opens 가 있을 때)
     - 거래 비용 cost(%)를 뺀다
     - 같은 탭에서 같은 종목이 N일 안에 다시 걸리면 그 N일 성적에는 한 번만 센다 (구간 겹침 방지)
+    - 보유 기간 중 가격이 끊긴(권리락·분할 등, breaks) 거래는 뺀다
     반환: 탭별 성적, 최근 기록, 조건별 성적, 장세별 성적, 점수 위·아래 절반 성적
+    entries_out(list)을 주면 거래별 기록 전체를 담아 준다 (origins: {기준일: live/recalc/unknown})
     """
+    origins = origins or {}
+    every = []
     days = list(closes.index)
     pos = {d: i for i, d in enumerate(days)}
     stats, recent, by_regime, halves = {}, [], {}, {}
@@ -2380,15 +2761,21 @@ def scorecard(history, closes, index_closes, regimes=None, opens=None, bench=Non
             for x in items:
                 code = x["code"]
                 entry = {"date": date, "group": g, "code": code, "name": x["name"], "close": x["close"]}
+                mid = len(ranked) % 2 and ranked.index(x) == len(ranked) // 2
+                meta = {"origin": origins.get(date), "half": None if mid else half.get(code), "rank": x.get("r"),
+                        "mult": x.get("value_mult", x.get("mul")),
+                        "rs20": ((x.get("rs") or {}).get("r20") or {}).get("diff")}
                 for n in HORIZONS:
                     if i0 + n >= len(days) or code not in closes.columns:
+                        continue
+                    if breaks is not None and code in breaks.columns and bool(breaks[code].iloc[i0 + 1:i0 + n + 1].fillna(False).any()):
                         continue
                     c1 = closes[code].iloc[i0 + n]
                     buy = opens[code].iloc[i0 + 1] if opens is not None and code in opens.columns else x["close"]
                     if c1 is None or math.isnan(c1) or buy is None or math.isnan(buy) or not buy:
                         continue
                     ret = (c1 / buy - 1) * 100 - cost
-                    mk = bench.get(x.get("market")) if bench else None
+                    mk = bench.get(mkt_of(x.get("market"))) if bench else None
                     if mk is not None:
                         k0, k1 = mk[0].get(days[i0 + 1]), mk[1].get(days[i0 + n])
                     else:
@@ -2413,6 +2800,7 @@ def scorecard(history, closes, index_closes, regimes=None, opens=None, bench=Non
                             s["ex"].append(ex)
                 recent.append(entry)
                 entry["features"] = features_of(x)
+                every.append({**entry, **meta})
     out = {}
     for g, by_n in stats.items():
         out[g] = {}
@@ -2426,8 +2814,101 @@ def scorecard(history, closes, index_closes, regimes=None, opens=None, bench=Non
     score_check = {g: {h: {str(n): summarize_returns(s["rets"], s["ex"]) for n, s in by_n.items()} for h, by_n in hl.items()}
                    for g, hl in halves.items()}
     recent.sort(key=lambda e: e["date"], reverse=True)
+    if entries_out is not None:
+        entries_out.extend(every)
     feats = feature_stats(recent) + feature_stats(recent, groups=("value",), features=VALUE_FEATURES)
     return out, recent[:60], feats, regime_out, score_check
+
+
+MULT_BUCKETS = ((3, 5, "3~5배"), (5, 8, "5~8배"), (8, 15, "8~15배"), (15, 1e9, "15배 넘음"))
+MIN_N = 30   # 이보다 적으면 비교 판단을 하지 않는다 (근거 부족)
+
+
+def _cmp(a, b, min_n=MIN_N):
+    """두 묶음 시장 대비 초과 수익 비교 → few(어느 한쪽 30건 미만) / none(차이가 운으로도 나올 폭 안) / better / worse (a가 b보다)."""
+    if len(a) < min_n or len(b) < min_n:
+        return "few"
+    ma, mb = sum(a) / len(a), sum(b) / len(b)
+    va = sum((v - ma) ** 2 for v in a) / (len(a) - 1)
+    vb = sum((v - mb) ** 2 for v in b) / (len(b) - 1)
+    se = math.sqrt(va / len(a) + vb / len(b))
+    if not se or abs(ma - mb) < 2 * se:
+        return "none"
+    return "better" if ma > mb else "worse"
+
+
+def scorecard_extra(entries, pool_dates=(), horizon=5, since=None, min_n=MIN_N):
+    """scorecard 의 거래별 기록(entries_out)으로 나눠 보기. 모두 시장 대비 초과 수익(x{horizon}), 같은 종목 겹침은 뺀다.
+
+    - by_origin: 실제 기록(live) / 다시 계산(recalc) / 판별 불가(unknown) 따로
+    - scope: 전체 기록이 있는 날만 — 화면 상위 10개 vs 조건 통과 전체 (탭 이름 뒤 '_rest' = 11위 밑)
+    - rs: 같은 날 같은 탭 후보 중 20일 상대강도 위 절반 vs 아래 절반
+    - mult: 단타 후보 거래 배수 구간별 (점수 공식은 자동으로 바꾸지 않음)
+    - periods: 점수 위·아래 절반을 '공식을 정한 기간'(since 전)과 '검증 기간'(since 뒤)으로 나눔
+    """
+    key = f"x{horizon}"
+    pool_dates = set(pool_dates)
+    since = STRATEGY_SINCE if since is None else since
+    ok = [e for e in entries if e.get(key) is not None and horizon not in e.get("dup", [])]
+    base = lambda g: g[:-5] if g.endswith("_rest") else g
+    out = {"horizon": horizon, "min_n": min_n}
+    by_o = {}
+    for e in ok:
+        if e["group"].endswith("_rest"):
+            continue
+        by_o.setdefault(e.get("origin") or "unknown", {}).setdefault(e["group"], []).append(e[key])
+    out["by_origin"] = {o: {g: summarize_returns(v, v) for g, v in gs.items()} for o, gs in by_o.items()}
+    scope = {}
+    for e in ok:
+        if e["date"] not in pool_dates:
+            continue
+        s = scope.setdefault(base(e["group"]), {"top": [], "all": [], "days": set()})
+        s["all"].append(e[key])
+        s["days"].add(e["date"])
+        if not e["group"].endswith("_rest"):
+            s["top"].append(e[key])
+    out["scope"] = {g: {"top": summarize_returns(s["top"], s["top"]), "all": summarize_returns(s["all"], s["all"]),
+                        "days": len(s["days"]), "verdict": "few" if len(s["all"]) < min_n else "info"} for g, s in scope.items()}
+    rs = {}
+    days = {}
+    for e in ok:
+        if e.get("rs20") is not None:
+            days.setdefault((e["date"], base(e["group"])), []).append(e)
+    for (d, g), es in days.items():
+        if len(es) < 2:
+            continue
+        v = sorted(x["rs20"] for x in es)
+        med = (v[(len(v) - 1) // 2] + v[len(v) // 2]) / 2
+        for x in es:
+            if x["rs20"] != med:
+                rs.setdefault(g, {"hi": [], "lo": []})["hi" if x["rs20"] > med else "lo"].append(x[key])
+    out["rs"] = {g: {"hi": summarize_returns(s["hi"], s["hi"]), "lo": summarize_returns(s["lo"], s["lo"]),
+                     "verdict": _cmp(s["hi"], s["lo"], min_n)} for g, s in rs.items()}
+    mult = {lb: [] for _, _, lb in MULT_BUCKETS}
+    for e in ok:
+        if base(e["group"]) == "scalp" and e.get("mult"):
+            lb = next(lb for lo, hi, lb in MULT_BUCKETS if lo <= e["mult"] < hi or (lo == 3 and e["mult"] < 3))
+            mult[lb].append(e[key])
+    out["mult"] = {"rows": [{"label": lb, **(summarize_returns(v, v) or {"n": 0})} for lb, v in mult.items()],
+                   "verdict": "few" if min(len(v) for v in mult.values()) < min_n else "info"}
+    per = {}
+    for e in ok:
+        g = e["group"]
+        if g.endswith("_rest") or e.get("half") is None:
+            continue
+        cut = since.get(g)
+        span = "eval" if cut and e["date"] >= cut else "set"
+        per.setdefault(g, {}).setdefault(span, {"hi": [], "lo": []})[e["half"]].append(e[key])
+    out["periods"] = {}
+    for g, sp in per.items():
+        row = {"since": since.get(g)}
+        for span, s in sp.items():
+            row[span] = {"hi": summarize_returns(s["hi"], s["hi"]), "lo": summarize_returns(s["lo"], s["lo"]),
+                         "verdict": _cmp(s["hi"], s["lo"], min_n)}
+        ev = row.get("eval")
+        row["verdict"] = "unconfirmed" if not ev or ev["verdict"] == "few" else ev["verdict"]
+        out["periods"][g] = row
+    return out
 
 
 def summarize_returns(rets, ex=None):
@@ -2435,7 +2916,7 @@ def summarize_returns(rets, ex=None):
         return None
     return {"n": len(rets), "avg": r1(sum(rets) / len(rets)),
             "win": round(100 * sum(1 for r in rets if r > 0) / len(rets)),
-            "excess": r1(sum(ex) / len(ex)) if ex else None}
+            "excess": r1(sum(ex) / len(ex)) if ex else None, "low10": _tail(rets)}
 
 
 # 조건별 성적: 후보 안에서 이 조건이 있을 때와 없을 때 5일 뒤 수익률 비교
