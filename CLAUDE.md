@@ -34,7 +34,7 @@
     재무는 `site/data/fin/{같은 번호}.json`(`fetch_profiles`: 없는 종목은 전부, 있으면 오래된 것부터 `FIN_BATCH`개, `FIN_WORKERS`개 동시·`FIN_BUDGET`초 한도).
     둘 다 main에 안 넣고(.gitignore) `data-cache` 브랜치에 커밋 하나로 덮어써 보관 — collect·morning·pages 워크플로가 받아서 배포에 넣는다.
     조건 목록은 `scalp_checks`·`swing_checks`·`value_checks` 하나로 필터와 검색이 같이 쓴다.
-    급등주 복기(`find_movers`·`replay_mover`, `SURGE`): 급등 = **하루 +20% 이상**(사용자 정의, 5일 누적은 급등 아님). 최근 5일 중 그런 날이 있는 종목을 그날 상승률 순으로 20개,
+    급등주 복기(`find_movers`·`replay_mover`, `SURGE`): 급등 = **하루 +20% 이상**(사용자 정의, 5일 누적은 급등 아님). 최근 5일 중 그런 날이 있는 종목을 그날 상승률 순으로 30개까지,
     15영업일 거슬러 큰손 순매수·거래 배수·리포트·우리 후보 여부와 '미리 잡음/당일/놓침'. 하루 +30.5% 넘는 값(가격 끊김)은 제외.
     신호 검증(`signal_validation`)도 같은 정의: 신호 뒤 5일 안에 하루 +20% 난 날이 있었나. `move_vs_atr`: 급등 전 평소 하루 변동폭(ATR14 %)의 몇 배인지(ⓘ `move_x`).
     급등 뒤 흐름(`follow_through`, `FOLLOW`): 하루 +15%↑·+8~15%·이틀 연속 급등 뒤 다음 날도 오름·3일 안 또 +8%·하루 쉬고 다시 +5% 비율과

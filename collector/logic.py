@@ -1552,7 +1552,7 @@ def replay_mover(code, name, closes, values, net, caps, cand_by_day, reports=Non
             "verdict": verdict, "lead": lead, "how": how, "early": sorted(early, key=lambda e: -e["lead"]), "timeline": timeline}
 
 
-def find_movers(closes, universe, rules=SURGE, min_cap=None, top=20):
+def find_movers(closes, universe, rules=SURGE, min_cap=None, top=30):
     """최근 급등주: 최근 5영업일 중 하루라도 +20% 이상 오른 종목 (시총 기준 이상만), 그날 상승률이 큰 순서.
     가격이 끊긴 날(권리락 등)은 종가 비교가 틀어지므로 하루 +30.5% 넘는 값은 급등으로 치지 않는다."""
     min_cap = min_cap if min_cap is not None else RULES["min_cap"]
