@@ -1091,3 +1091,12 @@ def test_scorecard_extra_vol_buckets():
     es.append({"date": "20261001", "group": "scalp_rest", "x5": -2.0, "atr_pct": 9.5})
     rows = {r["label"]: r["n"] for r in logic.scorecard_extra(es)["vol"]["rows"]}
     assert rows == {"하루 3% 미만": 1, "3~5%": 2, "5~8%": 1, "8% 넘음": 2}
+
+
+def test_exit_level_value_never_above_close():
+    days = [f"d{i:02d}" for i in range(30)]
+    c = pd.Series([100.0] * 29 + [90.0], index=days)
+    lo = pd.Series([99.0] * 29 + [95.0], index=days)    # 오늘 저가가 마감보다 높게 찍힌 어긋난 자료
+    ex = logic.exit_level("value", c, lo)
+    assert ex["stop"] == 90 and ex["gap"] == 0.0
+    assert logic.exit_level("value", c, lo.where(lo.index != "d29"))["stop"] == 90   # 오늘 저가가 빈 날도

@@ -367,6 +367,9 @@ table.fin .est { color: var(--faint); }
 .exit { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 13px; }
 .exit .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .exit > small { display: block; color: var(--sub); margin-top: 2px; line-height: 1.5; }
+.exit .xstop { font-size: 17px; }
+.exit .xwhat { margin: 2px 0 0; font-size: 12px; color: var(--sub); line-height: 1.5; }
+.exit .xnow, .exit .xusual { margin: 6px 0 0; line-height: 1.5; }
 .track, .rs { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 13px; line-height: 1.5; }
 .track .row, .rs .row, .risk .row, .chg .row { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .rs .row.sub { margin-top: 6px; font-size: 12px; }
@@ -377,6 +380,7 @@ table.fin .est { color: var(--faint); }
 .tsc b.up, .tf b.up { color: var(--up); }
 .tsc b.down, .tf b.down { color: var(--down); }
 .risk { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); font-size: 13px; }
+.risk .rk-in { margin-top: 0; }
 .risk .checks { margin-top: 4px; }
 .rk-now, .rk-out { margin: 6px 0 0; font-size: 13px; }
 .rk-in { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12px; color: var(--sub); }

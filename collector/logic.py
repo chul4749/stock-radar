@@ -2305,6 +2305,8 @@ def exit_level(group, close_s, low_s=None):
         stop = float(lows.iloc[-1]) if lows is not None and len(lows) and lows.index[-1] == c.index[-1] else close * 0.97
     else:
         stop = float(lows.iloc[-10:].min()) if lows is not None and len(lows) >= 10 else float(c.iloc[-10:].min())
+        # 10일 최저가는 오늘 마감 가격보다 높을 수 없다 — 저가 자료가 어긋난 날(오늘 저가가 마감보다 높게 찍힘 등)도 정리선이 빠지지 않게
+        stop = min(stop, close)
     if not (0 < stop <= close):
         return None
     rule, why, hold = EXIT_RULES[group]
