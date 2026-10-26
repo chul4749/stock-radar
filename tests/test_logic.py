@@ -806,7 +806,7 @@ def test_myth_check_events():
     assert it["down5"]["n"] >= 1
     # C의 갭은 그날 종가(1000)가 전날 종가와 같으니 그날 안에 메워짐
     assert it["gap"]["up"]["n"] >= 1 and it["gap"]["up"]["same_day"] is not None
-    assert {x["verdict"] for x in out["items"]} <= {"true", "false", "none", "few", "shaky_true", "shaky_false"}
+    assert {x["verdict"] for x in out["items"]} <= {"true", "false", "none", "few", "shaky_true", "shaky_false", "weak_true", "weak_false"}
 
 
 def test_myth_check_excess_and_skew():
@@ -832,3 +832,27 @@ def test_myth_check_excess_and_skew():
     assert logic._trim_mean([0] * 19 + [100]) == 0.0   # 20개↑면 한 종목 폭등은 빠짐
     assert logic._trim_mean([0] * 9 + [100]) == 10.0   # 20개 안 되면 그냥 평균
     assert logic._trim_mean([0] * 38 + [100, -100]) == 0.0
+
+
+def test_myth_check_planted_hype_is_significant():
+    """관심 과열(거래 5배 + 10%↑) 뒤 3일 동안 빠지도록 심어 두면 '모두가 볼 때는 늦었다'가 맞음으로, 상승·하락장 따로도 나옴"""
+    import numpy as np
+    days = [f"2026{i:04d}" for i in range(100, 182)]
+    n, k = len(days), 80
+    rng = np.random.default_rng(11)
+    r = rng.normal(0, 0.01, (n, k))
+    vol = np.ones((n, k))
+    for j in range(k):
+        for t in range(25 + (j % 7), n - 8, 9):   # 종목마다 9일 간격으로 과열 → 다음 4일 하락
+            r[t, j] += 0.12
+            vol[t, j] = 8.0
+            r[t + 1:t + 5, j] -= 0.02
+    cols = [f"{i:06d}" for i in range(k)]
+    cl = pd.DataFrame(1000 * np.exp(np.cumsum(r, 0)), index=days, columns=cols)
+    op = cl.shift(1).fillna(1000.0)
+    hi, lo = np.maximum(cl, op) * 1.001, np.minimum(cl, op) * 0.999
+    va = pd.DataFrame(vol, index=days, columns=cols)
+    out = logic.myth_check(cl, op, hi, lo, va, set(cols), cost=0)
+    hype = {x["key"]: x for x in out["items"]}["hype"]
+    assert hype["verdict"] == "true" and hype["t3"] < -2
+    assert set(hype["by_mk"]) == {"up", "down"}
