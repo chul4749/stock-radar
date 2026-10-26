@@ -519,3 +519,10 @@ table.score tr.best th, table.score tr.best td { background: var(--neutral-bg); 
 ul.plain { list-style: none; margin: 6px 0 0; padding: 0; font-size: 13px; line-height: 1.55; }
 ul.plain li { padding: 3px 0 3px 10px; position: relative; }
 ul.plain li::before { content: "·"; position: absolute; left: 0; color: var(--faint); }
+.fit.myths > li { margin-bottom: 8px; }
+.fit.myths .row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.fit.myths .row b { font-size: 15px; }
+.mwhy { margin: 6px 0 4px; font-size: 13px; line-height: 1.55; color: var(--sub); }
+.mrec { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); font-size: 13px; }
+.mrec ul.plain { margin-top: 4px; }
+.msay { margin: 4px 0 0; font-weight: 600; font-size: 13px; }

@@ -777,3 +777,33 @@ def test_volume_profile():
     vp = logic.volume_profile(h + [210], l + [200], c + [205], v + [1])
     assert vp["lo"] == 100 and vp["hi"] == 210 and vp["now"] == 205
     assert abs(sum(vp["b"]) - 100) < 1 and vp["top"] in (0, 1) and vp["below"] > 90
+
+
+def test_myth_check_events():
+    import numpy as np
+    days = [f"2026{i:04d}" for i in range(100, 182)]
+    n = len(days)
+    rng = np.random.default_rng(3)
+    cols = [f"{i:06d}" for i in range(40)]
+    cl = pd.DataFrame(1000 * np.exp(np.cumsum(rng.normal(0, 0.01, (n, 40)), 0)), index=days, columns=cols)
+    # A: 65일째 직전 60일 최고가를 크게 넘음(신고가) / B: 70~74일째 5일 연속 하락 / C: 50일째 시가 +5% 갭
+    cl["A"] = 1000.0; cl.iloc[65:, cl.columns.get_loc("A")] = 1100.0
+    b = [1000.0] * n
+    for k in range(70, 75):
+        b[k] = b[k - 1] * 0.98
+    for k in range(75, n):
+        b[k] = b[74]
+    cl["B"] = b
+    cl["C"] = 1000.0
+    op = cl.shift(1).fillna(1000.0)
+    op.iloc[50, op.columns.get_loc("C")] = 1050.0
+    hi = np.maximum(cl, op) * 1.001
+    lo = np.minimum(cl, op) * 0.999
+    va = pd.DataFrame(1.0, index=days, columns=cl.columns)
+    out = logic.myth_check(cl, op, hi, lo, va, set(cl.columns), cost=0)
+    it = {x["key"]: x for x in out["items"]}
+    assert it["new_high"]["n"] >= 1
+    assert it["down5"]["n"] >= 1
+    # C의 갭은 그날 종가(1000)가 전날 종가와 같으니 그날 안에 메워짐
+    assert it["gap"]["up"]["n"] >= 1 and it["gap"]["up"]["same_day"] is not None
+    assert {x["verdict"] for x in out["items"]} <= {"true", "false", "none", "few"}

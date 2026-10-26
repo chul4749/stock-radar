@@ -538,7 +538,14 @@ def build_replay(base, closes, values, flows_hist, listing, universe, today, rep
         hold = None
     if follow is not None:
         follow["hold"] = hold
-    return {"movers": movers, "validation": val, "follow": follow, "rules": logic.SURGE}
+    try:
+        myths = logic.myth_check(closes, opens, highs, lows, values, elig, reports) if opens is not None and highs is not None and lows is not None else None
+        if myths:
+            log("  속설 검증: " + ", ".join(f"{x['title']}({x['verdict']}, {x['n']}건)" for x in myths["items"]))
+    except Exception as e:
+        log(f"  속설 검증 실패: {type(e).__name__}: {e}")
+        myths = None
+    return {"movers": movers, "validation": val, "follow": follow, "myths": myths, "rules": logic.SURGE}
 
 
 def build_managers(base, days, listing, closes, errors, sectors=None, trust=None):

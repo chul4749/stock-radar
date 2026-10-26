@@ -1742,6 +1742,148 @@ def volume_profile(high, low, close, value, bins=20):
             "below": round(float(below), 1), "avg": round(avg), "top": int(acc.argmax())}
 
 
+MYTH = {"fwd": (3, 5), "gap": 3.0, "gap_days": 5, "high_days": 60, "down_days": 5, "vp_days": 40, "vp_bins": 20,
+        "hype_mult": 5.0, "hype_ret": 10.0, "report_n": 3}
+
+
+def myth_check(closes, opens, highs, lows, values, eligible, reports=None, rules=MYTH, cost=None):
+    """주식 속설 검증: 흔히 믿는 심리 패턴이 최근 약 80영업일 실제로 맞았나.
+    매수 쪽 속설은 '다음 날 시가에 사서 3·5영업일째 종가에 팖'(비용 뺌)을 평소(모든 종목·날)와 비교,
+    갭은 '며칠 안에 전날 종가로 돌아왔나' 비율로 본다."""
+    import numpy as np
+    cost = COST if cost is None else cost
+    cols = [c for c in closes.columns if c in eligible and c in opens.columns and c in highs.columns and c in lows.columns and c in values.columns]
+    if not cols or len(closes.index) < 30:
+        return None
+    idx = closes.index
+    cl = closes[cols]
+    op, hi, lo, va = (x.reindex(index=idx, columns=cols) for x in (opens, highs, lows, values))
+    ret = cl.pct_change(fill_method=None) * 100
+    entry = op.shift(-1)
+    fwd = {n: (cl.shift(-n) / entry - 1) * 100 - cost for n in rules["fwd"]}
+    n_last = max(rules["fwd"])
+    valid = entry.notna() & fwd[n_last].notna() & ret.notna()
+
+    def perf(mask):
+        m = (mask & valid).values
+        n = int(m.sum())
+        if not n:
+            return {"n": 0}
+        out = {"n": n}
+        for k, f in fwd.items():
+            a = f.values[m]
+            out[f"h{k}"] = r1(float(np.mean(a)))
+            out[f"h{k}_med"] = r1(float(np.median(a)))
+            out[f"h{k}_win"] = round(float((a > 0).mean() * 100), 1)
+        return out
+
+    base = perf(ret.notna())
+
+    def verdict(p, bullish=True):
+        if p.get("n", 0) < 30:
+            return "few"
+        ex = p["h3"] - base["h3"]
+        wex = p["h3_win"] - base["h3_win"]
+        if not bullish:
+            ex, wex = -ex, -wex
+        if ex >= 1.0 and wex >= 3:
+            return "true"
+        if ex <= -1.0 and wex <= -3:
+            return "false"
+        return "none"
+
+    items = []
+    # 1) 매물대를 뚫으면 간다: 전 40일 거래가 가장 많았던 가격대(대표가×거래대금 20칸) 윗선을 종가로 처음 넘은 날
+    W, B = rules["vp_days"], rules["vp_bins"]
+    typ = ((hi + lo + cl) / 3).values
+    V, C = va.values, cl.values
+    brk = np.zeros(C.shape, dtype=bool)
+    for t in range(W, len(idx)):
+        tp, vv = typ[t - W:t], V[t - W:t]
+        for j in range(C.shape[1]):
+            x, w = tp[:, j], vv[:, j]
+            ok = ~(np.isnan(x) | np.isnan(w))
+            if ok.sum() < W * 0.8 or np.isnan(C[t, j]) or np.isnan(C[t - 1, j]):
+                continue
+            x, w = x[ok], w[ok]
+            lo_, hi_ = x.min(), x.max()
+            if hi_ <= lo_:
+                continue
+            hist, edges = np.histogram(x, bins=B, range=(lo_, hi_), weights=w)
+            top_hi = edges[hist.argmax() + 1]
+            brk[t, j] = C[t - 1, j] <= top_hi < C[t, j]
+    p = perf(pd.DataFrame(brk, index=idx, columns=cols))
+    items.append({"key": "vp_break", "title": "매물대를 뚫으면 간다", "kind": "buy", **p, "verdict": verdict(p),
+                  "event": f"종가가 최근 {W}일 가장 많이 거래된 가격대를 처음 넘은 날"})
+    # 2) 신고가는 사라: 종가가 직전 60일 최고가(고가 기준)를 처음 넘은 날
+    H = rules["high_days"]
+    prev_high = hi.shift(1).rolling(H, min_periods=H).max()
+    newhi = (cl > prev_high) & ~(cl.shift(1) > prev_high.shift(1))
+    p = perf(newhi)
+    items.append({"key": "new_high", "title": "신고가는 사라", "kind": "buy", **p, "verdict": verdict(p),
+                  "event": f"종가가 직전 {H}일 최고가를 처음 넘은 날 (52주 기록은 없어 {H}일로 확인)"})
+    # 3) 갭은 메워진다: 시가가 전날 종가보다 3%↑(↓) 벌어져 시작 → 그날 안에 / 다음 4일 안에 전날 종가까지 돌아왔나.
+    #    주가는 원래 출렁여 3% 떨어진 가격에 자주 다시 닿으므로, '갭 없이(시가 ±1% 안) 장중에 3%↑ 벌어진 날'의 다음 4일과 비교
+    pc = cl.shift(1)
+    g = rules["gap"]
+    D = rules["gap_days"] - 1
+    nxt_lo = pd.concat([lo.shift(-k) for k in range(1, D + 1)]).groupby(level=0).min().reindex(idx)
+    nxt_hi = pd.concat([hi.shift(-k) for k in range(1, D + 1)]).groupby(level=0).max().reindex(idx)
+    okd = lo.shift(-D).notna() & pc.notna() & op.notna()
+    flat_open = (op / pc - 1).abs() < 0.01
+
+    def rate(mask, hit):
+        m = (mask & okd).values
+        n = int(m.sum())
+        return n, (round(float(hit.values[m].mean() * 100), 1) if n else None)
+
+    sides = {}
+    for side, gap, same, later, far in (
+            ("up", op >= pc * (1 + g / 100), lo <= pc, nxt_lo <= pc, cl >= pc * (1 + g / 100)),
+            ("down", op <= pc * (1 - g / 100), hi >= pc, nxt_hi >= pc, cl <= pc * (1 - g / 100))):
+        n, same_rate = rate(gap, same)
+        # 마감 때도 3%↑ 벌어진 채 끝난 갭 vs 갭 없이 장중에 3%↑ 벌어져 끝난 날 — 같은 거리에서 다음 4일 안에 돌아왔나
+        n_after, after = rate(gap & far, later)
+        bn, base_rate = rate(flat_open & far, later)
+        sides[side] = {"n": n, "same_day": same_rate, "after_n": n_after, "after": after, "base_n": bn, "base": base_rate}
+    tot = sides["up"]["n"] + sides["down"]["n"]
+    diffs = [(v["after"] - v["base"], v["after_n"]) for v in sides.values() if v["after"] is not None and v["base"] is not None]
+    diff = sum(d * n for d, n in diffs) / sum(n for _, n in diffs) if diffs and sum(n for _, n in diffs) else None
+    items.append({"key": "gap", "title": "갭은 메워진다", "kind": "gap", "n": tot, **sides, "diff": r1(diff),
+                  "verdict": "few" if tot < 30 or diff is None else "true" if diff >= 10 else "false" if diff <= -5 else "none",
+                  "event": f"시가가 전날 종가보다 {g:g}% 넘게 위(아래)에서 시작한 날 → 그날 안에 전날 종가까지 돌아왔나, 마감 때도 벌어져 있었다면 다음 {D}일 안에 돌아왔나"})
+    # 4) 5일 연속 빠지면 반등한다
+    K = rules["down_days"]
+    down = pd.concat([(ret.shift(k) < 0) for k in range(K)]).groupby(level=0).all().reindex(idx)
+    down = down & ~(ret.shift(K) < 0)   # 딱 5일째 되는 날만 (6일·7일째 중복 빼기)
+    p = perf(down)
+    nxt = ret.shift(-1)
+    m = (down & nxt.notna()).values
+    p["next_up"] = round(float((nxt.values[m] > 0).mean() * 100), 1) if m.sum() else None
+    bm = (ret.notna() & nxt.notna()).values
+    base_next = round(float((nxt.values[bm] > 0).mean() * 100), 1) if bm.sum() else None
+    items.append({"key": "down5", "title": f"{K}일 연속 빠지면 반등한다", "kind": "buy", **p, "base_next_up": base_next,
+                  "verdict": verdict(p), "event": f"종가가 {K}일 연속 내린 날"})
+    # 5) 모두가 볼 때는 늦었다: 거래 평소 5배↑ + 그날 +10%↑ (관심이 한꺼번에 몰림), 리포트 5일 3건↑ 따로
+    mult = va / va.shift(1).rolling(20, min_periods=10).mean()
+    hype = (mult >= rules["hype_mult"]) & (ret >= rules["hype_ret"])
+    p = perf(hype)
+    item = {"key": "hype", "title": "모두가 볼 때는 늦었다", "kind": "sell", **p, "verdict": verdict(p, bullish=False),
+            "event": f"거래대금이 평소의 {rules['hype_mult']:g}배 넘고 그날 +{rules['hype_ret']:g}% 넘게 오른 날 (관심이 한꺼번에 몰림)"}
+    if reports and reports.get("items"):
+        cnt = pd.DataFrame(0, index=idx, columns=cols)
+        pos = {d: i for i, d in enumerate(idx)}
+        for x in reports["items"]:
+            if x["code"] in cnt.columns and x["date"] in pos:
+                cnt.iat[pos[x["date"]], cnt.columns.get_loc(x["code"])] += 1
+        many = cnt.rolling(5, min_periods=1).sum() >= rules["report_n"]
+        rp = perf(many & ~many.shift(1, fill_value=False))
+        item["reports"] = {**rp, "event": f"증권사 리포트가 5일 안에 {rules['report_n']}건 넘게 쏟아진 날"}
+    items.append(item)
+    days = [d for d in idx if valid.loc[d].any()]
+    return {"from": days[0] if days else None, "to": days[-1] if days else None, "base": base, "cost": cost, "rules": rules, "items": items}
+
+
 def mover_scorecard(movers):
     """그동안의 급등주 복기 모음: 미리 잡은·당일 잡은·놓친 비율, 신호별로 급등 전에 있었던 비율과 평균 몇 일 먼저였나."""
     if not movers:

@@ -66,6 +66,7 @@ function render() {
   renderThemes();
   renderManagers();
   renderReplay();
+  renderMyths();
   renderRegime();
   renderFilter();
   renderToday();
@@ -106,6 +107,7 @@ const INFO = {
   mgr_skill: "운용사마다 직접 고른 액티브 ETF가 최근 60일 동안 KODEX 200(코스피 대표 200종목)보다 얼마나 더 벌었는지 평균입니다. +면 시장보다 잘 고른 곳.\n'요즘 잘하는 곳'이 산 종목을 조금 더 무겁게 봅니다. 다만 60일은 짧아서 운이 섞입니다.",
   managers: "액티브 ETF는 펀드매니저가 직접 종목을 골라 사고파는 ETF입니다 (TIME=타임폴리오, KoAct=삼성액티브, ACE=한국투자 등).\nETF는 매일 담고 있는 종목을 공개하는데, 종목별 '담은 주식 수'는 펀드에 돈이 들어와도 그대로이고 매니저가 사고팔 때만 바뀝니다. 그래서 5일·20일 전과 비교하면 매니저가 뭘 샀고 뭘 팔았는지 보입니다.\n· 새로 담음: 전에 없던 종목을 넣음 (가장 강한 신호)\n· 늘림 / 줄임: 담은 주식 수를 10% 이상 바꿈\n· 모두 뺌: 다 팔아 버림\n여러 운용사가 같은 종목을 같이 사면 더 눈여겨볼 만합니다.\n붙는 표시:\n· 계속 사는 중: 20일 동안 샀고 최근 5일에도 또 삼 (확신이 있다는 뜻)\n· 비중 크게 담음: ETF 안에서 3% 넘게 담음\n· 그 뒤 주가: 비교 시작일 이후 주가 등락. 이미 15% 넘게 올랐으면 따라 사기엔 늦었을 수 있음\n· 투신 5일: 자산운용사 전체(펀드)가 이 종목을 최근 5일 산 금액. 같은 방향이면 더 믿을 만함\n순서는 운용사 수 → 계속 사는지 → 비중 → 잘하는 운용사 순으로 매깁니다. 매니저도 틀리고, 공개는 하루 늦게 반영될 수 있어요.",
   replay: "급등한 종목을 거꾸로 따라가 '미리 알 수 있었나'를 확인합니다.\n· 미리 잡음 (성공): 급등 전날 저녁까지 우리 후보(스윙·단타·저평가)에 있었음 → 급등 날 아침에 살 수 있었음\n· 당일 마감 뒤 — 이미 늦음: 급등한 날 장 마감 뒤에야 후보에 걸림. 우리 자료는 저녁에 나오니 다음 날 아침에야 살 수 있어 이미 오른 뒤\n· 뒤늦게 잡음: 급등이 시작되고 며칠 뒤에야 걸림\n· 놓침: 후보에 안 걸림\n'N일 먼저' 신호는 급등 시작일보다 며칠 앞서 그 신호가 처음 보였는지입니다. 여러 급등주에서 같은 신호가 자주 먼저 보이면, 그 신호를 조건에 넣을 이유가 됩니다.",
+  myths: "주식 커뮤니티에서 흔히 도는 '속설'을 하나씩 꺼내, 최근 약 80영업일 실제 주가로 확인합니다.\n· 맞았음: 그런 날 다음 날 시가에 산 성적이 평소보다 3일 평균 +1%p 넘게, 오른 비율도 3%p 넘게 좋았음 ('늦었다' 같은 파는 쪽 속설은 반대로 나빴음)\n· 반대로 나옴: 평소보다 그만큼 나빴음\n· 차이 없음: 그 사이. 이것만으로 사고팔 이유는 안 됨\n· 건수 적어 보류: 그런 날이 30번 안 됨\n갭은 '원래 출렁여서 다시 닿는 것'과 구분하려고, 갭 없이 같은 만큼 벌어진 날과 비교합니다.\n같은 속설도 상승장·하락장에 따라 다르게 나오니, 판정이 바뀌는 것 자체가 공부가 됩니다.",
   hold: "이미 들고 있던 종목이 하루에 +8% 넘게 오른 날, 그 뒤를 실제 기록으로 봅니다 (최근 약 80영업일, 시총·거래대금 기준 이상 종목).\n· 가장 높았던 날: 그 뒤 10영업일 중 종가가 가장 높았던 날이 언제였나. '급등한 날이 최고'가 많으면 그날이 꼭지인 경우가 많다는 뜻\n· 오른 걸 다 돌려줌: 10일 안에 종가가 급등 전날 종가 아래로 내려간 비율\n· 팔기 방법: 급등한 날 종가에 바로 판 것과 비교해 각 방법으로 팔았을 때 얼마나 더(덜) 받았나\n  - 전날 저가 깨지면 팖: 그날 종가가 전날 가장 낮은 가격보다 낮으면 그날 종가에 팖 (힘이 빠진 첫 신호)\n  - 최고가에서 −7%면 팖: 급등 뒤 가장 높았던 종가에서 7% 내려온 날 종가에 팖 (오르는 동안은 들고 감)\n  - 둘 다 10일째까지 안 걸리면 10일째 종가에 팖\n묶음: 거래 폭발 = 그날 거래대금이 20일 평균의 5배 넘음 (관심이 한꺼번에 몰림), 조용한 첫 급등 = 전 5일 +10% 안 + 거래 3배 안.\n원리: 사람들은 이익 난 건 빨리 팔고 손해 난 건 오래 들고 가는 경향(처분 효과)이 있어, 급등 직후엔 차익 매물이 나옵니다. 이 기록은 그 매물이 실제로 얼마나 눌렀는지 보여 줍니다.",
   vp: "매물대 = 최근 60영업일 동안 어느 가격대에서 거래가 많았는지(거래대금)를 가로 막대로 나타낸 것. 그 가격에 산 사람이 많다는 뜻입니다.\n· 지금 가격보다 아래 매물: 그 사람들은 이익 중 → 급하게 안 팔고, 가격이 내려오면 '싸다'며 다시 사는 경향 → 받쳐 주는 가격대(지지)\n· 지금 가격보다 위 매물: 그 사람들은 손해 중 → 가격이 올라와 본전이 되면 팔고 나오려는 경향 → 누르는 가격대(저항)\n· 매물대를 뚫고 올라가면 그 위가 가벼워지고, 뚫린 매물대가 다음엔 받쳐 주는 쪽으로 바뀌는 경우가 많음\n· 평균 매수가: 거래대금으로 가중한 60일 평균 가격. 지금 가격이 이보다 위면 최근 산 사람들 대부분이 이익 중\n주의: 하루 거래를 그날 저가~고가에 고르게 펼친 근사이고, 60일보다 오래된 매물은 안 보입니다. 같은 사람이 사고팔기를 반복한 것도 다 들어가요. '왜 이 가격에서 막히나/받치나'를 이해하는 공부 자료로 보세요.",
   follow: "급등한 날(하루 +15%↑ 등) 뒤 며칠이 어떻게 흘렀는지 최근 약 80영업일 실제 기록을 셉니다. 시총·거래대금 기준 이상 종목만.\n· 다음 날도 오름: 급등 다음 날 종가가 또 올랐던 비율\n· 3일 안 또 급등: 다음 3일 중 하루라도 +8% 넘게 오른 비율\n· 하루 쉬고 다시: 다음 날은 보합·하락이었다가 2~3일째 +5% 넘게 오른 비율 (하루 건너 이어지는 모양)\n'평소' 줄은 아무 날·아무 종목이나 같은 방법으로 센 값이라, 급등 줄이 평소보다 높아야 '급등은 이어지는 편'이라고 말할 수 있어요.\n아래 표는 우리 자료가 장 마감 뒤에 나오니 실제로 살 수 있는 '다음 날 시가'에 사서 3·5영업일째 종가에 판 결과입니다 (거래 비용 뺌). 이어지는 경우가 많아도 다음 날 시가가 이미 높게 시작하면 남는 게 적을 수 있어서 따로 봅니다.",
@@ -1207,6 +1209,78 @@ document.addEventListener("click", (e) => {
   renderReplay();
 });
 
+/* ---------------- 주식 속설 검증 ---------------- */
+
+// 원리(왜 사람들이 그렇게 믿나)는 고정 설명, 판정과 숫자는 매일 다시 계산한 실제 기록
+const MYTH_WHY = {
+  vp_break: "그 가격대에 산 사람이 많으면, 주가가 거기까지 올라올 때마다 '본전이니 팔자'는 매물이 나와 막힙니다. 그걸 다 받아 내고 넘어서면 위에 팔 사람이 적어 가벼워진다는 생각.",
+  new_high: "사람들은 최근 최고가를 기준점으로 삼아 '너무 올랐다'며 망설입니다(기준점 효과). 그래서 신고가를 뚫어도 바로 따라붙지 않고 뒤늦게 따라오니, 오히려 신고가에 사라는 말.",
+  gap: "아침에 좋은·나쁜 소식으로 흥분해 크게 벌어져 시작해도, 흥분이 식으면 원래 가격으로 돌아간다는 생각.",
+  down5: "며칠씩 계속 빠지면 겁먹고 던진 물량이 다 나와 '너무 싸다'며 사는 사람이 생긴다는 생각 (과매도 반등).",
+  hype: "거래가 폭발하고 다들 이야기할 때는 살 사람이 이미 다 샀다는 뜻이라, 그때 따라 사면 늦는다는 생각 ('소문에 사서 뉴스에 팔아라'와 같은 뿌리).",
+};
+const MYTH_VERDICT = { true: ["맞았음", "fresh"], false: ["반대로 나옴", "known"], none: ["차이 없음", "stay"], few: ["건수 적어 보류", "stay"] };
+
+function mythCard(x, base) {
+  const [vl, vc] = MYTH_VERDICT[x.verdict] || MYTH_VERDICT.none;
+  const sg = (v) => `<b class="${cls(v)}">${signed(v, 1, "%")}</b>`;
+  let rec = "";
+  if (x.kind === "gap") {
+    const side = (v, lab) => v && v.n ? `<li>${lab} ${num(v.n)}번 — 그날 안에 메워짐 <b>${num(v.same_day, 0)}%</b>${v.after != null ? ` · 마감 때도 벌어져 있던 ${num(v.after_n)}번은 다음 4일 안에 ${num(v.after, 0)}% 메워짐 (갭 없이 같은 만큼 벌어진 날은 ${num(v.base, 0)}%)` : ""}</li>` : "";
+    rec = `<ul class="plain">${side(x.up, "위로 갭")}${side(x.down, "아래로 갭")}</ul>`;
+  } else if (x.n) {
+    const row = (lab, p) => `<li>${lab}: 3일 뒤 평균 ${sg(p.h3)} (오른 비율 ${num(p.h3_win, 0)}%) · 5일 뒤 ${sg(p.h5)}</li>`;
+    rec = `<ul class="plain">${row(`이런 날 ${num(x.n)}번`, x)}${row("평소 (아무 날·아무 종목)", base)}
+      ${x.next_up != null ? `<li>다음 날 오른 비율 ${num(x.next_up, 0)}% (평소 ${num(x.base_next_up, 0)}%)</li>` : ""}
+      ${x.reports && x.reports.n ? row(`리포트가 쏟아진 날 ${num(x.reports.n)}번${x.reports.n < 30 ? " (적어서 참고만)" : ""}`, x.reports) : ""}</ul>`;
+  } else rec = `<p class="hint">이 기간엔 이런 날이 없었어요.</p>`;
+  const say = { true: x.kind === "sell" ? "이 기간엔 정말 그런 날 따라 사면 평소보다 못했어요." : x.kind === "gap" ? "같은 거리만큼 벌어진 다른 날보다 실제로 더 잘 돌아왔어요." : "이 기간엔 정말 평소보다 나았어요.",
+    false: x.kind === "sell" ? "이 기간엔 오히려 따라 산 게 평소보다 나았어요." : x.kind === "gap" ? "갭이 아닌 날보다 오히려 덜 돌아왔어요 — 갭 방향으로 더 가는 편." : "이 기간엔 오히려 평소보다 못했어요.",
+    none: x.kind === "gap" ? "자주 메워지긴 하지만, 주가가 원래 출렁여서 그런 정도 — 갭이라서 특별하진 않았어요." : "평소와 거의 같았어요 — 이것만으로 사고팔 이유는 안 됐어요.",
+    few: "이런 날이 아직 적어 판단을 미뤄요." }[x.verdict] || "";
+  return `<li><div class="row"><b>“${esc(x.title)}”</b><span class="tag ${vc}">${vl}</span></div>
+    <p class="mwhy"><span class="rule">원리</span> ${esc(MYTH_WHY[x.key] || "")}</p>
+    <small>확인한 것: ${esc(x.event)}</small>
+    <div class="mrec"><span class="now">실제 기록</span>${rec}<p class="msay">${say}</p></div></li>`;
+}
+
+function renderMyths() {
+  const el = $("#myth-body");
+  if (!el) return;
+  const m = state.data.replay && state.data.replay.myths;
+  if (!m || !m.items) { el.innerHTML = `<div class="empty">이 날짜는 속설 검증 자료가 없습니다.</div>`; return; }
+  el.innerHTML = `<p class="hint">흔히 믿는 심리 패턴을 최근 ${ymd(m.from).slice(5)}~${ymd(m.to).slice(5)} 실제 기록으로 확인해요. 사는 쪽 속설은 우리 자료로 실제 살 수 있는 '다음 날 시가'에 사서 3·5일 뒤 성적을 평소와 비교합니다 (거래 비용 뺌).${infoBtn("myths")}</p>${infoBox("myths")}
+    <ul class="fit myths">${m.items.map((x) => mythCard(x, m.base)).join("")}</ul>
+    <p class="hint">장 분위기가 바뀌면 판정도 바뀔 수 있어 매일 다시 계산해요. 지금 기간은 하락장이 섞여 있습니다. 매수·매도 추천이 아닙니다.</p>`;
+}
+
+// 종목 팝업: 이 종목에 지금 해당하는 속설 (60일 종가·매물대·52주 고가로 판단)
+function mythNow(c, vp, fin) {
+  const m = state.data && state.data.replay && state.data.replay.myths;
+  if (!m || !c || c.length < 20) return "";
+  const it = Object.fromEntries(m.items.map((x) => [x.key, x]));
+  const v = c.filter((x) => x != null), last = v.at(-1), prev = v.at(-2);
+  const hits = [];
+  const prior = v.slice(0, -1);
+  if (prior.length >= 40 && last > Math.max(...prior) && !(prev > Math.max(...prior.slice(0, -1)))) hits.push(["new_high", `오늘 종가가 최근 ${v.length - 1}일 최고 종가를 넘음`]);
+  let dn = 0;
+  for (let i = v.length - 1; i > 0 && v[i] < v[i - 1]; i--) dn++;
+  if (dn >= 5) hits.push(["down5", `${dn}일 연속 내림`]);
+  if (vp && vp.b) {
+    const step = (vp.hi - vp.lo) / vp.b.length, topHi = vp.lo + step * (vp.top + 1);
+    if (prev <= topHi && last > topHi) hits.push(["vp_break", `가장 많이 거래된 가격대(${num(Math.round(topHi))}원 아래)를 오늘 넘음`]);
+  }
+  const near = fin && fin.high52 ? (last / fin.high52 - 1) * 100 : null;
+  if (!hits.length && near == null) return "";
+  const rows = hits.map(([k, why]) => {
+    const x = it[k];
+    const [vl] = x ? MYTH_VERDICT[x.verdict] || MYTH_VERDICT.none : ["–"];
+    return `<li>${esc(why)} → “${esc(x ? x.title : k)}” <b>${vl}</b>${x && x.n ? ` (실제 기록 3일 뒤 평균 ${signed(x.h3, 1, "%")}, 평소 ${signed(m.base.h3, 1, "%")})` : ""}</li>`;
+  }).join("");
+  return `<h3 class="sub">지금 해당하는 속설 <small>자세히는 '속설' 구역</small></h3>
+    <ul class="plain">${rows || "<li>오늘 해당하는 속설 없음</li>"}${near != null ? `<li>52주 최고가 ${num(fin.high52)}원까지 ${near >= 0 ? "넘어섬 (신고가)" : `${num(-near, 1)}% 남음`}${near > -5 && near < 0 ? " — 사람들이 기준점으로 보는 가격 바로 아래" : ""}</li>` : ""}</ul>`;
+}
+
 /* ---------------- 아침 요약 ---------------- */
 
 function renderMorning() {
@@ -1723,6 +1797,7 @@ async function openStock(code) {
     ${chartHtml}
     ${cx ? surgeNote(chs.days.slice(-cx.c.length), cx.c) : ""}
     ${cx && cx.vp ? vpBlock(cx.vp) : ""}
+    ${cx ? mythNow(cx.c, cx.vp, fin) : ""}
     <h3 class="sub">탭별 조건 <small>✓ 맞음 · ✗ 안 맞음</small></h3>
     <ul class="fit why">${block("swing", sw, s.sw, L.swing)}${block("scalp", sc, s.sc, L.scalp)}${block("value", va, s.va, L.value, s.vr)}</ul>
     ${tabs.length ? `<button class="more" type="button" data-code="${code}">후보 카드 자세히 보기</button>` : ""}
@@ -1879,7 +1954,7 @@ init();
 
 // 지금 보고 있는 구역을 바로 가기 줄에 표시. 섹션 → 바로 가기 묶음
 const JUMP_OF = { morning: "today", today: "today", filter: "filter", turn: "turn", temp: "turn", regime: "turn",
-  sectors: "sectors", themes: "sectors", managers: "sectors", replay: "replay", score: "score", glossary: "score" };
+  sectors: "sectors", themes: "sectors", managers: "sectors", replay: "replay", myths: "myths", score: "score", glossary: "score" };
 function updateJump() {
   const bar = document.querySelector(".bar");
   if (!bar) return;
