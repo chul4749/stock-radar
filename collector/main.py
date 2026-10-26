@@ -138,6 +138,8 @@ def main(argv):
     log(f"  구글 뉴스 {len(news)} ({g_start} ~ {g_end} 전)")
     # 네이버 주요뉴스는 최신 목록만 주므로 기준일이 최근일 때만 쓴다
     backfill = (datetime.now(KST).date() - datetime.strptime(base, "%Y%m%d").date()).days > 3
+    # '지금' 값만 주는 자료(추정 EPS·기업 정보·검색 순위)는 실제 기록(장 마감 뒤 ~ 다음 날 장 전)일 때만 쓴다 — 재계산엔 그날 몰랐던 정보
+    live_now = not backfill and logic.record_origin(base, datetime.now(KST)) == "live"
     nv = [] if backfill else (safe("네이버 주요뉴스", sources.naver_main_news, errors) or [])
     log(f"  네이버 주요뉴스 {len(nv)}{' (과거 기준일이라 생략)' if backfill else ''}")
     dart = safe("DART", lambda: sources.dart_today(base), errors)
@@ -235,8 +237,8 @@ def main(argv):
             time.sleep(0.2)
         return profiles[code]
 
-    # 추정 EPS는 '지금' 값이라 과거 기준일을 다시 계산할 땐 쓰지 않는다 (그날은 몰랐던 정보)
-    if not backfill:
+    # 추정 EPS는 '지금' 값이라 실제 기록일 때만 쓴다 (재계산 땐 그날은 몰랐던 정보)
+    if live_now:
         for x in value:
             profile(x["code"])
         logic.apply_forward_eps(value, profiles)
@@ -265,13 +267,13 @@ def main(argv):
         logic.enrich(group, closes, sectors, quality)
     for x in value[:10]:   # 저평가도 상세 화면에서 일별 수급을 보이게
         x["flow"] = logic.flow_detail(x["code"], flows_daily, flows_5d, pension_5d)
-    # 종목 상세(눌렀을 때)용 기업 정보: 화면에 나가는 후보만, 네이버 지금 시점 값 (과거 기준일엔 안 붙임)
-    for x in ([] if backfill else scalp[:10] + swing[:10] + value[:10]):
+    # 종목 상세(눌렀을 때)용 기업 정보: 화면에 나가는 후보만, 네이버 지금 시점 값 (실제 기록일 때만)
+    for x in (scalp[:10] + swing[:10] + value[:10] if live_now else []):
         if profile(x["code"]):
             x["profile"] = profiles[x["code"]]
     # 증권사 리포트(참고 정보: 오랜만에 다뤄지기 시작했나)와 네이버 검색 상위(관심 집중 표시)
     reports = update_reports(base, errors)
-    search_top = [] if backfill else (safe("검색 상위", sources.naver_search_top, errors) or [])
+    search_top = (safe("검색 상위", sources.naver_search_top, errors) or []) if live_now else []
     attention = update_attention(base, search_top)
     dart_sig = update_dart_signals(base, used_days, errors) if not backfill else load_dart_signals()
     rank = {c: i + 1 for i, c in enumerate(search_top)}
@@ -434,7 +436,7 @@ def main(argv):
     changes = build_changes(base, used_days, groups_now, pools, idx, closes, breaks)
     record = {"origin": origin, "strategy_ver": logic.strategy_ver(), "strategy": logic.STRATEGY,
               "data_asof": {"price": f"{base} 15:30 마감", "flows": last5[-1], "news_until": made.isoformat(timespec="minutes"),
-                            "dart": None if dart_failed else base, "profile": None if backfill else made.strftime("%Y%m%d"),
+                            "dart": None if dart_failed else base, "profile": made.strftime("%Y%m%d") if live_now else None,
                             "reports": (reports or {}).get("updated"), "search": made.strftime("%Y%m%d") if search_top else None}}
 
     out = {

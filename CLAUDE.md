@@ -54,7 +54,7 @@
     코스닥 글로벌도 코스닥 지수와 비교(`mkt_of`). 보유 중 가격이 끊긴(권리락·분할, `price_breaks`: 종가 변화 ≠ KRX 등락률) 거래는 뺀다.
     기록 출처: 기준일 15:30~다음 평일 09:00에 만든 기록만 실제 기록(`record_origin` live), 그 밖은 recalc, 만든 시각 없으면 unknown(`classify_record`).
     날짜 파일에 `record`(origin·`strategy_ver`·`data_asof`)를 남기고, live면 `site/data/live/{기준일}.json`(`write_live`)에 따로 보관 — 재계산은 여기에 절대 안 씀.
-    성적표는 live 파일이 있으면 그 후보를 쓴다(`load_record`). 과거 기준일 재계산엔 '지금' 값인 추정 EPS·기업 정보를 안 쓴다(미래 정보 차단).
+    성적표는 live 파일이 있으면 그 후보를 쓴다(`load_record`). 재계산(실제 기록이 아닌 실행)엔 '지금' 값인 추정 EPS·기업 정보·검색 순위를 안 쓴다(`live_now`, 미래 정보 차단).
     `filter.pools`: 조건 통과 후보 전체 최소 기록(`pool_record`: 순위·점수 재료 `k`·종가·상대강도·ATR) — 화면은 상위 10개.
     후보 변화(`build_changes`·`candidate_changes`): 어제 상위 10개 대비 새로/유지, 점수 변화를 점수 재료별로 나눔(`score_change`, 원인 지어내지 않음),
     빠진 종목은 순위 밖(`rank`) / 조건 깨짐(`filter`, `failed_conditions`) / 추적 불가(`unknown`), 우리 기록상 처음 걸린 날(`first_seen`)과 그 뒤 주가(가격 끊기면 추적 불가).
