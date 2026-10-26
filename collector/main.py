@@ -348,7 +348,8 @@ def main(argv):
     log(f"  테마 {len(themes['themes'])}개: " + ", ".join(f"{x['name']}({x['key']})" for x in themes["themes"][:6]))
 
     t = step("급등주 복기·신호 검증")
-    replay = build_replay(base, closes, values, flows_hist, listing, universe_all, {"scalp": scalp, "swing": swing, "value": value}, reports, opens, highs, lows, reported, attention)
+    replay = build_replay(base, closes, values, flows_hist, listing, universe_all, {"scalp": scalp, "swing": swing, "value": value}, reports, opens, highs, lows, reported, attention,
+                          {d.strftime("%Y%m%d"): float(v) for d, v in kospi_long.items()} if kospi_long is not None else None)
     log(f"  급등주 {len(replay['movers'])}개: " + ", ".join(f"{m['name']}({m['verdict']})" for m in replay["movers"][:8]))
 
     t = step("운용사 방향 (액티브 ETF)")
@@ -499,7 +500,7 @@ def update_season(base, dart_days, name_to_code, errors):
 
 
 def build_replay(base, closes, values, flows_hist, listing, universe, today, reports, opens=None, highs=None, lows=None,
-                 reported=None, attention=None):
+                 reported=None, attention=None, kospi_idx=None):
     """최근 급등주를 거슬러 보고(언제 어떤 신호가 먼저 있었나·우리가 언제 잡았나), 신호별로 급등을 앞섰는지 잰다."""
     net = logic.net_frame(flows_hist)
     caps = {c: v["cap"] for c, v in listing.items()}
@@ -543,7 +544,7 @@ def build_replay(base, closes, values, flows_hist, listing, universe, today, rep
     try:
         markets = {c: {"KOSPI": "P", "KOSDAQ": "D"}.get(v.get("market"), "") for c, v in listing.items()}
         myths = (logic.myth_check(closes, opens, highs, lows, values, elig, reports, markets=markets, caps=caps,
-                                  reported=(reported or {}).get("reported"), attention=attention)
+                                  reported=(reported or {}).get("reported"), attention=attention, index=kospi_idx)
                  if opens is not None and highs is not None and lows is not None else None)
         if myths:
             log("  속설 검증: " + ", ".join(f"{x['title']}({x['verdict']}, {x['n']}건)" for x in myths["items"]))

@@ -1757,7 +1757,7 @@ def _trim_mean(a, cut=0.05):
 
 
 def myth_check(closes, opens, highs, lows, values, eligible, reports=None, rules=MYTH, cost=None,
-               markets=None, caps=None, reported=None, attention=None):
+               markets=None, caps=None, reported=None, attention=None, index=None):
     """주식 속설 검증: 흔히 믿는 심리 패턴이 최근 약 80영업일 실제로 맞았나.
     사는 쪽 속설은 '다음 날 시가에 사서 3·5영업일째 종가에 팖'(비용 뺌). 판정은 통으로 보지 않고
     · 같은 날 전 종목 평균을 뺀 초과 수익(시장 전체가 오르내린 날의 효과를 뺌), 위아래 5%를 뺀 평균
@@ -1779,9 +1779,15 @@ def myth_check(closes, opens, highs, lows, values, eligible, reports=None, rules
     valid = entry.notna() & fwd[n_last].notna() & ret.notna()
     # 같은 날 전 종목 평균 대비 (시장 전체 효과 빼기)
     exc = {n: f.sub(f.where(valid).mean(axis=1), axis=0) for n, f in fwd.items()}
-    # 시장 흐름: 전 종목 평균 등락을 이어 붙인 지수가 20일 평균 위면 '오르는 중'
-    mk = (1 + ret.where(valid | ret.notna()).mean(axis=1).fillna(0) / 100).cumprod()
-    mk_up = (mk > mk.rolling(20, min_periods=10).mean()).values
+    # 상승장·하락장: 코스피가 20일 평균 위면 상승장 쪽 (화면 장세 판정과 같은 기준). 지수가 없으면 전 종목 평균으로 대신
+    if index is not None and len(index) >= 30:
+        ix = pd.Series(index, dtype=float)
+        mk_up = (ix > ix.rolling(20, min_periods=10).mean()).reindex(idx).ffill().fillna(False).astype(bool).values
+        mk_basis = "kospi"
+    else:
+        mk = (1 + ret.mean(axis=1).fillna(0) / 100).cumprod()
+        mk_up = (mk > mk.rolling(20, min_periods=10).mean()).values
+        mk_basis = "equal"
     col_mkt = np.array([(markets or {}).get(c, "") for c in cols])
     cap_arr = np.array([float((caps or {}).get(c) or 0) for c in cols])
     size = np.where(cap_arr >= 10000 * EOK, "large", np.where(cap_arr >= 3000 * EOK, "mid", "small"))
@@ -1804,7 +1810,9 @@ def myth_check(closes, opens, highs, lows, values, eligible, reports=None, rules
             out[f"beat{k}"] = round(float((x > 0).mean() * 100), 1)
         x3 = exc[3].values[m]
         # 우연인가: 같은 날 걸린 종목끼리는 함께 움직이므로 날짜별 평균으로 묶어 표준오차를 잼 (날짜 수가 실제 표본 크기)
-        dm = pd.Series(x3).groupby(tt).mean()
+        # 판정의 평균(위아래 5% 뺀 평균)과 맞추려고 양 끝 5%를 그 경계값으로 눌러 두고 잼
+        xc = np.clip(x3, *np.percentile(x3, [5, 95])) if len(x3) >= 20 else x3
+        dm = pd.Series(xc).groupby(tt).mean()
         if len(dm) >= 5 and dm.std(ddof=1) > 0:
             se = float(dm.std(ddof=1) / np.sqrt(len(dm)))
             out["se3"] = round(se, 2)
@@ -2023,7 +2031,9 @@ def myth_check(closes, opens, highs, lows, values, eligible, reports=None, rules
                   "pre_run": r1(float(pre[news & rumor & valid].stack().mean())) if a.get("n") else None,
                   "event": "실적 발표·오랜만의 리포트(뉴스) 전 10일 동안 이미 +10%↑ 오른 종목(소문에 산 사람이 있음) vs 안 오른 종목 — 뉴스 다음 날 시가에 샀다면"})
     days = [d for d in idx if valid.loc[d].any()]
-    return {"from": days[0] if days else None, "to": days[-1] if days else None, "base": base, "cost": cost, "rules": rules, "items": items}
+    return {"from": days[0] if days else None, "to": days[-1] if days else None, "base": base, "cost": cost, "rules": rules, "items": items,
+            "mk_basis": mk_basis, "mk_days": {"up": int(mk_up[[valid.loc[d].any() for d in idx]].sum()),
+                                              "down": int((~mk_up[[valid.loc[d].any() for d in idx]]).sum())}}
 
 
 def mover_scorecard(movers):
