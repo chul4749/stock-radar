@@ -1757,7 +1757,7 @@ def _trim_mean(a, cut=0.05):
 
 
 def myth_check(closes, opens, highs, lows, values, eligible, reports=None, rules=MYTH, cost=None,
-               markets=None, caps=None, reported=None, attention=None, index=None):
+               markets=None, caps=None, reported=None, attention=None, index=None, dart_events=None):
     """주식 속설 검증: 흔히 믿는 심리 패턴이 최근 약 80영업일 실제로 맞았나.
     사는 쪽 속설은 '다음 날 시가에 사서 3·5영업일째 종가에 팖'(비용 뺌). 판정은 통으로 보지 않고
     · 같은 날 전 종목 평균을 뺀 초과 수익(시장 전체가 오르내린 날의 효과를 뺌), 위아래 5%를 뺀 평균
@@ -2031,6 +2031,20 @@ def myth_check(closes, opens, highs, lows, values, eligible, reports=None, rules
                   "rows": rows, "verdict": rumor_verdict(a, b), "by_mk": mkr,
                   "pre_run": r1(float(pre[news & rumor & valid].stack().mean())) if a.get("n") else None,
                   "event": "실적 발표·오랜만의 리포트(뉴스) 전 10일 동안 이미 +10%↑ 오른 종목(소문에 산 사람이 있음) vs 안 오른 종목 — 뉴스 다음 날 시가에 샀다면"})
+    # 7~9) OpenDART '사는' 공시: 공시가 나온 날(대개 장 마감 뒤) 다음 날 아침에 샀다면
+    if dart_events:
+        for key, kind, title, event in (
+                ("insider", "insider", "회사 사람이 자기 주식을 사면 오른다", "임원·주요주주가 자기 회사 주식을 늘렸다고 보고한 날 (OpenDART)"),
+                ("buyback", "buyback", "자사주를 산다고 하면 오른다", "회사가 자기 주식을 사겠다고(자기주식 취득 결정) 공시한 날 (OpenDART)"),
+                ("major", "major", "큰손이 5% 넘게 사들이면 오른다", "5% 넘게 가진 투자자가 장에서 더 샀다고 보고한 날 (OpenDART)")):
+            ev = pd.DataFrame(False, index=idx, columns=cols)
+            for x in dart_events:
+                if x.get("kind") == kind and x.get("code") in ev.columns and x.get("date") in pos:
+                    ev.iat[pos[x["date"]], ev.columns.get_loc(x["code"])] = True
+            if not ev.values.any():
+                continue
+            p = perf(ev)
+            items.append({"key": key, "title": title, "kind": "buy", **p, "verdict": verdict(p), "by_mk": by_mk(ev), "event": event})
     days = [d for d in idx if valid.loc[d].any()]
     return {"from": days[0] if days else None, "to": days[-1] if days else None, "base": base, "cost": cost, "rules": rules, "items": items,
             "mk_basis": mk_basis, "mk_days": {"up": int(mk_up[[valid.loc[d].any() for d in idx]].sum()),

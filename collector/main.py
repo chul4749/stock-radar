@@ -262,6 +262,7 @@ def main(argv):
     reports = update_reports(base, errors)
     search_top = [] if backfill else (safe("검색 상위", sources.naver_search_top, errors) or [])
     attention = update_attention(base, search_top)
+    dart_sig = update_dart_signals(base, used_days, errors) if not backfill else load_dart_signals()
     rank = {c: i + 1 for i, c in enumerate(search_top)}
     details = {}
     for g, items in (("scalp", scalp[:10]), ("swing", swing[:10]), ("value", value[:10])):
@@ -366,7 +367,7 @@ def main(argv):
 
     t = step("급등주 복기·신호 검증")
     replay = build_replay(base, closes, values, flows_hist, listing, universe_all, {"scalp": scalp, "swing": swing, "value": value}, reports, opens, highs, lows, reported, attention,
-                          {d.strftime("%Y%m%d"): float(v) for d, v in kospi_long.items()} if kospi_long is not None else None)
+                          {d.strftime("%Y%m%d"): float(v) for d, v in kospi_long.items()} if kospi_long is not None else None, dart_sig)
     log(f"  급등주 {len(replay['movers'])}개: " + ", ".join(f"{m['name']}({m['verdict']})" for m in replay["movers"][:8]))
 
     t = step("운용사 방향 (액티브 ETF)")
@@ -420,6 +421,18 @@ def main(argv):
     idx = logic.stock_index(universe_all, {c: r for c, r in risk.items()}, closes, values, flows_daily, flows_5d,
                             news_today, news_3d, fund_now, fund_hist, sectors, picked)
     write_chart_shards(base, closes, logic.net_frame(flows_hist), idx["stocks"], highs, lows, values)
+    # 검색 팝업·카드: 최근 10영업일 OpenDART '사는' 공시 (임원·주요주주 매수, 5% 큰손 장내매수, 자사주 취득 결정)
+    recent_ds = {}
+    for x in (dart_sig or {}).get("events") or []:
+        if x.get("code") and x["date"] >= used_days[-10]:
+            recent_ds.setdefault(x["code"], []).append({"k": x["kind"], "d": x["date"], "w": x.get("who"), "r": x.get("rate")})
+    for c, v in recent_ds.items():
+        if c in idx["stocks"]:
+            idx["stocks"][c]["ds"] = v[-5:]
+    for g, items in (("scalp", scalp), ("swing", swing), ("value", value)):
+        for x in items:
+            if x["code"] in recent_ds:
+                x["dart_sig"] = recent_ds[x["code"]][-5:]
     for c, m in mg_of.items():   # 검색 화면에도 '운용사가 20일 동안 산·판' 표시
         if c in idx["stocks"]:
             idx["stocks"][c]["mg"] = m
@@ -517,7 +530,7 @@ def update_season(base, dart_days, name_to_code, errors):
 
 
 def build_replay(base, closes, values, flows_hist, listing, universe, today, reports, opens=None, highs=None, lows=None,
-                 reported=None, attention=None, kospi_idx=None):
+                 reported=None, attention=None, kospi_idx=None, dart_sig=None):
     """최근 급등주를 거슬러 보고(언제 어떤 신호가 먼저 있었나·우리가 언제 잡았나), 신호별로 급등을 앞섰는지 잰다."""
     net = logic.net_frame(flows_hist)
     caps = {c: v["cap"] for c, v in listing.items()}
@@ -561,7 +574,8 @@ def build_replay(base, closes, values, flows_hist, listing, universe, today, rep
     try:
         markets = {c: {"KOSPI": "P", "KOSDAQ": "D"}.get(v.get("market"), "") for c, v in listing.items()}
         myths = (logic.myth_check(closes, opens, highs, lows, values, elig, reports, markets=markets, caps=caps,
-                                  reported=(reported or {}).get("reported"), attention=attention, index=kospi_idx)
+                                  reported=(reported or {}).get("reported"), attention=attention, index=kospi_idx,
+                                  dart_events=(dart_sig or {}).get("events"))
                  if opens is not None and highs is not None and lows is not None else None)
         if myths:
             log("  속설 검증: " + ", ".join(f"{x['title']}({x['verdict']}, {x['n']}건)" for x in myths["items"]))
@@ -681,6 +695,45 @@ def build_themes(base, days, closes, flows_daily, flows_5d, listing, reports, re
     out.sort(key=lambda x: (order[x["key"]], -x["flow_pct"]))
     heat = logic.theme_heat(heat_src, logic.net_frame(flows_hist or []), caps, days=20)
     return {"themes": out, "bench": {c: logic.etf_trend(sr) for c, sr in bench.items()}, "heat": heat}
+
+
+def load_dart_signals():
+    try:
+        with open(os.path.join(DATA, "dart_signals.json"), encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {"v": 1, "checked": [], "events": []}
+
+
+def update_dart_signals(base, days, errors, keep_days=150, max_detail=400):
+    """OpenDART로 '사는' 공시(임원·주요주주 매수, 5% 큰손 장내매수, 자기주식 취득 결정)를 날마다 쌓는다 (dart_signals.json).
+    처음엔 최근 영업일(3개월 안)까지 거슬러 받고, 회사별 상세 호출이 한도(max_detail)에 걸리면 남은 날은 다음 실행에서 이어 받음."""
+    store = load_dart_signals()
+    if not sources.opendart_key():
+        return store
+    checked = set(store.get("checked") or [])
+    oldest = (datetime.strptime(base, "%Y%m%d") - timedelta(days=88)).strftime("%Y%m%d")
+    todo = sorted(d for d in days if d >= oldest and d <= base and d not in checked)
+    if not todo:
+        return store
+    try:
+        events, calls, stopped = sources.opendart_signals(todo[0], todo[-1], max_detail=max_detail)
+    except Exception as e:
+        errors.append(f"OpenDART 매수 공시: {type(e).__name__}")
+        log(f"  OpenDART 매수 공시 실패: {type(e).__name__}: {e}")
+        return store
+    done = [d for d in todo if stopped is None or d > stopped]
+    seen = {x["rcept"] for x in store["events"]}
+    store["events"] += [x for x in events if x["rcept"] not in seen and (stopped is None or x["date"] > stopped or x["kind"] == "buyback")]
+    cut = (datetime.strptime(base, "%Y%m%d") - timedelta(days=keep_days)).strftime("%Y%m%d")
+    store["events"] = sorted((x for x in store["events"] if x["date"] >= cut), key=lambda x: x["rcept"])
+    store["checked"] = sorted(d for d in checked | set(done) if d >= cut)
+    with open(os.path.join(DATA, "dart_signals.json"), "w", encoding="utf-8") as f:
+        json.dump(store, f, ensure_ascii=False, separators=(",", ":"))
+    kinds = {k: sum(1 for x in events if x["kind"] == k) for k in ("insider", "major", "buyback")}
+    log(f"  OpenDART 매수 공시 {todo[0]}~{todo[-1]}: 임원·주요주주 매수 {kinds['insider']} · 5% 큰손 장내매수 {kinds['major']} · 자사주 취득 결정 {kinds['buyback']}"
+        f" (상세 {calls}번{f', {stopped} 이전은 다음에' if stopped else ''})")
+    return store
 
 
 def update_attention(base, search_top, keep_days=150):

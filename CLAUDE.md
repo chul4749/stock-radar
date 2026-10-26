@@ -9,6 +9,10 @@
   - `main.py` — 하루치 결과를 `site/data/{기준일}.json`으로 쓰고 `index.json`, `scorecard.json`을 갱신한다.
     실행: `python -m collector.main [YYYYMMDD]` (기준일을 안 주면 18시 이후는 오늘, 그 전은 전 영업일)
   - `sources.py` — 외부 데이터 접속 (KRX/pykrx, 네이버, 구글 뉴스, DART, CBOE, FRED, CNN, 금융투자협회 FreeSIS)
+    공시는 OpenDART(Secrets `DART_API_KEY`, 무료·하루 2만 건)가 있으면 `opendart_list`로, 없거나 실패하면 DART 웹(`dart_web_today`)으로.
+    `opendart_signals`: '사는' 공시 — 임원·주요주주 지분 증가(`elestock`), 5% 큰손 장내매수(`majorstock`), 자기주식 취득 결정(주요사항보고서 제목).
+    main `update_dart_signals` → `site/data/dart_signals.json`(150일, 처음엔 3개월 거슬러, 회사별 상세 호출 하루 400번까지·남으면 다음 실행).
+    속설 검증에 '회사 사람이 사면 오른다'·'자사주를 산다고 하면 오른다'·'큰손이 5% 넘게 사들이면 오른다', 카드 `dsTag`·검색 팝업 `dsLines`(최근 10영업일).
   - `logic.py` — 시장 온도계, 종목 필터, 위험 공시 제외, 저평가, 성적표 계산,
     장세 판정(`market_regime`: 상승장·횡보·하락장·패닉, 시나리오 적합도 `FIT`, 인버스 점검표).
     `FIT`는 연구 결과(패닉 구간 추세 추종 붕괴, 이동평균 추세 추종, 인버스 매일 재조정 손실)에 기댄 규칙이고,
@@ -69,7 +73,7 @@
 - 예약 실행은 모두 `IF_MISSING`(그날 데이터 있으면 건너뜀). 외부 예약(cron-job.org)은 `if_missing=1`로 부른다 — `docs/external-schedule.md`.
 - `.github/workflows/pages.yml`: `site/` 코드(데이터 제외)가 main에 올라오면 수집 없이 바로 배포.
   수동 실행 때 `dates`에 과거 기준일을 넣으면 다시 계산한다(성적표 채우기용).
-- KRX는 로그인 필요: Secrets `KRX_ID`/`KRX_PW`.
+- KRX는 로그인 필요: Secrets `KRX_ID`/`KRX_PW`. OpenDART는 `DART_API_KEY` (collect·credit-probe에 전달).
 - VKOSPI는 경로를 못 찾아 코스피200 20일 실현 변동성으로 대신한다.
 - 신용잔고·반대매매는 금융투자협회 FreeSIS(`sources.kofia`)에서 받는다. T+1 공표라 기준일 전날 값이 최신.
 - 외국인 코스피200 선물 순매수는 다음 금융(`sources.daum_futures`), 종목 기업 정보는 네이버(`sources.naver_profile`).

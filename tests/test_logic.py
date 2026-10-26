@@ -856,3 +856,20 @@ def test_myth_check_planted_hype_is_significant():
     hype = {x["key"]: x for x in out["items"]}["hype"]
     assert hype["verdict"] == "true" and hype["t3"] < -2
     assert set(hype["by_mk"]) == {"up", "down"}
+
+
+def test_myth_check_dart_events():
+    import numpy as np
+    days = [f"2026{i:04d}" for i in range(100, 182)]
+    rng = np.random.default_rng(2)
+    cols = [f"{i:06d}" for i in range(50)]
+    cl = pd.DataFrame(1000 * np.exp(np.cumsum(rng.normal(0, 0.01, (len(days), 50)), 0)), index=days, columns=cols)
+    op = cl.shift(1).fillna(1000.0)
+    hi, lo = np.maximum(cl, op) * 1.001, np.minimum(cl, op) * 0.999
+    va = pd.DataFrame(1.0, index=days, columns=cols)
+    ev = [{"date": days[30 + i], "code": cols[i], "kind": "insider", "rcept": str(i)} for i in range(40)]
+    ev.append({"date": days[40], "code": "999999", "kind": "buyback", "rcept": "x"})   # 대상 밖 종목은 무시
+    out = logic.myth_check(cl, op, hi, lo, va, set(cols), cost=0, dart_events=ev)
+    it = {x["key"]: x for x in out["items"]}
+    assert it["insider"]["n"] == 40 and "by_mk" in it["insider"]
+    assert "buyback" not in it   # 해당 종목 없음 → 항목 안 만듦

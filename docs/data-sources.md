@@ -8,7 +8,7 @@
 | 뉴스 | 구글 뉴스 RSS | ✅ | 키 없음, 검색어별 100건 |
 | 뉴스 | 네이버 주요뉴스 `m.stock.naver.com/api/news/list` | ✅ | 비공식 |
 | 뉴스 | 네이버 종목 뉴스 `m.stock.naver.com/api/news/stock/{code}` | ✅ | 비공식 |
-| 공시 | DART 웹 목록 | ✅ | 정식은 OpenDART 키(무료) 권장 |
+| 공시 | OpenDART `list.json` (키 있으면) → DART 웹 목록 | ✅ | 2026-10-26 키 연결. 임원·주요주주(`elestock`)·대량보유(`majorstock`)·자기주식(`tsstkAqDecsn`)·재무(`fnlttSinglAcnt`) 확인됨 (`probe/opendart.py`) |
 | 전종목 시세 | 네이버 `api/stocks/marketValue/{KOSPI,KOSDAQ}` | ✅ | 코스피 2,494·코스닥 1,823 (ETF 포함), 100건/쪽 |
 | 일봉 | 네이버 `api.finance.naver.com/siseJson.naver` | ✅ | |
 | 기관·외국인 | 네이버 `api/stock/{code}/trend` | ✅ | 종목별, 일자별 순매수 수량 |

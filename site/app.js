@@ -931,7 +931,22 @@ function cardHead(x) {
   return `<div class="hd">
       <a class="nm" data-code="${x.code}" href="https://m.stock.naver.com/domestic/stock/${x.code}" target="_blank" rel="noopener">${esc(x.name)}<span class="mk">${esc(x.market)} ${x.code}${x.sector ? " · " + esc(x.sector) : ""}</span></a>
       <div class="px">${starBtn(x)}<b>${num(x.close)}</b><span class="${cls(x.change)}">${signed(x.change, 1, "%")}</span></div>
-    </div>${streakTag(x)}${mgrTag(x.managers)}${x.search_rank ? `<span class="tag known" title="네이버 증권에서 많이 검색한 상위 100개 안. 이미 많이 알려져 미리 사 두는 기회는 지났을 수 있음">검색 ${x.search_rank}위 · 이미 알려짐</span>` : ""}${x.overlap ? `<span class="tag both">두 관점 겹침</span>` : ""}`;
+    </div>${streakTag(x)}${mgrTag(x.managers)}${dsTag(x.dart_sig)}${x.search_rank ? `<span class="tag known" title="네이버 증권에서 많이 검색한 상위 100개 안. 이미 많이 알려져 미리 사 두는 기회는 지났을 수 있음">검색 ${x.search_rank}위 · 이미 알려짐</span>` : ""}${x.overlap ? `<span class="tag both">두 관점 겹침</span>` : ""}`;
+}
+
+// OpenDART '사는' 공시 (최근 10영업일): 임원·주요주주 매수, 5% 큰손 장내매수, 자사주 취득 결정
+const DS_NAME = { insider: "회사 사람 매수", major: "5% 큰손 장내매수", buyback: "자사주 취득 결정" };
+function dsTag(list) {
+  if (!list || !list.length) return "";
+  const kinds = [...new Set(list.map((x) => x.k))];
+  return kinds.map((k) => `<span class="tag fresh" title="최근 10영업일 공시 (OpenDART)">${DS_NAME[k] || k}</span>`).join("");
+}
+function dsLines(list) {
+  if (!list || !list.length) return "";
+  const m = state.data && state.data.replay && state.data.replay.myths;
+  const v = (k) => { const it = m && m.items.find((x) => x.key === k); return it ? ` <small>— 지난 기록: ${(MYTH_VERDICT[it.verdict] || MYTH_VERDICT.few)[0]}</small>` : ""; };
+  return `<h3 class="sub">최근 '사는' 공시 <small>10영업일, OpenDART</small></h3><ul class="plain">${list.map((x) =>
+    `<li>${ymd(x.d).slice(5)} <b>${DS_NAME[x.k] || x.k}</b>${x.w ? ` (${esc(x.w)}${x.r && x.r !== "-" ? `, 지분 ${esc(String(x.r))}%p` : ""})` : ""}${v(x.k)}</li>`).join("")}</ul>`;
 }
 
 // 운용사(액티브 ETF)가 20일 동안 산·판 종목
@@ -1406,6 +1421,9 @@ const MYTH_VERDICT = { true: ["맞았음", "fresh"], false: ["반대로 나옴",
 const MK_NAME = { up: "상승장 때", down: "하락장 때" };
 // 우연인가: 날짜로 묶은 t (|t|≥2면 우연으로 보기 어려움)
 const chance = (t) => t == null ? "" : Math.abs(t) >= 3 ? "우연일 가능성 매우 낮음" : Math.abs(t) >= 2 ? "우연일 가능성 낮음" : "우연과 구분 안 됨";
+MYTH_WHY.insider = "회사 사정을 가장 잘 아는 임원·대주주가 자기 돈으로 주식을 더 산다면, 앞으로 좋아질 걸 안다는 신호라는 생각. 다만 스톡옵션·상속처럼 시장에서 산 게 아닌 것도 섞여 있어요.";
+MYTH_WHY.buyback = "회사가 자기 주식을 사면 시장에 도는 주식이 줄고, '우리 주식이 싸다'는 회사의 판단이기도 하다는 생각. 다만 '사겠다'는 발표일 뿐 실제로 다 사지 않는 경우도 있어요.";
+MYTH_WHY.major = "이미 5% 넘게 가진 큰손이 장에서 더 사들인다면 뭔가 알고 있거나 경영권을 노린다는 생각.";
 MYTH_WHY.rumor = "좋은 소식(실적·리포트)이 나오기 전에 소문을 듣고 미리 산 사람들이, 정작 소식이 나오면 '이제 다 알려졌다'며 판다는 생각. 그래서 소식 전에 이미 많이 오른 종목은 뉴스 뒤에 힘이 빠진다는 말.";
 const SEG_NAME = { kospi: "코스피", kosdaq: "코스닥", large: "대형 (1조↑)", mid: "중형 (3천억~1조)", small: "소형 (3천억↓)" };
 
@@ -2069,6 +2087,7 @@ async function openStock(code) {
       <div class="px">${starBtn({ code, name: s.n, close: s.c, date: db.date })}<b>${num(s.c)}</b><span class="${cls(s.ch)}">${signed(s.ch, 1, "%")}</span></div></div>
     <p class="hint">${ymd(db.date)} 기준 · 시총 ${eokText(s.cap)} · 거래대금 ${num(s.v)}억${tabs.length ? ` · <b>오늘 ${tabs.join("·")} 후보</b>` : ""}</p>
     ${s.x ? `<div class="earnwarn">⚠ 위험 공시·투자주의로 후보에서 뺀 종목: ${s.x.map(esc).join(", ")}</div>` : ""}
+    ${dsLines(s.ds)}
     ${s.mg ? `<p class="hint">20일 동안 운용사(액티브 ETF): ${s.mg.buy && s.mg.buy.length ? `<b class="up">산 곳 ${s.mg.buy.map(esc).join("·")}</b>` : ""}${s.mg.buy && s.mg.buy.length && s.mg.sell && s.mg.sell.length ? " · " : ""}${s.mg.sell && s.mg.sell.length ? `<b class="down">판 곳 ${s.mg.sell.map(esc).join("·")}</b>` : ""}</p>` : ""}
     <div class="nums">
       <div><small>5일 기관+외국인</small><b class="${cls(s.f5)}">${signed(s.f5, 0, "억")}</b><small>${s.pd}일 순매수</small></div>

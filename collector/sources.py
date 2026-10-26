@@ -5,6 +5,7 @@ KRX 는 pykrx 가 환경변수 KRX_ID / KRX_PW 로 자동 로그인한다.
 """
 import html
 import math
+import os
 import re
 import time
 from datetime import datetime, timedelta, timezone
@@ -362,8 +363,122 @@ DART_EARNINGS = ["잠정)실적", "잠정실적", "손익구조"]
 DART_STATE = {"down": False}   # 한 번 첫 쪽부터 접속이 안 되면 이번 실행에선 더 부르지 않는다 (날마다 수 분씩 기다리지 않게)
 
 
+# ---------------------------------------------------------------- OpenDART (정식 API, 무료 키 DART_API_KEY)
+OPENDART = "https://opendart.fss.or.kr/api"
+
+
+def opendart_key():
+    return os.environ.get("DART_API_KEY", "").strip()
+
+
+def opendart(path, **params):
+    """OpenDART 호출. status 000(정상)·013(자료 없음)만 받아들이고 나머지는 예외 (키 오류·한도 초과 등)."""
+    d = retry(lambda: get(f"{OPENDART}/{path}", params={"crtfc_key": opendart_key(), **params}, timeout=30).json(), tries=3, wait=3)
+    if d.get("status") not in ("000", "013"):
+        raise RuntimeError(f"OpenDART {path} {d.get('status')} {d.get('message')}")
+    return d
+
+
+def opendart_list(bgn, end=None, kind=None, markets=("Y", "K"), max_pages=40):
+    """기간 공시 목록 (corp_code 없이는 3개월까지). 반환: list.json의 줄 그대로 (코스피 Y·코스닥 K만)."""
+    out = []
+    for page in range(1, max_pages + 1):
+        params = {"bgn_de": bgn, "end_de": end or bgn, "page_count": 100, "page_no": page}
+        if kind:
+            params["pblntf_ty"] = kind
+        d = opendart("list.json", **params)
+        rows = d.get("list") or []
+        out += [r for r in rows if r.get("corp_cls") in markets]
+        if page >= int(d.get("total_page") or 1):
+            break
+        time.sleep(0.15)
+    return out
+
+
+def _dart_item(ymd, corp, title, rcp, code=None):
+    """웹·API 공시를 같은 모양으로 (재료성·위험·실적 판정은 제목 글자로)."""
+    title = re.sub(r"\s+", " ", title).strip()
+    return {"corp": corp, "code": code, "title": title,
+            "url": f"https://dart.fss.or.kr/dsaf001/main.do?rcpNo={rcp}",
+            # API에는 접수 시각이 없어 장 마감 뒤(16:00)로 둔다 (그날 소식으로 셈)
+            "at": f"{ymd[:4]}-{ymd[4:6]}-{ymd[6:]}T16:00+09:00",
+            "kind": "공시", "source": "DART",
+            "good": any(k in title for k in DART_GOOD) and not any(k in title for k in DART_BAD)
+                    and not any(k in title for k in DART_NOT_GOOD) and "정정" not in title[:4],
+            "earnings": any(k in title for k in DART_EARNINGS) and not any(k in title for k in DART_NOT_GOOD),
+            "bad": any(k in title for k in DART_BAD)
+                   and not any(k in title for k in ("미지정", "철회", "해제", "취소", "지정유예"))}
+
+
 def dart_today(ymd, max_pages=15):
-    """DART 오늘 공시 목록(웹). 코스피·코스닥 상장사만. 정식 OpenDART 는 키가 필요하다.
+    """그날 공시 목록. 키가 있으면 OpenDART(빠르고 안정적), 없거나 실패하면 DART 웹."""
+    if opendart_key():
+        try:
+            rows = opendart_list(ymd)
+            return [_dart_item(ymd, r["corp_name"], r["report_nm"], r["rcept_no"], r.get("stock_code")) for r in rows
+                    if r["rcept_no"][:8] == ymd]
+        except Exception as e:
+            log(f"  OpenDART 목록 실패 → 웹으로: {type(e).__name__}: {e}")
+    return dart_web_today(ymd, max_pages)
+
+
+def _int(x):
+    try:
+        return int(str(x).replace(",", "").strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def opendart_signals(bgn, end, cache=None, max_detail=400):
+    """내부자·큰손·회사의 '사는' 공시 (기간 bgn~end, 3개월 안):
+    · insider: 임원·주요주주 특정증권 소유 보고에서 주식 수가 늘어난 것 (elestock, 회사마다 한 번 불러 접수번호로 맞춤)
+    · major:   5% 대량보유 보고 중 보고 사유에 '장내매수'가 있고 주식 수가 늘어난 것 (majorstock)
+    · buyback: 주요사항보고서(자기주식취득결정·자기주식취득신탁계약체결결정) — 제목만으로
+    반환 [{date, code, name, kind, rcept, qty, rate, who}], 회사별 상세 호출은 max_detail 개까지 (cache: corp_code → 응답 줄)."""
+    cache = cache if cache is not None else {}
+    out, calls = [], 0
+    for r in opendart_list(bgn, end, kind="B"):
+        t = r["report_nm"].replace(" ", "")
+        if "자기주식취득" in t and "정정" not in t[:6] and "처분" not in t:
+            out.append({"date": r["rcept_no"][:8], "code": r.get("stock_code"), "name": r["corp_name"], "kind": "buyback", "rcept": r["rcept_no"]})
+    rows = opendart_list(bgn, end, kind="D")
+    want = [r for r in rows if not r["report_nm"].startswith("[") and
+            ("임원ㆍ주요주주특정증권등소유상황보고서" in r["report_nm"] or "주식등의대량보유상황보고서" in r["report_nm"])]
+    want.sort(key=lambda r: r["rcept_no"], reverse=True)   # 최근 것부터 (상세 호출 한도 안에서)
+    stopped = None   # 한도에 걸려 이 날짜(포함) 이전은 다 못 봄
+    for r in want:
+        api = "elestock.json" if "임원" in r["report_nm"] else "majorstock.json"
+        key = (api, r["corp_code"])
+        if key not in cache:
+            if calls >= max_detail:
+                stopped = stopped or r["rcept_no"][:8]
+                continue
+            try:
+                cache[key] = opendart(api, corp_code=r["corp_code"]).get("list") or []
+            except Exception as e:
+                log(f"  OpenDART {api} {r['corp_name']} 실패: {type(e).__name__}")
+                cache[key] = []
+            calls += 1
+            time.sleep(0.1)
+        hit = next((x for x in cache[key] if x.get("rcept_no") == r["rcept_no"]), None)
+        if not hit:
+            continue
+        if api == "elestock.json":
+            q = _int(hit.get("sp_stock_lmp_irds_cnt"))
+            if q and q > 0:
+                out.append({"date": r["rcept_no"][:8], "code": r.get("stock_code"), "name": r["corp_name"], "kind": "insider",
+                            "rcept": r["rcept_no"], "qty": q, "rate": hit.get("sp_stock_lmp_irds_rate"),
+                            "who": hit.get("isu_exctv_ofcps") if hit.get("isu_exctv_ofcps") not in (None, "-") else hit.get("isu_main_shrholdr")})
+        else:
+            q = _int(hit.get("stkqy_irds"))
+            if q and q > 0 and "장내매수" in (hit.get("report_resn") or ""):
+                out.append({"date": r["rcept_no"][:8], "code": r.get("stock_code"), "name": r["corp_name"], "kind": "major",
+                            "rcept": r["rcept_no"], "qty": q, "rate": hit.get("stkrt_irds"), "who": hit.get("repror")})
+    return out, calls, stopped
+
+
+def dart_web_today(ymd, max_pages=15):
+    """DART 오늘 공시 목록(웹, OpenDART 키가 없거나 실패할 때). 코스피·코스닥 상장사만.
 
     첫 쪽부터 실패하면 예외를 낸다 (빈 목록과 '받지 못함'을 구분해야 위험 공시 제외가 조용히 약해지지 않는다).
     """
