@@ -1816,7 +1816,8 @@ def myth_check(closes, opens, highs, lows, values, eligible, reports=None, rules
         if len(dm) >= 5 and dm.std(ddof=1) > 0:
             se = float(dm.std(ddof=1) / np.sqrt(len(dm)))
             out["se3"] = round(se, 2)
-            out["t3"] = round(float(dm.mean() / se), 1)
+            # 판정·그림이 같은 값을 쓰도록 t는 화면에 보이는 평균(위아래 5% 뺀 x3)을 이 표준오차로 나눔
+            out["t3"] = round(float(_trim_mean(x3) / se), 1)
         else:
             out["se3"], out["t3"] = None, None
         # 쏠림: 종목별 초과 수익 합 중 위 5종목 몫(이긴 쪽 기준), 가장 많이 걸린 하루의 몫
