@@ -1079,9 +1079,9 @@ def test_sector_rs_only_for_members_of_large_enough_index():
 
 def test_move_vs_atr_uses_only_pre_surge_range():
     days = [f"d{i:02d}" for i in range(40)]
-    c = pd.Series([100.0] * 39 + [130.0], index=days)
+    c = pd.Series([100.0] * 38 + [130.0, 110.0], index=days)
     h, lo = c + 1, c - 1                       # 급등 전 하루 변동폭 2 (2%)
-    m = logic.move_vs_atr(h, lo, c, "d39")
+    m = logic.move_vs_atr(h, lo, c, "d38")     # 다음 날 되돌린 건 섞지 않고 급등 하루만
     assert m == {"atr_pct": 2.0, "rise": 30.0, "x": 15.0}
     assert logic.move_vs_atr(h, lo, c, "d00") is None and logic.move_vs_atr(h, lo, c, "zz") is None
 

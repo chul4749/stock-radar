@@ -2629,14 +2629,15 @@ def atr_wilder(high, low, close, n=14, breaks_s=None, min_len=None):
 
 
 def move_vs_atr(high, low, close, surge, breaks_s=None):
-    """급등 시작 전날 종가 → 지금 종가 상승률이 급등 전 평소 하루 변동폭(ATR14, %)의 몇 배인가.
-    같은 +20%라도 평소 1% 움직이던 종목과 6% 움직이던 종목은 무게가 다르다. ATR은 급등 전 자료로만."""
+    """급등한 그 하루(전날 종가 → 급등일 종가) 상승률이 급등 전 평소 하루 변동폭(ATR14, %)의 몇 배인가.
+    같은 +20%라도 평소 1% 움직이던 종목과 6% 움직이던 종목은 무게가 다르다. ATR은 급등 전 자료로만.
+    (그 뒤에 되돌린 것까지 섞으면 '얼마나 드문 하루였나'가 흐려져서 급등일 하루만 본다)"""
     idx = list(close.index)
     if surge not in idx or idx.index(surge) < 1:
         return None
     i = idx.index(surge)
     atr = atr_wilder(high.iloc[:i], low.iloc[:i], close.iloc[:i], breaks_s=breaks_s.iloc[:i] if breaks_s is not None else None)
-    base, now = close.iloc[i - 1], close.iloc[-1]
+    base, now = close.iloc[i - 1], close.iloc[i]
     if not atr or not base or base != base or now != now:
         return None
     pct = atr / base * 100
