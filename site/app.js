@@ -440,13 +440,11 @@ function ma200Tile(m) {
 // 내 지표 (트레이딩뷰 Pine 스크립트를 옮김): 코스피 종가 + EMA 9·21, BUY/SELL 신호, 지금 상태, 여러 종목에서 따라 했을 때 실제 성적
 const tvLab = (d) => d.length > 8 ? `${ymd(d)} ${d.slice(8)}시` : ymd(d);
 const TV_TF = { d: "일봉", w: "주봉", h4: "4시간봉" };
-let tvTf = "d";
-try { tvTf = localStorage.getItem("tvTf") || "d"; } catch (e) { /* 무시 */ }
+let tvTf = "d";   // 기준은 일봉 (열 때마다 일봉으로 시작)
 document.addEventListener("click", (e) => {
   const b = e.target.closest("button[data-tvtf]");
   if (!b) return;
   tvTf = b.dataset.tvtf;
-  try { localStorage.setItem("tvTf", tvTf); } catch (err) { /* 무시 */ }
   renderTv();
 });
 function tvChart(c) {
@@ -482,7 +480,7 @@ function renderTv() {
   if (!tfs[tvTf]) tvTf = tfs.d ? "d" : Object.keys(tfs)[0];
   const c = tfs[tvTf];
   if (!c) { el.innerHTML = ""; return; }
-  const seg = Object.keys(tfs).length > 1 ? `<div class="seg" role="tablist">${["d", "w", "h4"].filter((f) => tfs[f]).map((f) => `<button type="button" data-tvtf="${f}" aria-selected="${f === tvTf}">${TV_TF[f]}</button>`).join("")}</div>` : "";
+  const seg = Object.keys(tfs).length > 1 ? `<div class="seg" role="tablist">${["h4", "d", "w"].filter((f) => tfs[f]).map((f) => `<button type="button" data-tvtf="${f}" aria-selected="${f === tvTf}">${TV_TF[f]}</button>`).join("")}</div>` : "";
   const tfNote = { d: "하루 마감 가격 기준", w: "그 주 마지막 거래일 마감 가격 기준 (최근 2년)", h4: "09~13시·13~15:30 두 봉 (야후 시간봉을 묶음, 마감 뒤 하루 한 번 갱신)" }[tvTf];
   const nw = c.now, last = nw.last;
   const state1 = `EMA ${c.rules.fast}가 ${c.rules.slow} ${nw.ema_up ? "위" : "아래"} · RSI ${num(nw.rsi, 0)} (${nw.rsi > 50 ? "50 위" : "50 아래"}) · MACD가 신호선 ${nw.macd_up ? "위" : "아래"}`;
