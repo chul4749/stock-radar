@@ -1168,3 +1168,13 @@ def test_tv_signal_check_trades_and_baseline():
     br = pd.DataFrame(False, index=days, columns=["A", "B"])
     br.iloc[70:, 1] = True                                       # B는 보유 중 가격이 끊김 → 그 거래 뺌
     assert logic.tv_signal_check(cl, br, cost=0)["n"] == 1
+
+
+def test_weekly_and_4h_bars():
+    from datetime import datetime as dt
+    d = pd.Series([1.0, 2, 3, 4, 5, 6, 7], index=["20261026", "20261027", "20261028", "20261029", "20261030", "20261102", "20261103"])
+    w = logic.to_weekly(d)
+    assert list(w.index) == ["20261030", "20261103"] and list(w) == [5.0, 7.0]       # 그 주 마지막 거래일 마감
+    rows = [(dt(2026, 10, 29, h), float(h)) for h in (9, 10, 11, 12, 13, 14, 15)] + [(dt(2026, 10, 29, 16), 99.0)]
+    h4 = logic.to_4h(rows)
+    assert dict(h4) == {"2026102909": 12.0, "2026102913": 15.0}                    # 09~13시 / 13~15:30, 장 밖 봉은 뺌

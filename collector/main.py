@@ -394,9 +394,15 @@ def main(argv):
         temp["regime"] = logic.market_regime([float(v) for v in kospi_long.values], temp,
                                              dates=[d.strftime("%Y%m%d") for d in kospi_long.index])
     # 사용자 지표(트레이딩뷰 Pine: EMA 9·21 + RSI 14 + MACD) — 코스피 차트와, 여러 종목에서 신호를 따라 했을 때 실제 성적
-    if kospi_long is not None:
-        ks = pd.Series([float(v) for v in kospi_long.values], index=[d.strftime("%Y%m%d") for d in kospi_long.index])
-        temp["tv"] = safe("내 지표 코스피", lambda: logic.tv_chart(ks), errors)
+    # 일봉·주봉은 코스피 3년 종가(KRX), 4시간봉은 야후 60분봉을 묶어서 (기준일 뒤 자료는 잘라 냄 — 재계산 때 미래 정보 차단)
+    k3 = safe("코스피 3년", lambda: sources.index_history("1001", (datetime.strptime(base, "%Y%m%d") - timedelta(days=1100)).strftime("%Y%m%d"), base), errors)
+    hourly = [] if backfill else (safe("코스피 시간봉", lambda: sources.yahoo_hourly("^KS11"), errors) or [])
+    hourly = [(t, c) for t, c in hourly if t.strftime("%Y%m%d") <= base]
+    if k3 is not None:
+        ks = pd.Series([float(v) for v in k3.values], index=[d.strftime("%Y%m%d") for d in k3.index])
+        tfs = safe("내 지표 코스피", lambda: logic.tv_timeframes(ks, hourly), errors) or {}
+        temp["tv"] = tfs.get("d")
+        temp["tv_tf"] = tfs
     if long_closes is not None:
         elig = {c for c, v in universe_all.items() if v["cap"] >= logic.RULES["min_cap"]}
         temp["tv_check"] = safe("내 지표 검증", lambda: logic.tv_signal_check(long_closes, long_breaks, eligible=elig), errors)

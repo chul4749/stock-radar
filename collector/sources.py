@@ -594,6 +594,17 @@ def yahoo_daily(symbol, rng="1mo"):
     return out
 
 
+def yahoo_hourly(symbol, rng="730d"):
+    """야후 차트 API 60분봉 종가 (4시간봉 만들기용). 반환: [(현지 시각 naive datetime, 종가)] 오래된 순. 봉 시각은 그 봉이 시작한 시각."""
+    r = retry(lambda: get(f"https://query1.finance.yahoo.com/v8/finance/chart/{quote(symbol)}",
+                          params={"range": rng, "interval": "60m"}), tries=3, wait=5)
+    res = r.json()["chart"]["result"][0]
+    off = res["meta"].get("gmtoffset", 0)
+    closes = res["indicators"]["quote"][0]["close"]
+    return [(datetime.fromtimestamp(ts + off, tz=timezone.utc).replace(tzinfo=None), float(c))
+            for ts, c in zip(res.get("timestamp") or [], closes) if c is not None]
+
+
 # ---------------------------------------------------------------- 증권사 리포트·검색 상위 (네이버 모바일, 비공식)
 
 def naver_research(since_ymd, max_pages=40):

@@ -3142,3 +3142,36 @@ def tv_signal_check(closes, breaks=None, rules=TV, cost=None, eligible=None):
             "low10": _tail(rets), "hold": r1(float(np.median(holds))),
             "base": {"n": len(b), "win": round(float((b > 0).mean() * 100)), "avg": r1(b.mean())} if len(b) else None,
             "from": str(closes.index[0]), "to": str(closes.index[-1]), "cost": cost, "rules": rules}
+
+
+def to_weekly(daily):
+    """일봉 종가(index=YYYYMMDD) → 주봉 종가 (그 주 마지막 거래일 마감, index=그날)."""
+    s = daily.dropna()
+    if s.empty:
+        return s
+    last = {}
+    for d in s.index:
+        last[tuple(datetime.strptime(d, "%Y%m%d").isocalendar()[:2])] = d
+    return s.loc[sorted(last.values())]
+
+
+def to_4h(rows):
+    """시간봉 [(KST datetime, 종가)] → 4시간봉 종가 (트레이딩뷰 한국장처럼 09:00~13:00, 13:00~15:30 두 개, index=YYYYMMDDHH 시작 시각)."""
+    out = {}
+    for t, c in sorted(rows):
+        if c is None or not (9 <= t.hour < 16):
+            continue
+        key = t.strftime("%Y%m%d") + ("09" if t.hour < 13 else "13")
+        out[key] = float(c)     # 그 묶음의 마지막 시간봉 종가
+    return pd.Series(out, dtype=float)
+
+
+def tv_timeframes(daily, hourly=None, rules=TV):
+    """일봉·주봉·4시간봉 각각의 내 지표 차트. 주봉은 일봉에서, 4시간봉은 시간봉에서 만든다 (자료가 모자라면 그 봉은 뺀다)."""
+    out = {}
+    if daily is not None and len(daily):
+        out["d"] = tv_chart(daily.iloc[-300:], days=120, rules=rules)
+        out["w"] = tv_chart(to_weekly(daily), days=104, rules=rules)
+    if hourly:
+        out["h4"] = tv_chart(to_4h(hourly), days=120, rules=rules)
+    return {k: v for k, v in out.items() if v}

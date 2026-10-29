@@ -438,6 +438,17 @@ function ma200Tile(m) {
 }
 
 // 내 지표 (트레이딩뷰 Pine 스크립트를 옮김): 코스피 종가 + EMA 9·21, BUY/SELL 신호, 지금 상태, 여러 종목에서 따라 했을 때 실제 성적
+const tvLab = (d) => d.length > 8 ? `${ymd(d)} ${d.slice(8)}시` : ymd(d);
+const TV_TF = { d: "일봉", w: "주봉", h4: "4시간봉" };
+let tvTf = "d";
+try { tvTf = localStorage.getItem("tvTf") || "d"; } catch (e) { /* 무시 */ }
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-tvtf]");
+  if (!b) return;
+  tvTf = b.dataset.tvtf;
+  try { localStorage.setItem("tvTf", tvTf); } catch (err) { /* 무시 */ }
+  renderTv();
+});
 function tvChart(c) {
   const n = c.close.length;
   if (n < 2) return "";
@@ -459,22 +470,27 @@ function tvChart(c) {
     <path d="${path(c.ema_f)}" fill="none" stroke="#f59e0b" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
     <path d="${path(c.ema_s)}" fill="none" stroke="#3b82f6" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
     ${c.buy.map((d) => mk(d, true)).join("")}${c.sell.map((d) => mk(d, false)).join("")}</svg>`;
-  return tipWrap(svg, c.dates.map(ymd), [["코스피", c.close, ""], ["EMA 9", c.ema_f, ""], ["EMA 21", c.ema_s, ""]]) +
+  return tipWrap(svg, c.dates.map(tvLab), [["코스피", c.close, ""], ["EMA 9", c.ema_f, ""], ["EMA 21", c.ema_s, ""]]) +
     `<div class="legend"><span><i style="background:var(--sub)"></i>코스피</span><span><i style="background:#f59e0b"></i>EMA ${c.rules.fast}</span><span><i style="background:#3b82f6"></i>EMA ${c.rules.slow}</span><span style="color:var(--up)">▲ BUY</span><span style="color:var(--down)">▼ SELL</span></div>
-    <div class="barlab"><span style="text-align:left">${ymd(c.dates[0])}</span><span style="text-align:right">${ymd(c.dates[n - 1])}</span></div>`;
+    <div class="barlab"><span style="text-align:left">${tvLab(c.dates[0])}</span><span style="text-align:right">${tvLab(c.dates[n - 1])}</span></div>`;
 }
 function renderTv() {
   const el = $("#tv-body");
   if (!el) return;
-  const t = state.data.temperature || {}, c = t.tv, k = t.tv_check;
+  const t = state.data.temperature || {}, k = t.tv_check;
+  const tfs = t.tv_tf || (t.tv ? { d: t.tv } : {});
+  if (!tfs[tvTf]) tvTf = tfs.d ? "d" : Object.keys(tfs)[0];
+  const c = tfs[tvTf];
   if (!c) { el.innerHTML = ""; return; }
+  const seg = Object.keys(tfs).length > 1 ? `<div class="seg" role="tablist">${["d", "w", "h4"].filter((f) => tfs[f]).map((f) => `<button type="button" data-tvtf="${f}" aria-selected="${f === tvTf}">${TV_TF[f]}</button>`).join("")}</div>` : "";
+  const tfNote = { d: "하루 마감 가격 기준", w: "그 주 마지막 거래일 마감 가격 기준 (최근 2년)", h4: "09~13시·13~15:30 두 봉 (야후 시간봉을 묶음, 마감 뒤 하루 한 번 갱신)" }[tvTf];
   const nw = c.now, last = nw.last;
   const state1 = `EMA ${c.rules.fast}가 ${c.rules.slow} ${nw.ema_up ? "위" : "아래"} · RSI ${num(nw.rsi, 0)} (${nw.rsi > 50 ? "50 위" : "50 아래"}) · MACD가 신호선 ${nw.macd_up ? "위" : "아래"}`;
-  const lastTxt = last ? `마지막 신호: <b class="${last.kind === "buy" ? "up" : "down"}">${last.kind === "buy" ? "BUY" : "SELL"}</b> (${ymd(last.date).slice(5)})` : "최근 1년 동안 신호 없음";
+  const lastTxt = last ? `마지막 신호: <b class="${last.kind === "buy" ? "up" : "down"}">${last.kind === "buy" ? "BUY" : "SELL"}</b> (${tvLab(last.date).slice(5)})` : "보이는 기간 안에 신호 없음";
   let check = "";
   if (k) {
     const b = k.base || {};
-    check = `<h3 class="sub">이 지표를 실제로 따라 했다면 <small>${ymd(k.from).slice(2)}~${ymd(k.to).slice(2)}, 시총 500억 이상 종목</small>${infoBtn("tv_check")}</h3>${infoBox("tv_check")}
+    check = `<h3 class="sub">이 지표를 실제로 따라 했다면 (일봉) <small>${ymd(k.from).slice(2)}~${ymd(k.to).slice(2)}, 시총 500억 이상 종목</small>${infoBtn("tv_check")}</h3>${infoBox("tv_check")}
       ${take(`BUY 신호 ${num(k.n)}번을 따라 샀다면 100번 중 ${num(k.win)}번 이익이었어요 (지표 이름의 '80%'와 비교). 아무 날이나 사서 들고 있었을 때는 100번 중 ${num(b.win)}번.` + (k.n < 30 ? " 아직 30번이 안 돼 운일 수 있어요." : ""))}
       <div class="tile wide"><div class="chart-cap">이익 낸 횟수 (100번 중)</div>
       ${colBars([{ label: "아무 날이나 사기", sub: `${num(b.n)}번 · 10일 들고 있기`, bars: [{ v: b.win, base: true }] }, { label: "BUY 신호 따라 사기", sub: `${num(k.n)}번 · 보통 ${num(k.hold, 0)}일 들고 있음`, bars: [{ v: k.win }] }, { label: "지표 이름의 주장", sub: "검증된 숫자 아님", bars: [{ v: 80, base: true }] }], { unit: "번", count: true, vs: "100번 중 몇 번 이익" })}
@@ -483,7 +499,7 @@ function renderTv() {
       <p class="hint">BUY 다음 날 마감 가격에 사서, SELL 신호가 나온 다음 날 마감 가격에 판다고 계산했어요 (SELL이 ${c.rules.hold_max}영업일 안에 안 나오면 그날 팖). 수수료·세금 ${num(k.cost, 1)}% 뺌, 보유 중 권리락·분할로 가격이 끊긴 거래는 뺐어요.</p>`;
   }
   el.innerHTML = `<h3 class="fit-h">내 지표 — EMA ${c.rules.fast}·${c.rules.slow} + RSI ${c.rules.rsi} + MACD ${infoBtn("tv")}</h3>${infoBox("tv")}
-    <div class="tile wide">${tvChart(c)}<p class="interp">${state1}<br>${lastTxt}</p></div>${check}`;
+    ${seg}<div class="tile wide"><div class="chart-cap">코스피 ${TV_TF[tvTf]} · ${tfNote}</div>${tvChart(c)}<p class="interp">${state1}<br>${lastTxt}</p></div>${check}`;
 }
 
 // 외국인 코스피200 선물: 금액(억 원)이 먼저, 계약 수는 보조. 최근 20일 일별 막대 + 누적선
