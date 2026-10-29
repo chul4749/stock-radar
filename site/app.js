@@ -419,6 +419,25 @@ function highLowChart(b) {
     (d0 && d1 ? `<div class="barlab"><span style="text-align:left">${ymd(d0)}</span><span style="text-align:right">${ymd(d1)}</span></div>` : "");
 }
 
+// 200일선 위 종목 수 추이: 두 시장을 한 그림에, 위아래로 넉넉하게 + 눈금 (작은 스파크라인은 움직임이 안 보였음)
+function ma200Chart(m, lines) {
+  const w = 300, h = 130, d = m.markets[lines[0][0]].dates, n = d.length;
+  const all = lines.flatMap(([k]) => m.markets[k].spark).filter((v) => v != null);
+  const step = Math.max(...all) - Math.min(...all) > 30 ? 10 : 5;
+  const lo = Math.max(0, Math.floor((Math.min(...all) - 2) / step) * step), hi = Math.min(100, Math.ceil((Math.max(...all) + 2) / step) * step);
+  const y = (v) => h - ((v - lo) / (hi - lo || 1)) * h;
+  const ticks = [];
+  for (let v = lo; v <= hi; v += step) ticks.push(v);
+  const grid = ticks.map((v) => `<line x1="0" x2="${w}" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" stroke="var(--line)" stroke-width="1" vector-effect="non-scaling-stroke"/>`).join("");
+  const paths = lines.map(([k, , col]) => `<polyline points="${m.markets[k].spark.map((v, i) => `${((i / (n - 1)) * w).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}" fill="none" stroke="${col}" stroke-width="1.8" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>`).join("");
+  const labs = ticks.map((v) => `<span style="top:${(y(v) / h * 100).toFixed(1)}%">${v}</span>`).join("");
+  const svg = `<div class="ma200ch"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="최근 ${n}일 200일선 위 종목 수">${grid}${paths}</svg><div class="ylab">${labs}</div></div>`;
+  return `<div class="chart-cap">100개 중 200일선 위에 있는 수 (최근 ${n}일)</div>` +
+    tipWrap(svg, d.map(ymd), lines.map(([k, name]) => [name, m.markets[k].spark, "개"])) +
+    `<div class="legend">${lines.map(([, name, col]) => `<span><i style="background:${col}"></i>${name}</span>`).join("")}</div>` +
+    `<div class="barlab"><span style="text-align:left">${ymd(d[0])}</span><span style="text-align:right">${ymd(d[n - 1])}</span></div>`;
+}
+
 // 200일 평균선 위·아래 종목 수 (시장별) + 최근 '위에 있는 비율' 추이
 function ma200Tile(m) {
   const rows = [["KOSPI", "코스피"], ["KOSDAQ", "코스닥"]].filter(([k]) => m.markets[k]).map(([k, name]) => {
@@ -427,7 +446,7 @@ function ma200Tile(m) {
     return `<tr><td>${name}</td><td class="up">${num(x.above)}</td><td class="down">${num(x.below)}</td><td><b>${num(x.pct, 0)}개</b>${chg != null ? ` <small class="${cls(chg)}">(${x.dates.length}일 전 ${num(first, 0)}개)</small>` : ""}</td></tr>`;
   }).join("");
   const lines = [["KOSPI", "코스피", "var(--up)"], ["KOSDAQ", "코스닥", "var(--down)"]].filter(([k]) => m.markets[k] && m.markets[k].spark.length > 1);
-  const chart = lines.length ? `<div class="ma200sp">${lines.map(([k, name, col]) => `<div><small>${name} 100개 중 위에 있는 수 (최근 ${m.markets[k].spark.length}일)</small>${tipWrap(spark(m.markets[k].spark, col), m.markets[k].dates.map(ymd), [["100개 중 200일선 위", m.markets[k].spark, "개"]])}</div>`).join("")}</div>` : "";
+  const chart = lines.length ? ma200Chart(m, lines) : "";
   const exc = Object.values(m.markets).reduce((a, x) => a + x.excluded, 0);
   const k = m.markets.KOSPI;
   const read = k ? `코스피 종목 100개 중 ${num(k.pct, 0)}개가 200일 평균 위 — ${k.pct >= 60 ? "대부분이 긴 오름 흐름 위" : k.pct >= 40 ? "반반" : k.pct >= 20 ? "대부분이 긴 흐름 아래(약한 장)" : "거의 다 긴 흐름 아래(크게 무너진 장)"}` : "";
@@ -484,9 +503,12 @@ function renderTv() {
     return;
   }
   const seg = Object.keys(tfs).length > 1 ? `<div class="seg" role="tablist">${["h4", "d", "w"].filter((f) => tfs[f]).map((f) => `<button type="button" data-tvtf="${f}" aria-selected="${f === tvTf}">${TV_TF[f]}</button>`).join("")}</div>` : "";
-  const tfNote = { d: "하루 마감 가격 기준", w: "그 주 마지막 거래일 마감 가격 기준 (최근 2년)", h4: "09~13시·13~15:30 두 봉 (야후 시간봉을 묶음, 마감 뒤 하루 한 번 갱신)" }[tvTf];
+  const tfNote = { d: "하루 마감 가격 기준 (최근 1년)", w: "그 주 마지막 거래일 마감 가격 기준 (최근 2년)", h4: "09~13시·13~15:30 두 봉, 최근 약 4달 (야후 시간봉을 묶음, 마감 뒤 하루 한 번 갱신)" }[tvTf];
   const nw = c.now, last = nw.last;
   const state1 = `EMA ${c.rules.fast}가 ${c.rules.slow} ${nw.ema_up ? "위" : "아래"} · RSI ${num(nw.rsi, 0)} (${nw.rsi > 50 ? "50 위" : "50 아래"}) · MACD가 신호선 ${nw.macd_up ? "위" : "아래"}`;
+  const sigs = [...c.buy.map((d) => [d, 1]), ...c.sell.map((d) => [d, 0])].sort((a, b) => (a[0] < b[0] ? -1 : 1));
+  const sigList = sigs.length ? `<div class="s">보이는 기간 신호 ${sigs.length}번: ${sigs.map(([d, b]) => `<span class="${b ? "up" : "down"}">${b ? "▲" : "▼"}${tvLab(d).slice(2)}</span>`).join(" · ")}</div>
+    <p class="hint">원리: 9일·21일 평균이 서로 엇갈리는 날에만 신호가 나요. 한쪽으로 쭉 가는 장(크게 오르거나 크게 빠질 때)엔 엇갈림이 없어 신호가 드물고, 오르내림이 잦은 장에서 몰려 나와요.</p>` : "";
   const lastTxt = last ? `마지막 신호: <b class="${last.kind === "buy" ? "up" : "down"}">${last.kind === "buy" ? "BUY" : "SELL"}</b> (${tvLab(last.date).slice(5)})` : "보이는 기간 안에 신호 없음";
   let check = "";
   if (k) {
@@ -500,7 +522,7 @@ function renderTv() {
       <p class="hint">BUY 다음 날 마감 가격에 사서, SELL 신호가 나온 다음 날 마감 가격에 판다고 계산했어요 (SELL이 ${c.rules.hold_max}영업일 안에 안 나오면 그날 팖). 수수료·세금 ${num(k.cost, 1)}% 뺌, 보유 중 권리락·분할로 가격이 끊긴 거래는 뺐어요.</p>`;
   }
   el.innerHTML = `<h3 class="fit-h">내 지표 — EMA ${c.rules.fast}·${c.rules.slow} + RSI ${c.rules.rsi} + MACD ${infoBtn("tv")}</h3>${infoBox("tv")}
-    ${seg}<div class="tile wide"><div class="chart-cap">코스피 ${TV_TF[tvTf]} · ${tfNote}</div>${tvChart(c)}<p class="interp">${state1}<br>${lastTxt}</p></div>${check}`;
+    ${seg}<div class="tile wide"><div class="chart-cap">코스피 ${TV_TF[tvTf]} · ${tfNote}</div>${tvChart(c)}${sigList}<p class="interp">${state1}<br>${lastTxt}</p></div>${check}`;
 }
 
 // 외국인 코스피200 선물: 금액(억 원)이 먼저, 계약 수는 보조. 최근 20일 일별 막대 + 누적선

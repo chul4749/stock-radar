@@ -3170,8 +3170,8 @@ def tv_timeframes(daily, hourly=None, rules=TV):
     """일봉·주봉·4시간봉 각각의 내 지표 차트. 주봉은 일봉에서, 4시간봉은 시간봉에서 만든다 (자료가 모자라면 그 봉은 뺀다)."""
     out = {}
     if daily is not None and len(daily):
-        out["d"] = tv_chart(daily.iloc[-300:], days=120, rules=rules)
+        out["d"] = tv_chart(daily.iloc[-400:], days=250, rules=rules)   # 1년 (평균이 쌓이도록 앞 150일 더)
         out["w"] = tv_chart(to_weekly(daily), days=104, rules=rules)
     if hourly:
-        out["h4"] = tv_chart(to_4h(hourly), days=120, rules=rules)
+        out["h4"] = tv_chart(to_4h(hourly), days=240, rules=rules)   # 약 4달
     return {k: v for k, v in out.items() if v}
