@@ -91,6 +91,7 @@
   시작할 때 최신 main을 받고, 저장할 때도 최신 main 위에 새로 만든 파일만 덮어쓴다(다른 실행이 올린 날짜 파일을 지우지 않음).
 - `.github/workflows/morning.yml`: 평일 07:41 KST 아침 요약만 갱신·배포. 화면은 가장 최근 수집일을 볼 때, 그 뒤 아침에 만든 요약만 보여 준다.
 - 예약 실행은 모두 `IF_MISSING`(그날 데이터 있으면 건너뜀). 외부 예약(cron-job.org)은 `if_missing=1`로 부른다 — `docs/external-schedule.md`.
+- `.github/workflows/patch.yml`: 이미 수집한 날짜 파일에 시장 지표(200일선·내 지표)만 덧붙임(`collector/patch_market.py`) — 후보·기업 정보·기록 출처는 그대로.
 - `.github/workflows/pages.yml`: `site/` 코드(데이터 제외)가 main에 올라오면 수집 없이 바로 배포.
   수동 실행 때 `dates`에 과거 기준일을 넣으면 다시 계산한다(성적표 채우기용).
 - KRX는 로그인 필요: Secrets `KRX_ID`/`KRX_PW`. OpenDART는 `DART_API_KEY` (collect·credit-probe에 전달).

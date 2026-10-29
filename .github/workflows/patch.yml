@@ -1,0 +1,83 @@
+name: patch
+
+# 이미 수집한 날짜 파일에 시장 지표(200일선·내 지표)만 덧붙인다 — 후보·기업 정보·기록 출처는 그대로
+on:
+  workflow_dispatch:
+    inputs:
+      date:
+        description: "기준일 YYYYMMDD"
+        required: true
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: collect
+  cancel-in-progress: false
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+      - name: 차트·재무 받기
+        run: |
+          if git fetch -q --depth=1 origin data-cache; then
+            mkdir -p site/data && git archive FETCH_HEAD | tar -x -C site/data
+          fi
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: 지표 덧붙이기·저장
+        run: |
+          git config user.name "stock-radar-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python -m collector.patch_market "${{ inputs.date }}"
+          f="site/data/${{ inputs.date }}.json"
+          cp "$f" "$RUNNER_TEMP/day.json"
+          git fetch -q origin "$GITHUB_REF_NAME"
+          git checkout -q -f -B "$GITHUB_REF_NAME" "origin/$GITHUB_REF_NAME"
+          cp "$RUNNER_TEMP/day.json" "$f"
+          git add "$f"
+          git diff --cached --quiet || git commit -q -m "data: ${{ inputs.date }} 시장 지표 추가"
+          git push -q origin "$GITHUB_REF_NAME"
+        env:
+          KRX_ID: ${{ secrets.KRX_ID }}
+          KRX_PW: ${{ secrets.KRX_PW }}
+      - name: 긴 종가 기록 저장
+        run: |
+          [ -d site/data/hist ] || exit 0
+          tmp="$RUNNER_TEMP/cache" && rm -rf "$tmp" && mkdir -p "$tmp"
+          for d in charts fin hist; do if [ -d "site/data/$d" ]; then cp -r "site/data/$d" "$tmp/"; fi; done
+          export GIT_INDEX_FILE="$RUNNER_TEMP/cache.idx"
+          git --work-tree="$tmp" add -A -f .
+          c=$(git -c user.name=stock-radar-bot -c user.email=41898282+github-actions[bot]@users.noreply.github.com \
+                commit-tree "$(git write-tree)" -m "차트·재무 캐시 $(date -u +%F)")
+          for i in 1 2 3; do
+            git push -q -f --no-thin origin "$c:refs/heads/data-cache" && exit 0
+            sleep $((i * 10))
+          done
+          echo "::warning::캐시 저장 실패"
+      - run: rm -rf site/data/hist
+      - if: vars.PAGES_ENABLED == 'true'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/
+
+  deploy:
+    if: vars.PAGES_ENABLED == 'true'
+    needs: patch
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
