@@ -86,6 +86,7 @@ const INFO = {
   korea_vol: "코스피200이 최근 20일 동안 하루하루 얼마나 크게 오르내렸는지입니다.\n· 높을수록: 장이 크게 출렁임 = 불안\n· 낮을수록: 잔잔함\n원래는 'VKOSPI(한국 공포지수)'를 보는데, 구할 수 없어 대신 씁니다.",
   vix: "미국 증시의 '공포지수'입니다. 앞으로 한 달 동안 미국 주가가 얼마나 출렁일지 시장이 예상하는 값입니다.\n· 20 아래: 평온\n· 20~30: 경계\n· 30 위: 불안\n미국 장이 흔들리면 다음 날 한국 장도 영향을 받습니다.",
   cnn: "미국 CNN이 매일 발표하는 '투자 심리 점수'입니다.\n· 0에 가까울수록: 겁먹음 (공포)\n· 100에 가까울수록: 들뜸 (탐욕)\n미국 주가 흐름, 오르는 종목 수 등 7가지를 합쳐 만듭니다.",
+  ma200: "200일 평균선 = 최근 200영업일(약 10개월) 마감 가격의 평균. 주가가 이 선 위에 있으면 '긴 흐름으로 오르는 중', 아래면 '긴 흐름으로 내리는 중'으로 많이 봅니다.\n시장의 종목 100개 중 몇 개가 200일선 위에 있는지는 '시장 전체가 얼마나 건강한가'를 보는 흔한 지표예요. 지수는 큰 종목 몇 개 때문에 올라도, 이 비율이 낮으면 대부분 종목은 힘이 없다는 뜻입니다.\n· 대략 100개 중 60개 넘음: 넓게 강한 장 / 20개 아래: 크게 무너진 장 (반등 바닥 근처에서 자주 나오지만, 그것만으로 바닥이라고 볼 수는 없음)\n종목마다 200영업일 기록이 다 있어야 하고, 그사이 권리락·분할로 가격이 끊긴 종목은 평균이 틀어져서 뺍니다. 시장 온도 점수에는 넣지 않은 참고 지표예요.",
   breadth: "최근 60일 중 가장 비싼 값(신고가) 또는 가장 싼 값(신저가)을 찍은 종목 수입니다.\n· 신저가가 많을수록: 시장 안쪽이 약함\n지수는 삼성전자 같은 큰 종목 몇 개 때문에 버틸 수 있어서, 종목 전체가 어떤지 따로 봅니다.",
   updown: "그날 오른 종목 수와 내린 종목 수입니다.\n지수는 올랐는데 내린 종목이 더 많으면, 큰 종목 몇 개만 지수를 끌어올렸다는 뜻입니다.",
   momentum: "코스피가 최근 20거래일(약 한 달) 동안 몇 % 오르거나 내렸는지입니다.\n· 많이 내렸으면: 공포 쪽\n· 많이 올랐으면: 들뜬 쪽",
@@ -415,6 +416,24 @@ function highLowChart(b) {
     (d0 && d1 ? `<div class="barlab"><span style="text-align:left">${ymd(d0)}</span><span style="text-align:right">${ymd(d1)}</span></div>` : "");
 }
 
+// 200일 평균선 위·아래 종목 수 (시장별) + 최근 '위에 있는 비율' 추이
+function ma200Tile(m) {
+  const rows = [["KOSPI", "코스피"], ["KOSDAQ", "코스닥"]].filter(([k]) => m.markets[k]).map(([k, name]) => {
+    const x = m.markets[k], tot = x.above + x.below;
+    const first = x.spark[0], chg = x.spark.length > 1 ? x.pct - first : null;
+    return `<tr><td>${name}</td><td class="up">${num(x.above)}</td><td class="down">${num(x.below)}</td><td><b>${num(x.pct, 0)}개</b>${chg != null ? ` <small class="${cls(chg)}">(${x.dates.length}일 전 ${num(first, 0)}개)</small>` : ""}</td></tr>`;
+  }).join("");
+  const lines = [["KOSPI", "코스피", "var(--up)"], ["KOSDAQ", "코스닥", "var(--down)"]].filter(([k]) => m.markets[k] && m.markets[k].spark.length > 1);
+  const chart = lines.length ? `<div class="ma200sp">${lines.map(([k, name, col]) => `<div><small>${name} 100개 중 위에 있는 수 (최근 ${m.markets[k].spark.length}일)</small>${tipWrap(spark(m.markets[k].spark, col), m.markets[k].dates.map(ymd), [["100개 중 200일선 위", m.markets[k].spark, "개"]])}</div>`).join("")}</div>` : "";
+  const exc = Object.values(m.markets).reduce((a, x) => a + x.excluded, 0);
+  const k = m.markets.KOSPI;
+  const read = k ? `코스피 종목 100개 중 ${num(k.pct, 0)}개가 200일 평균 위 — ${k.pct >= 60 ? "대부분이 긴 오름 흐름 위" : k.pct >= 40 ? "반반" : k.pct >= 20 ? "대부분이 긴 흐름 아래(약한 장)" : "거의 다 긴 흐름 아래(크게 무너진 장)"}` : "";
+  return `<div class="tile wide"><div class="l">200일 평균선 위·아래 종목 ${infoBtn("ma200")}</div>
+    <table class="flowtbl"><thead><tr><th></th><th>위</th><th>아래</th><th>100개 중 위</th></tr></thead><tbody>${rows}</tbody></table>
+    ${chart}<div class="s">보통주 · 200영업일 기록이 없거나 그사이 권리락·분할로 가격이 끊긴 ${num(exc)}종목은 계산에서 뺌</div>
+    ${read ? `<p class="interp">${read}</p>` : ""}${infoBox("ma200")}</div>`;
+}
+
 // 외국인 코스피200 선물: 금액(억 원)이 먼저, 계약 수는 보조. 최근 20일 일별 막대 + 누적선
 const sEok = (v) => (v == null ? "–" : `${v > 0 ? "+" : v < 0 ? "−" : ""}${eokText(Math.abs(v))}`);
 const sCt = (v) => (v == null ? "" : `${v > 0 ? "+" : ""}${num(v)}계약`);
@@ -505,6 +524,7 @@ function renderTemp() {
     } else {
       tiles.push(tile("오르고 내린 종목", `<span class="up">${num(b.up)}</span> / <span class="down">${num(b.down)}</span>`, "상승 / 하락 (보통주)", null, { key: "updown" }));
     }
+    if (t.ma200 && t.ma200.markets) tiles.push(ma200Tile(t.ma200));
     if (!(t.summary || []).some((s) => s.key === "selling")) tiles.push(tile("60일 신저가 종목", num(b.new_lows.at(-1)), `신고가 ${num(b.new_highs.at(-1))} · 최근 20일 추이`, b.new_lows, { key: "breadth" }));
   }
   if (t.flows) {

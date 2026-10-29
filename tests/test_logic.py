@@ -1100,3 +1100,40 @@ def test_exit_level_value_never_above_close():
     ex = logic.exit_level("value", c, lo)
     assert ex["stop"] == 90 and ex["gap"] == 0.0
     assert logic.exit_level("value", c, lo.where(lo.index != "d29"))["stop"] == 90   # 오늘 저가가 빈 날도
+
+
+def test_ma_breadth_counts_by_market_and_excludes_breaks():
+    import numpy as np
+    days = [f"d{i:03d}" for i in range(210)]
+    up = pd.Series(np.linspace(100, 200, 210), index=days)      # 계속 오름 → 200일선 위
+    down = pd.Series(np.linspace(200, 100, 210), index=days)    # 계속 내림 → 아래
+    cl = pd.DataFrame({"A": up, "B": down, "C": up, "D": up}, index=days)
+    cl.loc["d100", "D"] = float("nan")                          # 200일 안에 거래 없던 날 → 제외
+    br = pd.DataFrame(False, index=days, columns=cl.columns)
+    br.loc["d150", "C"] = True                                  # 200일 안에 가격 끊김 → 제외
+    out = logic.ma_breadth(cl, br, {"A": "KOSPI", "B": "KOSPI", "C": "KOSDAQ", "D": "KOSDAQ"}, n=200, hist=5)
+    k = out["markets"]["KOSPI"]
+    assert (k["above"], k["below"], k["excluded"], k["pct"]) == (1, 1, 0, 50.0) and len(k["spark"]) == 5
+    assert "KOSDAQ" not in out["markets"]                       # 두 종목 다 제외되면 그 시장은 안 보여 줌
+    assert logic.ma_breadth(cl.iloc[:100], br.iloc[:100], {"A": "KOSPI"}) is None
+
+
+def test_long_history_caches_and_fetches_only_missing(tmp_path, monkeypatch):
+    from collector import main, sources
+    days = [f"2026{i:04d}" for i in range(101, 131)]
+    monkeypatch.setattr(main, "HIST", str(tmp_path / "hist"))
+    monkeypatch.setattr(main, "HIST_DAYS", 20)
+    monkeypatch.setattr(sources, "business_days", lambda base, n: [d for d in days if d <= base][-n:])
+    asked = []
+
+    def fake_ohlcv(ds):
+        asked.extend(ds)
+        return {d: pd.DataFrame({"종가": [100.0, 50.0], "등락률": [0.0, 0.0]}, index=["A", "B"]) for d in ds}
+    monkeypatch.setattr(sources, "daily_ohlcv", fake_ohlcv)
+    now = pd.DataFrame({"A": [101.0] * 5, "B": [51.0] * 5}, index=days[25:30])
+    chg = pd.DataFrame(0.0, index=now.index, columns=now.columns)
+    cl, br = main.long_history(days[29], now, chg)
+    assert len(cl) == 20 and len(asked) == 15 and cl.loc[days[29], "A"] == 101.0 and not br.any().any()
+    asked.clear()
+    cl2, _ = main.long_history(days[29], now, chg)                  # 두 번째엔 보관본으로 → 새로 받을 게 없음
+    assert asked == [] and len(cl2) == 20 and list(cl2.columns) == ["A", "B"]

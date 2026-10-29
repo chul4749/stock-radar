@@ -169,6 +169,32 @@ def breadth(closes, window=60, recent=20, markets=None):
             "dates": [d for d in closes.index[-len(lows):]] if lows else []}
 
 
+def ma_breadth(closes, breaks, markets, n=200, hist=60):
+    """시장별 n일 이동평균 위·아래 종목 수와 최근 hist일 '위에 있는 비율' 추이.
+    closes: 종가 DataFrame(행=영업일 오래된 순), breaks: 같은 모양의 '가격 끊긴 날' True/False,
+    markets: 티커 → KOSPI/KOSDAQ. n일 안에 거래 없던 날이 있거나(신규 상장·정지) 가격이 끊긴(권리락·분할) 종목은
+    평균이 틀어지므로 계산에서 빼고 '계산 제외'로 센다."""
+    if closes is None or len(closes) < n:
+        return None
+    ma = closes.rolling(n, min_periods=n).mean()
+    brk = breaks.reindex(index=closes.index, columns=closes.columns).fillna(False).astype(float).rolling(n, min_periods=1).max() > 0
+    valid = ma.notna() & closes.notna() & ~brk
+    above = (closes > ma) & valid
+    out = {}
+    for m in ("KOSPI", "KOSDAQ"):
+        cols = [c for c in closes.columns if markets.get(c) == m]
+        if not cols:
+            continue
+        a, v = above[cols].sum(axis=1), valid[cols].sum(axis=1)
+        days = [d for d in closes.index[-hist:] if v.get(d, 0) > 0]
+        if not days or v.iloc[-1] == 0:
+            continue
+        out[m] = {"above": int(a.iloc[-1]), "below": int(v.iloc[-1] - a.iloc[-1]), "excluded": int(len(cols) - v.iloc[-1]),
+                  "pct": r1(a.iloc[-1] / v.iloc[-1] * 100),
+                  "spark": [r1(a[d] / v[d] * 100) for d in days], "dates": days}
+    return {"n": n, "markets": out} if out else None
+
+
 def flows_summary(df):
     """시장 전체 투자자별 순매수(원) DataFrame → 억 원 단위 최근/5일 합."""
     out = {}

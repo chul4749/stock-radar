@@ -78,9 +78,10 @@ jobs:
       - name: 차트·재무 저장
         if: always()
         run: |
-          [ -d site/data/fin ] || [ -d site/data/charts ] || exit 0
+          [ -d site/data/fin ] || [ -d site/data/charts ] || [ -d site/data/hist ] || exit 0
           tmp="$RUNNER_TEMP/cache" && rm -rf "$tmp" && mkdir -p "$tmp"
-          for d in charts fin; do if [ -d "site/data/$d" ]; then cp -r "site/data/$d" "$tmp/"; fi; done
+          # hist/ = 200일선용 긴 종가 기록 (화면엔 안 씀, 배포에서 뺌)
+          for d in charts fin hist; do if [ -d "site/data/$d" ]; then cp -r "site/data/$d" "$tmp/"; fi; done
           export GIT_INDEX_FILE="$RUNNER_TEMP/cache.idx"
           git --work-tree="$tmp" add -A -f .
           c=$(git -c user.name=stock-radar-bot -c user.email=41898282+github-actions[bot]@users.noreply.github.com \
@@ -91,6 +92,7 @@ jobs:
             sleep $((i * 10))
           done
           echo "::warning::차트·재무 캐시 저장 실패 — 다음 수집 때 다시 받음"
+      - run: rm -rf site/data/hist   # 긴 종가 기록은 수집용이라 화면 배포엔 안 넣음
       - uses: actions/upload-artifact@v4
         with:
           name: site

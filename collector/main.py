@@ -101,6 +101,11 @@ def main(argv):
         if oc is not None:
             bench[mk] = oc
 
+    # 200일 이동평균용 긴 종가 기록: data-cache 의 hist/ 에 쌓아 두고 모자란 날만 받는다 (처음 한 번만 오래 걸림)
+    t = step("긴 종가 기록 (200일선)")
+    long_closes, long_breaks = safe("긴 종가 기록", lambda: long_history(base, closes, chg), errors) or (None, None)
+    log(f"  {0 if long_closes is None else len(long_closes)}일, {time.time() - t:.0f}초")
+
     t = step("종목별 수급")
     last5 = used_days[-5:]
     flows_daily = []
@@ -361,6 +366,9 @@ def main(argv):
     uni_closes = closes[[c for c in universe if c in closes.columns]]
     b = logic.breadth(uni_closes, markets={c: v["market"] for c, v in universe.items()})
     temp["breadth"] = b
+    if long_closes is not None:
+        lc = long_closes[[c for c in universe_all if c in long_closes.columns]]
+        temp["ma200"] = logic.ma_breadth(lc, long_breaks[lc.columns], {c: v["market"] for c, v in universe_all.items()})
     flows = safe("시장 수급", lambda: sources.market_flows(used_days[-20], base), errors)
     if flows:
         temp["flows"] = {m: logic.flows_summary(df) for m, df in flows.items()}
@@ -949,6 +957,46 @@ def write_chart_shards(base, closes, net, stocks, highs=None, lows=None, values=
     for k, v in shards.items():
         with open(os.path.join(d, f"{k}.json"), "w", encoding="utf-8") as f:
             json.dump({"date": base, "days": days, "net_days": ndays, "stocks": v}, f, ensure_ascii=False, separators=(",", ":"))
+
+
+HIST = os.path.join(DATA, "hist")
+HIST_DAYS = 260   # 200일 평균 + 최근 60일 추이
+
+
+def long_history(base, closes, chg):
+    """최근 HIST_DAYS 영업일 전 종목 종가·등락률 (data-cache 의 hist/ 에 보관). 이번 실행에서 받은 날은 그대로 쓰고,
+    없는 날만 KRX에서 받는다. → (종가 DataFrame, 가격 끊긴 날 DataFrame)"""
+    days = sources.business_days(base, HIST_DAYS)
+    old_c = old_r = None
+    try:
+        old_c = pd.read_csv(os.path.join(HIST, "closes.csv.gz"), index_col=0, dtype={0: str})
+        old_r = pd.read_csv(os.path.join(HIST, "chg.csv.gz"), index_col=0, dtype={0: str})
+        old_c.index, old_r.index = old_c.index.astype(str), old_r.index.astype(str)
+    except (OSError, ValueError):
+        old_c = old_r = None
+    have = set(closes.index) | (set(old_c.index) if old_c is not None else set())
+    missing = [d for d in days if d not in have]
+    got = sources.daily_ohlcv(missing) if missing else {}
+    log(f"  보관 {0 if old_c is None else len(old_c)}일 + 이번 {len(closes)}일 + 새로 받음 {len(got)}/{len(missing)}일")
+    parts_c = [x for x in (old_c,) if x is not None] + [closes]
+    parts_r = [x for x in (old_r,) if x is not None] + ([chg] if chg is not None else [])
+    if got:
+        parts_c.append(pd.DataFrame({d: got[d]["종가"] for d in got}).T.astype(float).replace(0, float("nan")))
+        parts_r.append(pd.DataFrame({d: got[d]["등락률"] for d in got}).T.astype(float))
+    cl = pd.concat(parts_c)
+    cl = cl[~cl.index.duplicated(keep="last")].sort_index()
+    rt = pd.concat(parts_r) if parts_r else None
+    if rt is not None:
+        rt = rt[~rt.index.duplicated(keep="last")].sort_index()
+    keep = [d for d in cl.index if d >= days[0]]
+    save = sorted(set(cl.index))[-(HIST_DAYS + 40):]   # 예전 기준일 재계산도 쓸 수 있게 조금 더 남김
+    os.makedirs(HIST, exist_ok=True)
+    cl.loc[save].round(2).to_csv(os.path.join(HIST, "closes.csv.gz"), compression="gzip")
+    if rt is not None:
+        rt.loc[[d for d in save if d in rt.index]].round(2).to_csv(os.path.join(HIST, "chg.csv.gz"), compression="gzip")
+    cl = cl.loc[[d for d in keep if d <= base]]
+    rt = rt.reindex(cl.index) if rt is not None else None
+    return cl, logic.price_breaks(cl, rt)
 
 
 def load_fin_cache():

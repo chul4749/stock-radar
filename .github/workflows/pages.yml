@@ -31,6 +31,7 @@ jobs:
           if git fetch -q --depth=1 origin data-cache; then
             mkdir -p site/data && git archive FETCH_HEAD | tar -x -C site/data
           fi
+          rm -rf site/data/hist   # 200일선용 긴 종가 기록은 수집용 (화면 배포엔 안 넣음)
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site/
