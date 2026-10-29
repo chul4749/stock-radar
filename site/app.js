@@ -68,6 +68,7 @@ function render() {
   renderReplay();
   renderMyths();
   renderRegime();
+  renderTv();
   renderFilter();
   renderToday();
   renderTurn();
@@ -86,6 +87,8 @@ const INFO = {
   korea_vol: "코스피200이 최근 20일 동안 하루하루 얼마나 크게 오르내렸는지입니다.\n· 높을수록: 장이 크게 출렁임 = 불안\n· 낮을수록: 잔잔함\n원래는 'VKOSPI(한국 공포지수)'를 보는데, 구할 수 없어 대신 씁니다.",
   vix: "미국 증시의 '공포지수'입니다. 앞으로 한 달 동안 미국 주가가 얼마나 출렁일지 시장이 예상하는 값입니다.\n· 20 아래: 평온\n· 20~30: 경계\n· 30 위: 불안\n미국 장이 흔들리면 다음 날 한국 장도 영향을 받습니다.",
   cnn: "미국 CNN이 매일 발표하는 '투자 심리 점수'입니다.\n· 0에 가까울수록: 겁먹음 (공포)\n· 100에 가까울수록: 들뜸 (탐욕)\n미국 주가 흐름, 오르는 종목 수 등 7가지를 합쳐 만듭니다.",
+  tv: "트레이딩뷰에서 쓰시던 Pine 스크립트('XAUUSD & BTCUSD Buy/Sell Signals')를 그대로 옮겨 코스피에 적용한 것입니다.\n· BUY: 빠른 평균선(EMA 9)이 느린 평균선(EMA 21)을 아래에서 위로 뚫은 날 + RSI(14)가 50 위 + MACD(12·26)가 신호선(9) 위\n· SELL: 반대 (EMA 9가 21을 위에서 아래로 + RSI 50 아래 + MACD가 신호선 아래)\nEMA는 최근 가격에 더 무게를 둔 평균, RSI는 최근 오른 힘과 내린 힘의 비율(50이 중간), MACD는 짧은 평균과 긴 평균의 차이예요.\n마감 가격으로만 계산해서, 장중에 보는 트레이딩뷰와 하루 늦거나 조금 다를 수 있어요.",
+  tv_check: "지표 이름에 붙은 '80% 정확도'가 맞는지 우리 자료로 잰 결과입니다. 코스피 하나로는 1년에 신호가 몇 번 안 나와서, 시총 500억 이상 종목 전체에 같은 규칙을 적용했어요.\n· 이익 낸 횟수: 신호대로 사고팔았을 때 비용을 빼고도 남은 거래가 100번 중 몇 번인지\n· 비교 기준: 같은 종목들에서 아무 날이나 사서 10영업일 들고 있었을 때\n이 지표는 원래 금·비트코인용으로 만든 것이고, 성적은 기간(상승장·하락장)에 따라 크게 달라질 수 있어요.",
   ma200: "200일 평균선 = 최근 200영업일(약 10개월) 마감 가격의 평균. 주가가 이 선 위에 있으면 '긴 흐름으로 오르는 중', 아래면 '긴 흐름으로 내리는 중'으로 많이 봅니다.\n시장의 종목 100개 중 몇 개가 200일선 위에 있는지는 '시장 전체가 얼마나 건강한가'를 보는 흔한 지표예요. 지수는 큰 종목 몇 개 때문에 올라도, 이 비율이 낮으면 대부분 종목은 힘이 없다는 뜻입니다.\n· 대략 100개 중 60개 넘음: 넓게 강한 장 / 20개 아래: 크게 무너진 장 (반등 바닥 근처에서 자주 나오지만, 그것만으로 바닥이라고 볼 수는 없음)\n종목마다 200영업일 기록이 다 있어야 하고, 그사이 권리락·분할로 가격이 끊긴 종목은 평균이 틀어져서 뺍니다. 시장 온도 점수에는 넣지 않은 참고 지표예요.",
   breadth: "최근 60일 중 가장 비싼 값(신고가) 또는 가장 싼 값(신저가)을 찍은 종목 수입니다.\n· 신저가가 많을수록: 시장 안쪽이 약함\n지수는 삼성전자 같은 큰 종목 몇 개 때문에 버틸 수 있어서, 종목 전체가 어떤지 따로 봅니다.",
   updown: "그날 오른 종목 수와 내린 종목 수입니다.\n지수는 올랐는데 내린 종목이 더 많으면, 큰 종목 몇 개만 지수를 끌어올렸다는 뜻입니다.",
@@ -432,6 +435,55 @@ function ma200Tile(m) {
     <table class="flowtbl"><thead><tr><th></th><th>위</th><th>아래</th><th>100개 중 위</th></tr></thead><tbody>${rows}</tbody></table>
     ${chart}<div class="s">보통주 · 200영업일 기록이 없거나 그사이 권리락·분할로 가격이 끊긴 ${num(exc)}종목은 계산에서 뺌</div>
     ${read ? `<p class="interp">${read}</p>` : ""}${infoBox("ma200")}</div>`;
+}
+
+// 내 지표 (트레이딩뷰 Pine 스크립트를 옮김): 코스피 종가 + EMA 9·21, BUY/SELL 신호, 지금 상태, 여러 종목에서 따라 했을 때 실제 성적
+function tvChart(c) {
+  const n = c.close.length;
+  if (n < 2) return "";
+  const w = 320, h = 150, pad = 14;
+  const vals = [...c.close, ...c.ema_f, ...c.ema_s].filter((v) => v != null);
+  const lo = Math.min(...vals), hi = Math.max(...vals);
+  const x = (i) => (i / (n - 1)) * w, y = (v) => pad + (1 - (v - lo) / (hi - lo || 1)) * (h - 2 * pad);
+  const path = (arr) => arr.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+  const idx = (d) => c.dates.indexOf(d);
+  const mk = (d, buy) => {
+    const i = idx(d);
+    if (i < 0) return "";
+    const px = x(i), py = y(c.close[i]), tx = Math.min(w - 12, Math.max(12, px));   // 글자가 그림 밖으로 잘리지 않게
+    return buy ? `<path d="M${px},${py + 4} l-4,7 h8 z" fill="var(--up)"/><text x="${tx}" y="${Math.min(h - 1, py + 20)}" text-anchor="middle" font-size="8" fill="var(--up)">BUY</text>`
+      : `<path d="M${px},${py - 4} l-4,-7 h8 z" fill="var(--down)"/><text x="${tx}" y="${Math.max(8, py - 13)}" text-anchor="middle" font-size="8" fill="var(--down)">SELL</text>`;
+  };
+  const svg = `<svg class="tvchart" viewBox="0 0 ${w} ${h}" role="img" aria-label="코스피와 EMA 9·21, 매수·매도 신호">
+    <path d="${path(c.close)}" fill="none" stroke="var(--sub)" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
+    <path d="${path(c.ema_f)}" fill="none" stroke="#f59e0b" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
+    <path d="${path(c.ema_s)}" fill="none" stroke="#3b82f6" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
+    ${c.buy.map((d) => mk(d, true)).join("")}${c.sell.map((d) => mk(d, false)).join("")}</svg>`;
+  return tipWrap(svg, c.dates.map(ymd), [["코스피", c.close, ""], ["EMA 9", c.ema_f, ""], ["EMA 21", c.ema_s, ""]]) +
+    `<div class="legend"><span><i style="background:var(--sub)"></i>코스피</span><span><i style="background:#f59e0b"></i>EMA ${c.rules.fast}</span><span><i style="background:#3b82f6"></i>EMA ${c.rules.slow}</span><span style="color:var(--up)">▲ BUY</span><span style="color:var(--down)">▼ SELL</span></div>
+    <div class="barlab"><span style="text-align:left">${ymd(c.dates[0])}</span><span style="text-align:right">${ymd(c.dates[n - 1])}</span></div>`;
+}
+function renderTv() {
+  const el = $("#tv-body");
+  if (!el) return;
+  const t = state.data.temperature || {}, c = t.tv, k = t.tv_check;
+  if (!c) { el.innerHTML = ""; return; }
+  const nw = c.now, last = nw.last;
+  const state1 = `EMA ${c.rules.fast}가 ${c.rules.slow} ${nw.ema_up ? "위" : "아래"} · RSI ${num(nw.rsi, 0)} (${nw.rsi > 50 ? "50 위" : "50 아래"}) · MACD가 신호선 ${nw.macd_up ? "위" : "아래"}`;
+  const lastTxt = last ? `마지막 신호: <b class="${last.kind === "buy" ? "up" : "down"}">${last.kind === "buy" ? "BUY" : "SELL"}</b> (${ymd(last.date).slice(5)})` : "최근 1년 동안 신호 없음";
+  let check = "";
+  if (k) {
+    const b = k.base || {};
+    check = `<h3 class="sub">이 지표를 실제로 따라 했다면 <small>${ymd(k.from).slice(2)}~${ymd(k.to).slice(2)}, 시총 500억 이상 종목</small>${infoBtn("tv_check")}</h3>${infoBox("tv_check")}
+      ${take(`BUY 신호 ${num(k.n)}번을 따라 샀다면 100번 중 ${num(k.win)}번 이익이었어요 (지표 이름의 '80%'와 비교). 아무 날이나 사서 들고 있었을 때는 100번 중 ${num(b.win)}번.` + (k.n < 30 ? " 아직 30번이 안 돼 운일 수 있어요." : ""))}
+      <div class="tile wide"><div class="chart-cap">이익 낸 횟수 (100번 중)</div>
+      ${colBars([{ label: "아무 날이나 사기", sub: `${num(b.n)}번 · 10일 들고 있기`, bars: [{ v: b.win, base: true }] }, { label: "BUY 신호 따라 사기", sub: `${num(k.n)}번 · 보통 ${num(k.hold, 0)}일 들고 있음`, bars: [{ v: k.win }] }, { label: "지표 이름의 주장", sub: "검증된 숫자 아님", bars: [{ v: 80, base: true }] }], { unit: "번", count: true, vs: "100번 중 몇 번 이익" })}
+      <div class="chart-cap">${kindTag(false)}한 번 거래의 평균 주가 변화 (비용 뺌)</div>
+      ${colBars([{ label: "아무 날이나 사기", bars: [{ v: b.avg, base: true }] }, { label: "BUY 신호 따라 사기", sub: `나쁜 10% 평균 ${signed(k.low10, 1, "%")}`, bars: [{ v: k.avg }] }], { vs: "주가가 오른(내린) %" })}</div>
+      <p class="hint">BUY 다음 날 마감 가격에 사서, SELL 신호가 나온 다음 날 마감 가격에 판다고 계산했어요 (SELL이 ${c.rules.hold_max}영업일 안에 안 나오면 그날 팖). 수수료·세금 ${num(k.cost, 1)}% 뺌, 보유 중 권리락·분할로 가격이 끊긴 거래는 뺐어요.</p>`;
+  }
+  el.innerHTML = `<h3 class="fit-h">내 지표 — EMA ${c.rules.fast}·${c.rules.slow} + RSI ${c.rules.rsi} + MACD ${infoBtn("tv")}</h3>${infoBox("tv")}
+    <div class="tile wide">${tvChart(c)}<p class="interp">${state1}<br>${lastTxt}</p></div>${check}`;
 }
 
 // 외국인 코스피200 선물: 금액(억 원)이 먼저, 계약 수는 보조. 최근 20일 일별 막대 + 누적선

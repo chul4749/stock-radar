@@ -1137,3 +1137,34 @@ def test_long_history_caches_and_fetches_only_missing(tmp_path, monkeypatch):
     asked.clear()
     cl2, _ = main.long_history(days[29], now, chg)                  # 두 번째엔 보관본으로 → 새로 받을 게 없음
     assert asked == [] and len(cl2) == 20 and list(cl2.columns) == ["A", "B"]
+
+
+def test_tv_signals_match_pine_rules():
+    import numpy as np
+    days = [f"d{i:03d}" for i in range(120)]
+    # 내리다가(0~59) 오르는(60~) 흐름 → 오르기 시작한 뒤 BUY 한 번, 그 전엔 SELL 쪽
+    c = pd.Series(np.r_[np.linspace(200, 100, 60), np.linspace(101, 180, 60)], index=days)
+    s = logic.tv_signals(c)
+    b = list(s.index[s["buy"]])
+    assert len(b) == 1 and b[0] > "d060"
+    row = s.loc[b[0]]
+    assert row["ema_f"] > row["ema_s"] and row["rsi"] > 50 and row["macd"] > row["sig"]
+    # EMA는 트레이딩뷰 ta.ema 와 같은 재귀식: ema = a*x + (1-a)*ema[1], a = 2/(n+1)
+    e, a = c.iloc[0], 2 / 10
+    for x in c.iloc[1:]:
+        e = a * x + (1 - a) * e
+    assert abs(s["ema_f"].iloc[-1] - e) < 1e-9
+    ch = logic.tv_chart(c, days=50)
+    assert ch["buy"] == b and ch["now"]["ema_up"] and ch["now"]["last"]["kind"] == "buy"
+
+
+def test_tv_signal_check_trades_and_baseline():
+    import numpy as np
+    days = [f"d{i:03d}" for i in range(160)]
+    c = np.r_[np.linspace(200, 100, 60), np.linspace(101, 180, 60), np.linspace(180, 120, 40)]
+    cl = pd.DataFrame({"A": c, "B": c * 2}, index=days)
+    out = logic.tv_signal_check(cl, cost=0)
+    assert out["n"] == 2 and out["win"] == 100 and out["base"]["n"] > 0
+    br = pd.DataFrame(False, index=days, columns=["A", "B"])
+    br.iloc[70:, 1] = True                                       # B는 보유 중 가격이 끊김 → 그 거래 뺌
+    assert logic.tv_signal_check(cl, br, cost=0)["n"] == 1

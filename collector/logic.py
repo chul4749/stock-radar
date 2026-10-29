@@ -3051,3 +3051,94 @@ def feature_stats(entries, horizon=5, groups=("swing", "scalp"), features=FEATUR
         out.append({"key": key, "label": label, "horizon": horizon, "who": "value" if groups == ("value",) else "flow",
                     "yes": summarize_returns(yes), "no": summarize_returns(no)})
     return out
+
+
+# ---------------------------------------------------------------- 사용자 지표 (트레이딩뷰 Pine 스크립트를 옮김)
+
+# "XAUUSD & BTCUSD Buy/Sell Signals" — EMA 9·21 교차 + RSI 14가 50 위/아래 + MACD 12·26·9 선이 신호선 위/아래.
+# 이름의 '80% 정확도'는 근거가 없는 문구라, 우리 자료로 신호 뒤 실제 성적을 따로 잰다 (tv_signal_check)
+TV = {"fast": 9, "slow": 21, "rsi": 14, "macd_fast": 12, "macd_slow": 26, "macd_sig": 9, "hold_max": 20}
+
+
+def tv_signals(close, rules=TV):
+    """Pine 스크립트와 같은 계산 (close 만 씀). EMA = 지수평균(ta.ema), RSI = 와일더 방식(ta.rsi, RMA), MACD = EMA 12 − EMA 26, 신호선 = 그 EMA 9.
+    BUY: 빠른 EMA가 느린 EMA를 아래→위로 뚫은 날 + RSI > 50 + MACD > 신호선. SELL: 반대.
+    처음 몇십 일은 평균이 덜 쌓여 트레이딩뷰 값과 조금 다를 수 있어 결과에서 뺀다(warm)."""
+    c = close.astype(float)
+    ema = lambda s, n: s.ewm(span=n, adjust=False).mean()
+    ef, es = ema(c, rules["fast"]), ema(c, rules["slow"])
+    d = c.diff()
+    up, dn = d.clip(lower=0), (-d).clip(lower=0)
+    a = 1 / rules["rsi"]
+    rs = up.ewm(alpha=a, adjust=False).mean() / dn.ewm(alpha=a, adjust=False).mean()
+    rsi = 100 - 100 / (1 + rs)
+    macd = ema(c, rules["macd_fast"]) - ema(c, rules["macd_slow"])
+    sig = ema(macd, rules["macd_sig"])
+    cross_up = (ef > es) & (ef.shift(1) <= es.shift(1))
+    cross_dn = (ef < es) & (ef.shift(1) >= es.shift(1))
+    out = pd.DataFrame({"close": c, "ema_f": ef, "ema_s": es, "rsi": rsi, "macd": macd, "sig": sig,
+                        "buy": cross_up & (rsi > 50) & (macd > sig), "sell": cross_dn & (rsi < 50) & (macd < sig)})
+    warm = rules["macd_slow"] + rules["macd_sig"]
+    out.iloc[:warm, out.columns.get_indexer(["buy", "sell"])] = False
+    return out
+
+
+def tv_chart(close, days=120, rules=TV):
+    """코스피 차트용: 최근 days일 종가·EMA 두 줄, BUY/SELL 날, 지금 상태."""
+    s = tv_signals(close, rules)
+    if len(s) < rules["macd_slow"] + rules["macd_sig"] + 5:
+        return None
+    t = s.iloc[-days:]
+    last = s.iloc[-1]
+    sigs = s[(s["buy"]) | (s["sell"])]
+    prev = sigs.iloc[-1] if len(sigs) else None
+    return {"dates": [str(d) for d in t.index], "close": [r1(v) for v in t["close"]],
+            "ema_f": [r1(v) for v in t["ema_f"]], "ema_s": [r1(v) for v in t["ema_s"]],
+            "buy": [str(d) for d in t.index[t["buy"].values]], "sell": [str(d) for d in t.index[t["sell"].values]],
+            "now": {"ema_up": bool(last["ema_f"] > last["ema_s"]), "rsi": r1(last["rsi"]), "macd_up": bool(last["macd"] > last["sig"]),
+                    "last": None if prev is None else {"kind": "buy" if prev["buy"] else "sell", "date": str(sigs.index[-1])}},
+            "rules": rules}
+
+
+def tv_signal_check(closes, breaks=None, rules=TV, cost=None, eligible=None):
+    """여러 종목에서 BUY 신호를 그대로 따라 했다면: 신호 다음 날 마감 가격에 사서, SELL 신호가 나온 다음 날 마감에 팔기
+    (SELL이 hold_max 영업일 안에 안 나오면 그날 판다). 비용 뺀 수익으로 '이긴 횟수'(제목의 80%와 비교)와 평균·나쁜 10%.
+    비교 기준 = 같은 종목들에서 아무 날이나 사서 같은 기간 들고 있었을 때. 보유 중 가격이 끊긴(권리락·분할) 거래는 뺀다.
+    closes 는 마감 가격만 있어 '다음 날 아침 첫 가격' 대신 '다음 날 마감 가격'에 산다."""
+    import numpy as np
+    cost = COST if cost is None else cost
+    cols = [c for c in closes.columns if eligible is None or c in eligible]
+    warm = rules["macd_slow"] + rules["macd_sig"]
+    H = rules["hold_max"]
+    rets, holds, base = [], [], []
+    for c in cols:
+        col = closes[c]
+        if col.notna().sum() < warm + H + 5:
+            continue
+        s = tv_signals(col.ffill(), rules)
+        v = col.values
+        bk = breaks[c].fillna(False).values if breaks is not None and c in breaks.columns else np.zeros(len(v), bool)
+        buys = np.nonzero(s["buy"].values)[0]
+        sells = np.nonzero(s["sell"].values)[0]
+        for i in buys:
+            e = i + 1
+            if e >= len(v):
+                continue
+            later = sells[sells > i]
+            x = min(int(later[0]) + 1, e + H) if len(later) else e + H
+            if x >= len(v) or np.isnan(v[e]) or np.isnan(v[x]) or bk[e + 1:x + 1].any() or np.isnan(v[e:x + 1]).any():
+                continue
+            rets.append((v[x] / v[e] - 1) * 100 - cost)
+            holds.append(x - e)
+        # 비교: 아무 날이나 사서 10영업일 (신호 거래의 보통 보유 기간과 비슷하게)
+        for e in range(warm, len(v) - 10, 5):
+            x = e + 10
+            if not np.isnan(v[e]) and not np.isnan(v[x]) and not bk[e + 1:x + 1].any():
+                base.append((v[x] / v[e] - 1) * 100 - cost)
+    if not rets:
+        return None
+    r, b = pd.Series(rets), pd.Series(base)
+    return {"n": len(r), "win": round(float((r > 0).mean() * 100)), "avg": r1(r.mean()), "med": r1(r.median()),
+            "low10": _tail(rets), "hold": r1(float(np.median(holds))),
+            "base": {"n": len(b), "win": round(float((b > 0).mean() * 100)), "avg": r1(b.mean())} if len(b) else None,
+            "from": str(closes.index[0]), "to": str(closes.index[-1]), "cost": cost, "rules": rules}

@@ -393,6 +393,13 @@ def main(argv):
     if kospi_long is not None:
         temp["regime"] = logic.market_regime([float(v) for v in kospi_long.values], temp,
                                              dates=[d.strftime("%Y%m%d") for d in kospi_long.index])
+    # 사용자 지표(트레이딩뷰 Pine: EMA 9·21 + RSI 14 + MACD) — 코스피 차트와, 여러 종목에서 신호를 따라 했을 때 실제 성적
+    if kospi_long is not None:
+        ks = pd.Series([float(v) for v in kospi_long.values], index=[d.strftime("%Y%m%d") for d in kospi_long.index])
+        temp["tv"] = safe("내 지표 코스피", lambda: logic.tv_chart(ks), errors)
+    if long_closes is not None:
+        elig = {c for c, v in universe_all.items() if v["cap"] >= logic.RULES["min_cap"]}
+        temp["tv_check"] = safe("내 지표 검증", lambda: logic.tv_signal_check(long_closes, long_breaks, eligible=elig), errors)
     # 전일·1주 전·1달 전 온도: 이전 기록 파일에서
     prev_files = sorted(n[:8] for n in os.listdir(DATA) if n[:8].isdigit() and n.endswith(".json") and n[:8] < base)
     hist = {}
