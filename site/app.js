@@ -479,7 +479,10 @@ function renderTv() {
   const tfs = t.tv_tf || (t.tv ? { d: t.tv } : {});
   if (!tfs[tvTf]) tvTf = tfs.d ? "d" : Object.keys(tfs)[0];
   const c = tfs[tvTf];
-  if (!c) { el.innerHTML = ""; return; }
+  if (!c) {   // 지표를 넣기 전 날짜 기록: 자리만 보여 줌
+    el.innerHTML = `<h3 class="fit-h">내 지표 — EMA 9·21 + RSI 14 + MACD</h3><div class="empty">이 날짜 기록엔 아직 없어요. 지표를 넣은 뒤 저녁 수집부터 나와요 (가장 최근 날짜를 보세요).</div>`;
+    return;
+  }
   const seg = Object.keys(tfs).length > 1 ? `<div class="seg" role="tablist">${["h4", "d", "w"].filter((f) => tfs[f]).map((f) => `<button type="button" data-tvtf="${f}" aria-selected="${f === tvTf}">${TV_TF[f]}</button>`).join("")}</div>` : "";
   const tfNote = { d: "하루 마감 가격 기준", w: "그 주 마지막 거래일 마감 가격 기준 (최근 2년)", h4: "09~13시·13~15:30 두 봉 (야후 시간봉을 묶음, 마감 뒤 하루 한 번 갱신)" }[tvTf];
   const nw = c.now, last = nw.last;
