@@ -623,3 +623,8 @@ table.mythsum th { font-size: 13px; }
 .tile .ma200ch svg { width: 100%; height: 130px; display: block; }
 .ma200ch .ylab span { position: absolute; left: 2px; transform: translateY(-50%); font-size: 10px; color: var(--faint); background: var(--card); padding: 0 2px; line-height: 1.2; pointer-events: none; }
 .tile svg.tvchart { width: 100%; height: 170px; display: block; margin-top: 2px; }
+.tvwrap { position: relative; }
+.tvmk { position: absolute; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; font-size: 9px; line-height: 1; pointer-events: none; }
+.tvmk b { font-size: 8px; font-weight: 600; }
+.tvmk.buy { color: var(--up); margin-top: 3px; }
+.tvmk.sell { color: var(--down); transform: translate(-50%, calc(-100% - 3px)); }

@@ -475,18 +475,18 @@ function tvChart(c) {
   const x = (i) => (i / (n - 1)) * w, y = (v) => pad + (1 - (v - lo) / (hi - lo || 1)) * (h - 2 * pad);
   const path = (arr) => arr.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
   const idx = (d) => c.dates.indexOf(d);
+  // 선은 칸 너비에 맞춰 늘리고(preserveAspectRatio none), ▲▼·글자는 찌그러지지 않게 위에 따로 얹는다
   const mk = (d, buy) => {
     const i = idx(d);
     if (i < 0) return "";
-    const px = x(i), py = y(c.close[i]), tx = Math.min(w - 12, Math.max(12, px));   // 글자가 그림 밖으로 잘리지 않게
-    return buy ? `<path d="M${px},${py + 4} l-4,7 h8 z" fill="var(--up)"/><text x="${tx}" y="${Math.min(h - 1, py + 20)}" text-anchor="middle" font-size="8" fill="var(--up)">BUY</text>`
-      : `<path d="M${px},${py - 4} l-4,-7 h8 z" fill="var(--down)"/><text x="${tx}" y="${Math.max(8, py - 13)}" text-anchor="middle" font-size="8" fill="var(--down)">SELL</text>`;
+    const l = Math.min(97, Math.max(3, (x(i) / w) * 100)), t = (y(c.close[i]) / h) * 100;
+    return `<span class="tvmk ${buy ? "buy" : "sell"}" style="left:${l.toFixed(2)}%;top:${t.toFixed(1)}%">${buy ? "▲<b>BUY</b>" : "<b>SELL</b>▼"}</span>`;
   };
-  const svg = `<svg class="tvchart" viewBox="0 0 ${w} ${h}" role="img" aria-label="코스피와 EMA 9·21, 매수·매도 신호">
+  const svg = `<div class="tvwrap"><svg class="tvchart" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="코스피와 EMA 9·21, 매수·매도 신호">
     <path d="${path(c.close)}" fill="none" stroke="var(--sub)" stroke-width="1.2" vector-effect="non-scaling-stroke"/>
     <path d="${path(c.ema_f)}" fill="none" stroke="#f59e0b" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
-    <path d="${path(c.ema_s)}" fill="none" stroke="#3b82f6" stroke-width="1.6" vector-effect="non-scaling-stroke"/>
-    ${c.buy.map((d) => mk(d, true)).join("")}${c.sell.map((d) => mk(d, false)).join("")}</svg>`;
+    <path d="${path(c.ema_s)}" fill="none" stroke="#3b82f6" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>
+    ${c.buy.map((d) => mk(d, true)).join("")}${c.sell.map((d) => mk(d, false)).join("")}</div>`;
   return tipWrap(svg, c.dates.map(tvLab), [["코스피", c.close, ""], ["EMA 9", c.ema_f, ""], ["EMA 21", c.ema_s, ""]]) +
     `<div class="legend"><span><i style="background:var(--sub)"></i>코스피</span><span><i style="background:#f59e0b"></i>EMA ${c.rules.fast}</span><span><i style="background:#3b82f6"></i>EMA ${c.rules.slow}</span><span style="color:var(--up)">▲ BUY</span><span style="color:var(--down)">▼ SELL</span></div>
     <div class="barlab"><span style="text-align:left">${tvLab(c.dates[0])}</span><span style="text-align:right">${tvLab(c.dates[n - 1])}</span></div>`;
