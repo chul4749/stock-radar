@@ -1702,15 +1702,19 @@ def surge_precursors(closes, values=None, breaks=None, eligible=None, rules=PRE)
     f = rules["fwd"]
     fwd_max = dr[::-1].rolling(f, min_periods=f).max()[::-1].shift(-1)
     fwd_ret = (cl.shift(-f) / cl - 1) * 100 - COST
-    # 판정 가능: 앞으로 f일 자료가 다 있고, 지난 look일·앞 f일 안에 가격 끊김이 없음
+    # 판정 가능: 앞으로 f일 자료가 다 있고 그사이 가격 끊김이 없음.
+    # 지난 기간에 끊김(감자·병합 등)이 있던 종목은 빼지 않는다 — 대개 사정이 나쁜 종목이라 빼면 모양 성적이 부풀려짐.
+    # 대신 가격 높이를 비교하는 모양(고점 근처·크게 빠진 뒤)만 그 종목을 끊김 뒤 look일 동안 빼고 본다
     brk = br.astype(float)
-    clean = (brk.rolling(rules["look"], min_periods=1).max() == 0) & (brk[::-1].rolling(f, min_periods=1).max()[::-1].shift(-1).fillna(1) == 0)
-    ok = fwd_max.notna() & cl.notna() & clean
+    ok = fwd_max.notna() & cl.notna() & (brk[::-1].rolling(f, min_periods=1).max()[::-1].shift(-1).fillna(1) == 0)
+    look_brk = brk.rolling(120, min_periods=1).max() > 0
     ok.iloc[:rules["look"]] = False
     hit = (fwd_max >= rules["hit"]) & ok
     # 주가 변화는 같은 날 다른 종목 평균을 뺀 '초과'로 (폭락한 날 다 같이 빠졌다 다 같이 오른 것을 모양 덕으로 착각하지 않게)
     exc = fwd_ret.where(ok).sub(fwd_ret.where(ok).mean(axis=1), axis=0)
     feats = _pre_features(cl, va, dr, rules["look"])
+    for k in ("near_high", "deep_dip"):
+        feats[k] = feats[k] & ~look_brk
     # 출렁임이 큰 종목은 원래 급등이 잦다 → 그날 60일 출렁임 5등분 칸마다의 급등 비율을 '기대값'으로 (모양이 출렁임 말고 뭘 더 알려 주나)
     vb = np.ceil(dr.rolling(rules["look"], min_periods=rules["look"] - 10).std().rank(axis=1, pct=True) * 5)
     expect = pd.DataFrame(np.nan, index=cl.index, columns=cols)
