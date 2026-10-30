@@ -1,0 +1,29 @@
+name: cleanup
+
+# Actions 저장 공간(무료 0.5GB)을 차지하는 예전 보관 파일(artifact)을 지운다.
+# 화면 배포용(github-pages)은 배포가 끝나면 필요 없고, 'site'는 예전에 수집마다 올리던 것(지금은 안 올림).
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 0"   # 매주 일요일 12:17 KST
+
+permissions:
+  actions: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 보관 파일 지우기 (probe 결과는 7일 안 된 것 남김)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cutoff=$(date -u -d '7 days ago' +%s)
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | [.id, .name, .size_in_bytes, .created_at] | @tsv' > list.tsv
+          total=0; n=0
+          while IFS=$'\t' read -r id name size created; do
+            if [ "$name" = "probe-result" ] && [ "$(date -u -d "$created" +%s)" -gt "$cutoff" ]; then continue; fi
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/$id" && total=$((total + size)) && n=$((n + 1))
+          done < list.tsv
+          echo "지운 보관 파일 ${n}개, $((total / 1024 / 1024))MB"

@@ -19,6 +19,7 @@ jobs:
           KRX_PW: ${{ secrets.KRX_PW }}
       - uses: actions/upload-artifact@v4
         with:
+          retention-days: 7   # 저장 공간(무료 0.5GB) 아끼기
           name: probe-result
           path: |
             probe/result.json
