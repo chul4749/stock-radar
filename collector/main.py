@@ -103,7 +103,7 @@ def main(argv):
 
     # 200일 이동평균용 긴 종가 기록: data-cache 의 hist/ 에 쌓아 두고 모자란 날만 받는다 (처음 한 번만 오래 걸림)
     t = step("긴 종가 기록 (200일선)")
-    long_closes, long_breaks = safe("긴 종가 기록", lambda: long_history(base, closes, chg), errors) or (None, None)
+    long_closes, long_breaks, long_values = safe("긴 종가 기록", lambda: long_history(base, closes, chg, values), errors) or (None, None, None)
     log(f"  {0 if long_closes is None else len(long_closes)}일, {time.time() - t:.0f}초")
 
     t = step("종목별 수급")
@@ -431,6 +431,11 @@ def main(argv):
     replay = build_replay(base, closes, values, flows_hist, listing, universe_all, {"scalp": scalp, "swing": swing, "value": value}, reports, opens, highs, lows, reported, attention,
                           {d.strftime("%Y%m%d"): float(v) for d, v in kospi_long.items()} if kospi_long is not None else None, dart_sig, breaks)
     log(f"  급등주 {len(replay['movers'])}개: " + ", ".join(f"{m['name']}({m['verdict']})" for m in replay["movers"][:8]))
+    # 급등 전조 찾기 (약 1년 긴 기록, 앞 기간에서 찾고 뒤 기간에서 확인 — 규칙 자동 변경 없음)
+    if long_closes is not None:
+        t = step("급등 전조 찾기")
+        replay["precursor"] = safe("급등 전조", lambda: logic.surge_precursors(long_closes, long_values, long_breaks, eligible=set(universe_all)), errors)
+        log(f"  {time.time() - t:.0f}초")
 
     t = step("운용사 방향 (액티브 ETF)")
     managers = build_managers(base, used_days, listing, closes, errors, sectors=sectors, trust=quality.get("trust"))
@@ -976,40 +981,50 @@ HIST = os.path.join(DATA, "hist")
 HIST_DAYS = 260   # 200일 평균 + 최근 60일 추이
 
 
-def long_history(base, closes, chg):
-    """최근 HIST_DAYS 영업일 전 종목 종가·등락률 (data-cache 의 hist/ 에 보관). 이번 실행에서 받은 날은 그대로 쓰고,
-    없는 날만 KRX에서 받는다. → (종가 DataFrame, 가격 끊긴 날 DataFrame)"""
+def long_history(base, closes, chg, values=None):
+    """최근 HIST_DAYS 영업일 전 종목 종가·등락률·거래대금 (data-cache 의 hist/ 에 보관). 이번 실행에서 받은 날은 그대로 쓰고,
+    없는 날만 KRX에서 받는다. → (종가, 가격 끊긴 날, 거래대금) DataFrame"""
     days = sources.business_days(base, HIST_DAYS)
-    old_c = old_r = None
-    try:
-        old_c = pd.read_csv(os.path.join(HIST, "closes.csv.gz"), index_col=0, dtype={0: str})
-        old_r = pd.read_csv(os.path.join(HIST, "chg.csv.gz"), index_col=0, dtype={0: str})
-        old_c.index, old_r.index = old_c.index.astype(str), old_r.index.astype(str)
-    except (OSError, ValueError):
-        old_c = old_r = None
-    have = set(closes.index) | (set(old_c.index) if old_c is not None else set())
-    missing = [d for d in days if d not in have]
+
+    def load(name):
+        try:
+            x = pd.read_csv(os.path.join(HIST, name), index_col=0, dtype={0: str})
+            x.index = x.index.astype(str)
+            return x
+        except (OSError, ValueError):
+            return None
+    old_c, old_r, old_v = load("closes.csv.gz"), load("chg.csv.gz"), load("values.csv.gz")
+    if old_v is not None:
+        old_v = old_v * 1e6   # 파일은 백만 원 단위
+    have_c = set(closes.index) | (set(old_c.index) if old_c is not None else set())
+    have_v = (set(values.index) if values is not None else set()) | (set(old_v.index) if old_v is not None else set())
+    # 거래대금은 나중에 보태서(급등 전조) 예전 날짜엔 없음 → 종가가 있어도 거래대금이 없으면 그날을 다시 받는다 (처음 한 번만)
+    missing = [d for d in days if d not in have_c or d not in have_v]
     got = sources.daily_ohlcv(missing) if missing else {}
-    log(f"  보관 {0 if old_c is None else len(old_c)}일 + 이번 {len(closes)}일 + 새로 받음 {len(got)}/{len(missing)}일")
-    parts_c = [x for x in (old_c,) if x is not None] + [closes]
-    parts_r = [x for x in (old_r,) if x is not None] + ([chg] if chg is not None else [])
-    if got:
-        parts_c.append(pd.DataFrame({d: got[d]["종가"] for d in got}).T.astype(float).replace(0, float("nan")))
-        parts_r.append(pd.DataFrame({d: got[d]["등락률"] for d in got}).T.astype(float))
-    cl = pd.concat(parts_c)
-    cl = cl[~cl.index.duplicated(keep="last")].sort_index()
-    rt = pd.concat(parts_r) if parts_r else None
-    if rt is not None:
-        rt = rt[~rt.index.duplicated(keep="last")].sort_index()
+    log(f"  보관 {0 if old_c is None else len(old_c)}일(거래대금 {0 if old_v is None else len(old_v)}일) + 이번 {len(closes)}일 + 새로 받음 {len(got)}/{len(missing)}일")
+
+    def merge(parts):
+        parts = [x for x in parts if x is not None]
+        if not parts:
+            return None
+        x = pd.concat(parts)
+        return x[~x.index.duplicated(keep="last")].sort_index()
+    frame = lambda col: pd.DataFrame({d: got[d][col] for d in got}).T.astype(float) if got else None
+    cl = merge([old_c, closes, frame("종가").replace(0, float("nan")) if got else None])
+    rt = merge([old_r, chg, frame("등락률") if got else None])
+    va = merge([old_v, values, frame("거래대금") if got else None])
     keep = [d for d in cl.index if d >= days[0]]
     save = sorted(set(cl.index))[-(HIST_DAYS + 40):]   # 예전 기준일 재계산도 쓸 수 있게 조금 더 남김
     os.makedirs(HIST, exist_ok=True)
     cl.loc[save].round(2).to_csv(os.path.join(HIST, "closes.csv.gz"), compression="gzip")
     if rt is not None:
         rt.loc[[d for d in save if d in rt.index]].round(2).to_csv(os.path.join(HIST, "chg.csv.gz"), compression="gzip")
+    if va is not None:
+        (va.loc[[d for d in save if d in va.index]] / 1e6).round(0).to_csv(os.path.join(HIST, "values.csv.gz"), compression="gzip")   # 백만 원 단위로 저장
     cl = cl.loc[[d for d in keep if d <= base]]
     rt = rt.reindex(cl.index) if rt is not None else None
-    return cl, logic.price_breaks(cl, rt)
+    va = va.reindex(index=cl.index, columns=cl.columns) if va is not None else None
+    return cl, logic.price_breaks(cl, rt), va
 
 
 def load_fin_cache():

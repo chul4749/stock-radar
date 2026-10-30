@@ -1619,6 +1619,166 @@ def signal_validation(closes, values, net, caps, eligible, rules=SURGE):
             "fwd": f, "hit": rules["hit"], "rows": rows}
 
 
+# 급등 전조 찾기: 급등(하루 +20%↑) 전에 보일 만한 모양을 넓게 후보로 두고, 앞 기간에서 찾고 뒤 기간에서 다시 확인한다.
+# 규칙을 자동으로 바꾸지 않는다 — 통과한 모양을 보여 주고 필터에 넣을지는 사람이 정함.
+PRE = {"fwd": 5, "hit": 20.0, "look": 60, "lift": 1.5, "t": 2.0, "t_pair": 3.0, "min_hits": 10, "adj": 1.3}
+PRE_NAMES = {
+    "squeeze": "움직임이 줄어듦 (최근 10일 출렁임이 60일 평소의 절반 아래)",
+    "near_high": "60일 최고가 근처 (3% 안)",
+    "deep_dip": "크게 빠진 뒤 (120일 최고가의 60% 아래)",
+    "prior_surge": "최근 20일 안에 급등한 적 있음",
+    "big_drop": "오늘 −10% 넘게 빠짐",
+    "up3": "조용히 3일 연속 오름 (5일 합 +10% 미만)",
+    "vol_creep": "가격은 그대로인데 거래가 늘어남 (5일 거래대금이 60일 평균의 2배↑, 5일 등락 ±5% 안)",
+    "vol_spike": "오늘 거래 폭발 (20일 평균의 5배↑), 가격은 0~+10%",
+    "thin": "거래가 적은 종목 (20일 평균 거래대금 10억 미만)",
+    "cheap": "주가 2,000원 미만",
+}
+
+
+def _pre_features(cl, va, dr, look):
+    import numpy as np
+    std10 = dr.rolling(10, min_periods=8).std()
+    std60 = dr.rolling(look, min_periods=look - 10).std()
+    hi60 = cl.rolling(look, min_periods=look - 10).max()
+    hi120 = cl.rolling(120, min_periods=look).max()
+    r5 = (cl / cl.shift(5) - 1) * 100
+    f = {
+        "squeeze": std10 < 0.5 * std60,
+        "near_high": cl >= 0.97 * hi60,
+        "deep_dip": cl <= 0.6 * hi120,
+        "prior_surge": (dr >= 20).astype(float).rolling(20, min_periods=1).max() > 0,
+        "big_drop": dr <= -10,
+        "up3": (dr > 0) & (dr.shift(1) > 0) & (dr.shift(2) > 0) & (r5 < 10),
+        "cheap": cl < 2000,
+    }
+    if va is not None:
+        v = va.where(va > 0)
+        v5, v20, v60 = v.rolling(5, min_periods=5).mean(), v.rolling(20, min_periods=15).mean(), v.rolling(look, min_periods=look - 10).mean()
+        f["vol_creep"] = (v5 >= 2 * v60) & (r5.abs() <= 5)
+        f["vol_spike"] = (v >= 5 * v20.shift(1)) & (dr >= 0) & (dr <= 10)
+        f["thin"] = v20 < 1e9
+    return {k: x.fillna(False).astype(bool) if hasattr(x, "fillna") else x for k, x in f.items()}
+
+
+def _pre_stats(mask, hit, ok, base_by_day, expect=None):
+    """mask(그 모양) & ok(판정 가능) 인 칸에서 급등 비율, 평소 대비 몇 배, 날짜로 묶은 t (그날 그 모양 종목의 급등 비율 − 그날 평소),
+    expect(그날 출렁임이 비슷한 종목들의 급등 비율)가 있으면 '출렁임 비슷한 종목 대비 몇 배'(adj)도."""
+    import numpy as np
+    m = (mask & ok).values
+    n = int(m.sum())
+    if not n:
+        return {"n": 0, "hits": 0}
+    h = hit.values
+    hits = int(h[m].sum())
+    rate = hits / n * 100
+    per_n = m.sum(axis=1)
+    per_h = (m & h).sum(axis=1)
+    use = per_n > 0
+    diff = per_h[use] / per_n[use] * 100 - base_by_day[use]
+    t = float(diff.mean() / (diff.std(ddof=1) / np.sqrt(len(diff)))) if len(diff) > 2 and diff.std(ddof=1) > 0 else None
+    base = float(np.nanmean(base_by_day[use])) if use.any() else None
+    ex = float(np.nansum(expect.values[m])) if expect is not None else None
+    return {"n": n, "hits": hits, "rate": round(rate, 1), "lift": round(rate / base, 1) if base else None,
+            "t": round(t, 1) if t is not None else None, "adj": round(hits / ex, 1) if ex else None}
+
+
+def surge_precursors(closes, values=None, breaks=None, eligible=None, rules=PRE):
+    """긴 기록(약 1년)에서 날마다·종목마다 모양(전조 후보)을 표시하고, 그 뒤 fwd일 안에 하루 +hit% 이상 오른 날이 있었나를 본다.
+    기간을 반으로 나눠 앞(찾은 기간)과 뒤(확인 기간) 모두에서 평소보다 lift배 이상·우연 아님(날짜로 묶은 t)이면 '통과'.
+    두 모양을 같이 본 것은 여럿을 시험할수록 운으로 통과하는 게 섞이므로 확인 기간 기준을 더 엄하게(t_pair).
+    급등을 잡아도 손해일 수 있어서 '그날 마감에 샀다면 5일 뒤' 주가 변화(비용 뺌)도 같이 — 같은 날 다른 종목 평균을 뺀 초과(exc5)와 날짜로 묶은 t."""
+    import numpy as np
+    cols = [c for c in closes.columns if eligible is None or c in eligible]
+    if len(closes.index) < rules["look"] + rules["fwd"] + 20 or not cols:
+        return None
+    cl = closes[cols].astype(float)
+    va = values.reindex(index=cl.index, columns=cols).astype(float) if values is not None else None
+    if va is not None and va.notna().sum(axis=1).gt(len(cols) * 0.5).mean() < 0.9:
+        va = None   # 거래대금 기록이 아직 덜 쌓임 → 거래 관련 모양은 '기록 쌓는 중'
+    dr = (cl.pct_change(fill_method=None) * 100).round(6)
+    br = breaks.reindex(index=cl.index, columns=cols).fillna(False).astype(bool) if breaks is not None else pd.DataFrame(False, index=cl.index, columns=cols)
+    dr = dr.where(~br & (dr <= 30.5))
+    f = rules["fwd"]
+    fwd_max = dr[::-1].rolling(f, min_periods=f).max()[::-1].shift(-1)
+    fwd_ret = (cl.shift(-f) / cl - 1) * 100 - COST
+    # 판정 가능: 앞으로 f일 자료가 다 있고, 지난 look일·앞 f일 안에 가격 끊김이 없음
+    brk = br.astype(float)
+    clean = (brk.rolling(rules["look"], min_periods=1).max() == 0) & (brk[::-1].rolling(f, min_periods=1).max()[::-1].shift(-1).fillna(1) == 0)
+    ok = fwd_max.notna() & cl.notna() & clean
+    ok.iloc[:rules["look"]] = False
+    hit = (fwd_max >= rules["hit"]) & ok
+    # 주가 변화는 같은 날 다른 종목 평균을 뺀 '초과'로 (폭락한 날 다 같이 빠졌다 다 같이 오른 것을 모양 덕으로 착각하지 않게)
+    exc = fwd_ret.where(ok).sub(fwd_ret.where(ok).mean(axis=1), axis=0)
+    feats = _pre_features(cl, va, dr, rules["look"])
+    # 출렁임이 큰 종목은 원래 급등이 잦다 → 그날 60일 출렁임 5등분 칸마다의 급등 비율을 '기대값'으로 (모양이 출렁임 말고 뭘 더 알려 주나)
+    vb = np.ceil(dr.rolling(rules["look"], min_periods=rules["look"] - 10).std().rank(axis=1, pct=True) * 5)
+    expect = pd.DataFrame(np.nan, index=cl.index, columns=cols)
+    for b in range(1, 6):
+        mb = (vb == b) & ok
+        rate_b = (hit & mb).sum(axis=1) / mb.sum(axis=1).replace(0, np.nan)
+        expect = expect.mask(mb, pd.DataFrame(np.repeat(rate_b.values[:, None], len(cols), axis=1), index=cl.index, columns=cols))
+    days = [d for d in cl.index if ok.loc[d].any()]
+    if len(days) < 40:
+        return None
+    half = days[len(days) // 2]
+    parts = {"a": [d for d in days if d < half], "b": [d for d in days if d >= half]}
+
+    def stats_for(mask):
+        out = {}
+        for p, ds in parts.items():
+            o, h, m = ok.loc[ds], hit.loc[ds], mask.loc[ds]
+            base_by_day = (h.values.sum(axis=1) / np.maximum(o.values.sum(axis=1), 1)) * 100
+            out[p] = _pre_stats(m, h, o, base_by_day, expect.loc[ds])
+        mm = (mask & ok).values
+        r = fwd_ret.values[mm]
+        r = r[~np.isnan(r)]
+        if len(r):
+            out["ret5"], out["ret5_win"] = round(float(r.mean()), 1), round(float((r > 0).mean() * 100))
+            per = exc.where(mask & ok).mean(axis=1).dropna()   # 날짜별 평균 초과 → 날짜로 묶은 t
+            out["exc5"] = round(float(per.mean()), 1) if len(per) else None
+            out["exc5_t"] = round(float(per.mean() / (per.std(ddof=1) / np.sqrt(len(per)))), 1) if len(per) > 2 and per.std(ddof=1) > 0 else None
+        return out
+
+    def verdict(st, pair=False):
+        a, b = st["a"], st["b"]
+        good = lambda x, tt: x.get("lift") is not None and x["lift"] >= rules["lift"] and x["hits"] >= rules["min_hits"] and (x.get("t") or 0) >= tt
+        bad = lambda x: x.get("lift") is not None and x["lift"] <= 1 / rules["lift"] and (x.get("t") or 0) <= -rules["t"]
+        if good(a, rules["t"]) and good(b, rules["t_pair"] if pair else rules["t"]):
+            # 출렁임 비슷한 종목과 견주면 별 차이 없음 = 그냥 출렁이는 종목을 고른 것
+            return "pass" if min(a.get("adj") or 0, b.get("adj") or 0) >= rules["adj"] else "vol_only"
+        if bad(a) and bad(b):
+            return "less"
+        if good(a, rules["t"]):
+            return "first_only"
+        if min(a["hits"], b["hits"]) < rules["min_hits"]:
+            return "few"
+        return "none"
+    rows = []
+    for k, m in feats.items():
+        st = stats_for(m)
+        rows.append({"key": k, "label": PRE_NAMES[k], **st, "verdict": verdict(st)})
+    # 두 모양 같이: 각각 판정할 만큼 있는 것끼리만
+    keys = [r["key"] for r in rows if r["a"]["n"] and r["b"]["n"]]
+    pairs = []
+    for i, k1 in enumerate(keys):
+        for k2 in keys[i + 1:]:
+            st = stats_for(feats[k1] & feats[k2])
+            if st["a"].get("hits", 0) + st["b"].get("hits", 0) < rules["min_hits"]:
+                continue
+            pairs.append({"key": f"{k1}+{k2}", "label": f"{PRE_NAMES[k1].split(' (')[0]} + {PRE_NAMES[k2].split(' (')[0]}", **st, "verdict": verdict(st, pair=True)})
+    pairs.sort(key=lambda r: -(min(r["a"].get("lift") or 0, r["b"].get("lift") or 0)))
+    base = {}
+    for p, ds in parts.items():
+        o, h = ok.loc[ds].values, hit.loc[ds].values
+        base[p] = {"n": int(o.sum()), "hits": int(h.sum()), "rate": round(float(h.sum() / max(o.sum(), 1) * 100), 2), "from": ds[0], "to": ds[-1]}
+    r = fwd_ret.values[ok.values]
+    r = r[~np.isnan(r)]
+    base["ret5"], base["ret5_win"] = round(float(r.mean()), 1), round(float((r > 0).mean() * 100))
+    return {"base": base, "rows": rows, "pairs": pairs[:12], "n_pairs": len(pairs), "vol_ready": va is not None,
+            "from": days[0], "to": days[-1], "rules": rules}
+
+
 # 급등 = 하루 +20% 이상 (SURGE와 같은 정의). mid(+8~20%)는 급등이 아닌 큰 상승 — 비교용
 FOLLOW = {"big": 20.0, "mid": 8.0, "again": 20.0, "rebound": 5.0}
 

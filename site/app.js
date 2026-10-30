@@ -116,6 +116,7 @@ const INFO = {
   vp: "매물대 = 최근 60영업일 동안 어느 가격대에서 거래가 많았는지(거래대금)를 가로 막대로 나타낸 것. 그 가격에 산 사람이 많다는 뜻입니다.\n· 지금 가격보다 아래 매물: 그 사람들은 이익 중 → 급하게 안 팔고, 가격이 내려오면 '싸다'며 다시 사는 경향 → 받쳐 주는 가격대(지지)\n· 지금 가격보다 위 매물: 그 사람들은 손해 중 → 가격이 올라와 본전이 되면 팔고 나오려는 경향 → 누르는 가격대(저항)\n· 매물대를 뚫고 올라가면 그 위가 가벼워지고, 뚫린 매물대가 다음엔 받쳐 주는 쪽으로 바뀌는 경우가 많음\n· 평균 매수가: 거래대금으로 가중한 60일 평균 가격. 지금 가격이 이보다 위면 최근 산 사람들 대부분이 이익 중\n주의: 하루 거래를 그날 저가~고가에 고르게 펼친 근사이고, 60일보다 오래된 매물은 안 보입니다. 같은 사람이 사고팔기를 반복한 것도 다 들어가요. '왜 이 가격에서 막히나/받치나'를 이해하는 공부 자료로 보세요.",
   follow: "급등한 날(하루 +20%↑) 뒤 며칠이 어떻게 흘렀는지 최근 약 80영업일 실제 기록을 셉니다. 시총·거래대금 기준 이상 종목만.\n· 다음 날도 오름: 급등 다음 날 종가가 또 올랐던 비율\n· 3일 안 또 급등: 다음 3일 중 하루라도 +20% 넘게 오른 비율\n· 하루 쉬고 다시: 다음 날은 보합·하락이었다가 2~3일째 +5% 넘게 오른 비율 (하루 건너 이어지는 모양)\n'평소' 줄은 아무 날·아무 종목이나 같은 방법으로 센 값이라, 급등 줄이 평소보다 높아야 '급등은 이어지는 편'이라고 말할 수 있어요.\n아래 표는 우리 자료가 장 마감 뒤에 나오니 실제로 살 수 있는 '다음 날 아침 첫 가격'에 사서 3·5영업일째 종가에 판 결과입니다 (거래 비용 뺌). 이어지는 경우가 많아도 다음 날 아침 첫 가격가 이미 높게 시작하면 남는 게 적을 수 있어서 따로 봅니다.",
   follow_split: "급등한 날(하루 +20% 이상)을 그날의 모양으로 나눠, 어떤 경우가 그 뒤에 더 잘 이어졌는지 봅니다.\n· 종가가 고가 근처: 장 끝까지 힘이 남아 있었음 / 고가에서 밀림: 오르다 팔려 내려옴\n· 첫 급등 vs 이미 오른 뒤: 전 5일 동안 +10% 넘게 올라 있었는지\n· 거래 배수: 그날 거래대금이 20일 평균의 몇 배인지\n· 큰손: 그날 기관+외국인이 샀는지 팔았는지 (최근 약 25일만 있어 건수가 적음)\n· 시총: 3천억 기준 (지금 시총으로 나눔)\n건수가 적은 줄은 우연일 수 있어 참고만 하세요.",
+  precursor: "급등(하루 +20%↑) 며칠 전에 보일 만한 모양을 여러 개 후보로 두고, 약 1년 기록에서 그 모양이 보인 날 뒤 5일 안에 급등이 나왔던 횟수를 평소(아무 종목·아무 날)와 비교합니다.\n속지 않으려고 세 가지를 봅니다. ① 기간을 반으로 나눠 앞에서 찾은 게 뒤에서도 맞나(과거에만 맞춘 규칙 거르기). ② 원래 크게 출렁이는 종목은 급등도 잦으니, 출렁임이 비슷한 종목끼리 견줘도 잦은가. ③ 급등이 잦아도 그만큼 크게 빠지기도 하면 소용없으니, 그날 마감에 샀다면 5일 뒤 같은 날 다른 종목보다 나았나.\n종가·거래대금만 써서 공시·뉴스로 갑자기 뛰는 급등은 미리 알 수 없습니다.",
   signal_check: "거꾸로도 확인합니다: 그 신호가 뜬 종목들 중 실제로 5일 안에 하루 +20% 넘게 오른 날이 있었던 비율(100번 중 몇 번)이 얼마인지, 아무 신호 없이 고른 종목(평소)보다 몇 배인지.\n급등주에만 신호가 있었던 게 아니라 평범한 종목에도 흔하게 뜨는 신호라면 '평소의 몇 배'가 1에 가까워서 쓸모가 없습니다.",
   exit: "정리선 = 미리 정해 두는 '이 가격 아래로 마감하면 판다'는 가격입니다. 사기 전에 언제 팔지 정해 두려는 것이고, 걸린 날 값으로 정한 뒤 바꾸지 않아요.\n· 스윙: 걸린 날의 20일 평균 가격 (오르는 흐름이 깨짐)\n· 단타: 걸린 날의 저가 (급등시킨 힘이 빠짐)\n· 저평가: 걸린 날까지 최근 10일 중 가장 낮은 가격 (아직 바닥이 아니었음)\n마감 가격으로만 판단해요 — 장중에 잠깐 내려갔다 올라오면 팔지 않고, 마감이 아래면 다음 날 아침 첫 가격에 팝니다.\n정리선은 손실을 막아 주는 보장이 아니에요. 밤사이 나쁜 소식으로 다음 날 아침 크게 낮게 시작하면 더 낮은 가격에 팔려요. 이 규칙을 실제로 지켰다면 어땠는지는 성적표 '정리 기준을 지켰다면'에서 확인합니다.",
   vol_bucket: "단타 후보를 걸린 날의 '평소 하루 변동폭'(최근 14일 하루 움직임 폭의 평균, ATR14를 가격으로 나눈 %) 크기로 나눠, 그 뒤 성적을 비교합니다.\n· 너무 조용한 종목: 거래 비용과 정리선 거리에 비해 움직임이 작아 단타로 남는 게 적을 수 있음\n· 아주 많이 출렁이는 종목: 크게 오를 수도 있지만 평균 성적은 오히려 나쁘다는 연구가 많음 (사람들이 '한 방'을 기대하고 비싸게 사서)\n그래서 '많이 출렁이는 종목 고르기'가 아니라, 기록이 쌓이면 '너무 조용한 종목 빼기'(하한선)가 맞는지를 따로 확인하려는 칸입니다.",
@@ -1678,7 +1679,52 @@ function renderReplay() {
     ${rp.movers.length > 4 ? `<details class="rules"><summary>급등주 ${rp.movers.length - 4}개 더 보기</summary><ul class="fit movers">${rp.movers.slice(4).map(moverCard).join("")}</ul></details>` : ""}
     <p class="hint">급등 뒤 흐름·가진 종목이 급등했을 때·신호 검증은 아래 <a href="#research">연구 자료</a>로 옮겼어요.</p>`;
   const rb = $("#research-body");
-  if (rb) rb.innerHTML = `<p class="hint kdleg">${kindTag(false)} = 그 종목 주가가 실제로 오르내린 % · ${kindTag(true)} = 같은 기간 지수나 다른 종목보다 몇 % 더(덜) 올랐나</p>${holdBlock(rp.follow && rp.follow.hold)}${ft}${vt}`;
+  if (rb) rb.innerHTML = `<p class="hint kdleg">${kindTag(false)} = 그 종목 주가가 실제로 오르내린 % · ${kindTag(true)} = 같은 기간 지수나 다른 종목보다 몇 % 더(덜) 올랐나</p>${holdBlock(rp.follow && rp.follow.hold)}${ft}${vt}${preBlock(rp.precursor)}`;
+}
+
+/* 급등 전조 찾기: 앞 기간에서 찾고 뒤 기간에서 다시 확인. 규칙은 자동으로 안 바꿈 */
+const PRE_SHORT = { squeeze: "움직임 줄어듦", near_high: "60일 고점 근처", deep_dip: "크게 빠진 뒤", prior_surge: "최근 20일 급등 이력",
+  big_drop: "오늘 −10%↓", up3: "조용히 3일 오름", vol_creep: "가격 그대로·거래만 늘어남", vol_spike: "오늘 거래 폭발", thin: "거래 적은 종목", cheap: "2,000원 미만" };
+const PRE_V = { pass: ["확인됨", "fresh"], vol_only: ["출렁이는 종목이라 그런 것", "stay"], first_only: ["앞 기간에서만 — 뒤엔 안 맞음", "known"],
+  less: ["오히려 덜 급등", "known"], none: ["차이 없음", "known"], few: ["기록 적음", "known"] };
+const preLabel = (k) => k.split("+").map((x) => PRE_SHORT[x] || x).join(" + ");
+// 가로 막대: 100번 중 몇 번, 세로 선 = 평소
+function rateRows(rows, base, baseLabel = "평소") {
+  const M = Math.max(base * 1.2, ...rows.map((r) => r.v || 0)) * 1.08;
+  const row = (label, sub, v, col, isBase) => `<div class="rd${isBase ? " rbase-row" : ""}"><div class="dl">${esc(label)}${sub ? `<small>${sub}</small>` : ""}</div>
+    <div class="rt"><span class="rbar" style="width:${(v / M * 100).toFixed(1)}%;background:var(--${col})"></span><i class="rbase" style="left:${(base / M * 100).toFixed(1)}%"></i></div>
+    <b class="dv">${num(v, 1)}번<small class="vs">100번 중</small></b></div>`;
+  return `<div class="dbars">${row(baseLabel, "아무 종목·아무 날 (비교 기준)", base, "faint", true)}${rows.map((r) => row(r.label, r.sub, r.v, r.col, false)).join("")}
+    <div class="dax"><span></span><span><i class="rbase-leg"></i>${baseLabel}</span></div></div>`;
+}
+function preBlock(p) {
+  if (!p) return "";
+  const b = p.base, all = [...p.rows, ...(p.pairs || [])];
+  const ok = all.filter((r) => r.verdict === "pass");
+  const singles = p.rows.filter((r) => r.b && r.b.n);
+  const vtag = (r) => { const [t, c] = PRE_V[r.verdict] || ["", "known"]; return `<span class="tag ${c}">${t}</span>`; };
+  const rowOf = (r) => ({ label: preLabel(r.key), v: r.b.rate, col: r.verdict === "pass" ? "up" : r.verdict === "vol_only" ? "sub" : "faint",
+    sub: `${vtag(r)} 평소의 ${num(r.b.lift, 1)}배 · 출렁임 비슷한 종목의 ${num(r.b.adj, 1)}배${r.b.n < 300 ? ` · ${num(r.b.n)}건` : ""}` });
+  const money = ok.filter((r) => r.exc5 != null);
+  const goodMoney = money.filter((r) => r.exc5_t != null && r.exc5_t >= 2);
+  const tk = !ok.length ? "앞·뒤 기간 모두에서 급등을 미리 알려 준 모양은 아직 없어요."
+    : `급등이 더 잦았던 모양: ${ok.slice(0, 3).map((r) => `‘${preLabel(r.key)}’`).join(", ")}${ok.length > 3 ? ` 등 ${ok.length}개` : ""}. ` +
+      (goodMoney.length ? `그중 ${goodMoney.map((r) => `‘${preLabel(r.key)}’`).join(", ")}은 그날 마감에 샀어도 다른 종목보다 나았어요.`
+        : "하지만 그날 마감에 샀다면 5일 뒤 다른 종목보다 나았던 건 없어요 — 급등이 잦다는 건 크게 빠지는 날도 잦다는 뜻이었어요.");
+  const tbl = `<table class="score"><thead><tr><th>모양</th><th>앞 기간 (100번 중)</th><th>뒤 기간 (100번 중)</th><th>출렁임 비슷한 종목 대비</th><th>5일 뒤 다른 종목보다</th></tr></thead><tbody>
+    <tr><th>평소</th><td>${num(b.a.rate, 1)}번</td><td>${num(b.b.rate, 1)}번</td><td>–</td><td>–</td></tr>
+    ${all.filter((r) => r.a && r.b).map((r) => `<tr><th>${esc(preLabel(r.key))}<br><small>${(PRE_V[r.verdict] || [""])[0]}</small></th><td>${r.a.rate == null ? "–" : num(r.a.rate, 1) + "번"}<br><small>${num(r.a.n)}건 · ${r.a.lift ?? "–"}배</small></td><td>${r.b.rate == null ? "–" : num(r.b.rate, 1) + "번"}<br><small>${num(r.b.n)}건 · ${r.b.lift ?? "–"}배</small></td><td>${r.a.adj ?? "–"}배 / ${r.b.adj ?? "–"}배</td><td>${signed(r.exc5, 1, "%")}</td></tr>`).join("")}</tbody></table>`;
+  return `<h3 class="sub">급등 전조 찾기 <small>${ymd(p.from).slice(2)}~${ymd(p.to).slice(2)}, 하루 +${p.rules.hit}%↑가 ${p.rules.fwd}일 안에</small>${infoBtn("precursor")}</h3>${infoBox("precursor")}
+    ${take(tk)}
+    <div class="tile wide"><div class="chart-cap">이 모양이 보인 종목 100번 중, ${p.rules.fwd}일 안에 하루 +${p.rules.hit}% 넘게 오른 날이 있었던 횟수 (뒤 기간 ${ymd(b.b.from).slice(5)}~${ymd(b.b.to).slice(5)} = 확인용)</div>
+      ${rateRows(singles.map(rowOf).sort((x, y) => y.v - x.v), b.b.rate)}
+      ${p.vol_ready ? "" : `<p class="hint">⏳ 거래대금 모양(가격 그대로·거래만 늘어남, 오늘 거래 폭발, 거래 적은 종목)은 긴 거래 기록을 쌓는 중이라 다음 수집부터 나와요.</p>`}
+      ${(p.pairs || []).length ? `<details class="rules"><summary>두 모양이 같이 보였을 때 (${num(p.n_pairs)}개 조합 시험 — 여럿을 시험할수록 운으로 통과하는 게 섞여서 더 엄하게 봄)</summary>
+        ${rateRows(p.pairs.filter((r) => r.b && r.b.rate != null).map(rowOf), b.b.rate)}</details>` : ""}
+      ${money.length ? `<div class="chart-cap">${kindTag(true)}그런데 그날 마감 가격에 샀다면? 5일 뒤 주가가 같은 날 다른 종목들보다 몇 % 더 올랐나 (비용 뺌)</div>
+        ${forest(money.map((r) => ({ label: preLabel(r.key), sub: `100번 중 ${num(r.ret5_win, 0)}번 이익`, x: r.exc5, se: r.exc5_t ? Math.abs(r.exc5 / r.exc5_t) : null })), { axis: ["다른 종목보다 못함", "더 나음"], vs: "다른 종목보다" })}` : ""}
+      ${asTable(tbl)}</div>
+    <p class="hint">기간을 반으로 나눠 앞에서 찾은 모양이 뒤 기간에도 맞았을 때만 ‘확인됨’이에요. 원래 크게 출렁이는 종목은 급등도 잦아서, 출렁임이 비슷한 종목끼리 견줘도 1.3배 넘게 잦아야 해요. 확인돼도 필터에 자동으로 넣지 않아요 — 넣을지는 직접 정하세요.</p>`;
 }
 
 /* 가진 종목이 급등했을 때: 급등일 종가 기준 그 뒤 10일 (언제 가장 높았나·팔기 방법 비교) */

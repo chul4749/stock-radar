@@ -1128,15 +1128,23 @@ def test_long_history_caches_and_fetches_only_missing(tmp_path, monkeypatch):
 
     def fake_ohlcv(ds):
         asked.extend(ds)
-        return {d: pd.DataFrame({"종가": [100.0, 50.0], "등락률": [0.0, 0.0]}, index=["A", "B"]) for d in ds}
+        return {d: pd.DataFrame({"종가": [100.0, 50.0], "등락률": [0.0, 0.0], "거래대금": [3e9, 1e9]}, index=["A", "B"]) for d in ds}
     monkeypatch.setattr(sources, "daily_ohlcv", fake_ohlcv)
     now = pd.DataFrame({"A": [101.0] * 5, "B": [51.0] * 5}, index=days[25:30])
     chg = pd.DataFrame(0.0, index=now.index, columns=now.columns)
-    cl, br = main.long_history(days[29], now, chg)
+    val = pd.DataFrame({"A": [2e9] * 5, "B": [1e9] * 5}, index=days[25:30])
+    cl, br, va = main.long_history(days[29], now, chg, val)
     assert len(cl) == 20 and len(asked) == 15 and cl.loc[days[29], "A"] == 101.0 and not br.any().any()
+    assert va.loc[days[29], "A"] == 2e9 and va.loc[days[10], "A"] == 3e9
     asked.clear()
-    cl2, _ = main.long_history(days[29], now, chg)                  # 두 번째엔 보관본으로 → 새로 받을 게 없음
-    assert asked == [] and len(cl2) == 20 and list(cl2.columns) == ["A", "B"]
+    cl2, _, va2 = main.long_history(days[29], now, chg, val)        # 두 번째엔 보관본으로 → 새로 받을 게 없음
+    assert asked == [] and len(cl2) == 20 and list(cl2.columns) == ["A", "B"] and va2.loc[days[10], "A"] == 3e9   # 백만 원 단위 저장 → 원으로 복원
+    # 예전 보관본엔 거래대금이 없었음 → 그 날들만 한 번 다시 받는다
+    import os
+    os.remove(tmp_path / "hist" / "values.csv.gz")
+    asked.clear()
+    main.long_history(days[29], now, chg, val)
+    assert len(asked) == 15
 
 
 def test_tv_signals_match_pine_rules():
@@ -1178,3 +1186,29 @@ def test_weekly_and_4h_bars():
     rows = [(dt(2026, 10, 29, h), float(h)) for h in (9, 10, 11, 12, 13, 14, 15)] + [(dt(2026, 10, 29, 16), 99.0)]
     h4 = logic.to_4h(rows)
     assert dict(h4) == {"2026102909": 12.0, "2026102913": 15.0}                    # 09~13시 / 13~15:30, 장 밖 봉은 뺌
+
+
+def test_surge_precursors_finds_planted_pattern_and_checks_later_half():
+    import numpy as np
+    rng = np.random.default_rng(0)
+    nd, ns = 220, 400
+    days = [f"2026{i:04d}" for i in range(nd)]
+    cols = [f"S{i:03d}" for i in range(ns)]
+    r = rng.normal(0, 2.0, (nd, ns))
+    # 심어 둔 전조: '오늘 −10% 넘게 빠짐' 뒤 사흘째에 +25% (앞·뒤 기간 모두)
+    for k in range(200):
+        d, s = rng.integers(70, nd - 6), rng.integers(0, ns)
+        r[d, s], r[d + 3, s] = -12.0, 25.0
+    # 아무 관계 없는 드문 급등도 섞음 (평소 비율)
+    for k in range(300):
+        r[rng.integers(61, nd), rng.integers(0, ns)] = 22.0
+    cl = pd.DataFrame(10000 * np.cumprod(1 + r / 100, axis=0), index=days, columns=cols)
+    out = logic.surge_precursors(cl)
+    rows = {x["key"]: x for x in out["rows"]}
+    assert out["vol_ready"] is False and "vol_creep" not in rows      # 거래대금 없으면 거래 모양은 빼고 '쌓는 중'
+    bd = rows["big_drop"]
+    assert bd["verdict"] in ("pass", "vol_only") and bd["a"]["lift"] >= 1.5 and bd["b"]["lift"] >= 1.5
+    assert rows["up3"]["verdict"] in ("none", "few", "less")
+    assert out["base"]["a"]["to"] < out["base"]["b"]["from"]            # 앞(찾은 기간)과 뒤(확인 기간)가 겹치지 않음
+    assert "exc5" in bd and "ret5_win" in bd
+    assert logic.surge_precursors(cl.iloc[:60]) is None
