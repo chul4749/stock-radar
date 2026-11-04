@@ -1894,7 +1894,7 @@ def _wave3_hold(cl, ev, bm, upmk, half, rules):
     return out
 
 
-def wave3_study(closes, breaks=None, eligible=None, rules=WAVE):
+def wave3_study(closes, breaks=None, eligible=None, rules=WAVE, state_out=None):
     """약 1년 기록에서 '3파처럼 보인 첫날'(event) 뒤 5·10일 주가가 같은 날 다른 종목보다 어땠나(exc, 날짜로 묶은 t),
     10일 안에 그날 마감보다 dd% 넘게 빠진 적이 있나(4파 조정처럼) — 평소와 비교, 기간 앞·뒤 반씩.
     → (연구 결과, 지금 3파처럼 보이는 종목 {코드: 모양})"""
@@ -1905,16 +1905,19 @@ def wave3_study(closes, breaks=None, eligible=None, rules=WAVE):
     cl = closes[cols].astype(float)
     br = breaks.reindex(index=cl.index, columns=cols).fillna(False).astype(bool) if breaks is not None else None
     ev = np.zeros(cl.shape, bool)
+    sts = np.zeros(cl.shape, bool)
     now = {}
     days = list(cl.index)
     for j, c in enumerate(cols):
         st, e, cur = wave3_scan(cl[c].values, rules, br[c].values if br is not None else None)
-        ev[:, j] = e
+        ev[:, j], sts[:, j] = e, st
         if cur:
             cur = {**cur, "d0": days[cur["d0"]], "d1": days[cur["d1"]], "d2": days[cur["d2"]]}
             first = [days[i] for i in np.where(e)[0]]
             cur["since"] = first[-1] if first else None
             now[c] = cur
+    if state_out is not None:   # 날마다 '3파처럼 보이는 중'인지 (성적표 정리 규칙 비교용, 그날까지 정보만 씀)
+        state_out["state"] = pd.DataFrame(sts, index=cl.index, columns=cols)
     out = {"rules": {k: v for k, v in rules.items()}, "n_now": len(now)}
     bm = br.values if br is not None else np.zeros(cl.shape, bool)
     for f in rules["fwd"]:
@@ -3058,7 +3061,7 @@ def _tail(vals, frac=0.1, worst=True):
     return r1(sum(v) / k)
 
 
-def stop_scorecard(history, closes, lows, opens=None, bench=None, horizons=(5, 20), cost=None, index_closes=None, breaks=None):
+def stop_scorecard(history, closes, lows, opens=None, bench=None, horizons=(5, 20), cost=None, index_closes=None, breaks=None, w3=None):
     """정리 기준을 지켰다면: 그냥 N일 들고 있기 vs 정리선 아래로 마감한 다음 날 아침 첫 가격(시가)에 팔고 현금으로 기다리기.
 
     - 둘 다 같은 날 사서(다음 날 시가) 같은 날(N영업일째)까지 잰다. 일찍 판 뒤엔 현금(0%)이라 시장 대비는 N일 시장 수익과 비교
@@ -3066,6 +3069,8 @@ def stop_scorecard(history, closes, lows, opens=None, bench=None, horizons=(5, 2
     - 다음 날 시가가 비면(거래 정지 등) 그다음 거래되는 날 시가에 판다. N일째까지 못 팔면 N일째 종가 (실제로도 못 팔았을 것)
     - 마감 가격이 빈 날은 정리선 판단을 못 하므로 건너뛴다. 기간 중 가격이 끊긴(권리락·분할) 거래는 양쪽 모두에서 뺀다
     - 평균·이긴 비율 말고 나쁜 쪽 10% 평균, 거래 하나 동안 가장 깊이 빠진 폭(마감 가격 기준)도 같이
+    - w3(날마다 '3파처럼 보이는 중' DataFrame)가 있으면 셋째 방법 'w3': 정리선은 그대로 지키면서, 들고 있는 동안
+      3파처럼 보인 날(마감 뒤 확인)이 오면 다음 거래되는 날 시가에 절반을 판다. 나머지 절반은 정리선 규칙대로
     """
     cost = COST if cost is None else cost
     days = list(closes.index)
@@ -3111,6 +3116,18 @@ def stop_scorecard(history, closes, lows, opens=None, bench=None, horizons=(5, 2
                                     spath = [buy] + [float(u) for u in cs.iloc[i0 + 1:i0 + k + 1] if not math.isnan(u)] + [sell]
                                     break
                             break
+                    # 3파처럼 보이면 절반 정리 (정리선으로 이미 다 팔았으면 그 뒤는 볼 필요 없음)
+                    half, k_w3 = None, None
+                    if w3 is not None and code in w3.columns:
+                        ws = w3[code].reindex(days).fillna(False).values
+                        for k in range(1, (k_out if k_out else n)):
+                            if ws[i0 + k]:
+                                for j in range(k + 1, n + 1):
+                                    o = os_.iloc[i0 + j] if os_ is not None else cs.iloc[i0 + j]
+                                    if o is not None and not math.isnan(o) and o > 0:
+                                        half, k_w3 = float(o), k
+                                        break
+                                break
                     mk = bench.get(mkt_of(x.get("market"))) if bench else None
                     if mk is not None:
                         k0, k1 = mk[0].get(days[i0 + 1]), mk[1].get(days[i0 + n])
@@ -3120,13 +3137,24 @@ def stop_scorecard(history, closes, lows, opens=None, bench=None, horizons=(5, 2
                         k0 = k1 = None
                     m = (k1 / k0 - 1) * 100 if k0 and k1 else None
                     a = acc.setdefault(g, {}).setdefault(n, {"hold": [], "hold_x": [], "stop": [], "stop_x": [], "hit": 0,
-                                                             "hold_dd": [], "stop_dd": [], "gap": []})
+                                                             "hold_dd": [], "stop_dd": [], "gap": [], "w3": [], "w3_x": [], "w3_dd": [], "w3_hit": 0})
                     for kind, price, pth in (("hold", float(c_end), path), ("stop", sell, spath)):
                         r = (price / buy - 1) * 100 - cost
                         a[kind].append(r)
                         if m is not None:
                             a[kind + "_x"].append(r - m)
                         a[kind + "_dd"].append(_drawdown(pth))
+                    if w3 is not None:
+                        r_stop = (sell / buy - 1) * 100 - cost
+                        r = (0.5 * ((half / buy - 1) * 100 - cost) + 0.5 * r_stop) if half else r_stop
+                        a["w3"].append(r)
+                        if m is not None:
+                            a["w3_x"].append(r - m)
+                        # 절반 판 뒤엔 남은 절반만 따라감 (판 절반은 그 값에 고정) → 그 기준으로 가장 깊이 빠진 폭
+                        bpath = [v if t <= k_w3 or not half else 0.5 * half + 0.5 * v for t, v in enumerate(spath)] if half else spath
+                        a["w3_dd"].append(_drawdown(bpath))
+                        if half:
+                            a["w3_hit"] += 1
                     if k_out:
                         a["hit"] += 1
                         a["gap"].append((sell / ex["stop"] - 1) * 100)   # 정리선보다 얼마나 낮게 팔렸나 (갭 하락)
@@ -3140,6 +3168,7 @@ def stop_scorecard(history, closes, lows, opens=None, bench=None, horizons=(5, 2
         return s
 
     return {g: {str(n): {"hold": summ(a, "hold"), "stop": summ(a, "stop"),
+                         **({"w3": summ(a, "w3"), "w3_hit": round(100 * a["w3_hit"] / len(a["hold"])) if a["hold"] else None} if a["w3"] else {}),
                          "hit": round(100 * a["hit"] / len(a["hold"])) if a["hold"] else None,
                          "fill_gap": r1(sum(a["gap"]) / len(a["gap"])) if a["gap"] else None}
                 for n, a in by_n.items()} for g, by_n in acc.items()}

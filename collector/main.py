@@ -437,9 +437,13 @@ def main(argv):
         replay["precursor"] = safe("급등 전조", lambda: logic.surge_precursors(long_closes, long_values, long_breaks, eligible=set(universe_all)), errors)
         log(f"  {time.time() - t:.0f}초")
         # '3파처럼 보이는' 모양과 그 뒤 실제 흐름 (엘리엇 파동을 느슨하게)
-        replay["wave3"], wave3_now = safe("3파 모양", lambda: logic.wave3_study(long_closes, long_breaks, eligible=set(universe_all)), errors) or (None, {})
+        w3_state = {}
+        replay["wave3"], wave3_now = safe("3파 모양", lambda: logic.wave3_study(long_closes, long_breaks, eligible=set(universe_all), state_out=w3_state), errors) or (None, {})
+        w3_state = w3_state.get("state")
+        if replay.get("wave3"):   # 지금 3파처럼 보이는 종목 전체 (화면이 관심 종목★과 맞춰 봄 — ★은 브라우저에만 있음)
+            replay["wave3"]["now"] = {c: {"since": v["since"], "w3x": v["w3x"]} for c, v in wave3_now.items()}
     else:
-        wave3_now = {}
+        wave3_now, w3_state = {}, None
 
     t = step("운용사 방향 (액티브 ETF)")
     managers = build_managers(base, used_days, listing, closes, errors, sectors=sectors, trust=quality.get("trust"))
@@ -543,11 +547,11 @@ def main(argv):
     kospi = safe("코스피 기간", lambda: sources.index_history("1001", used_days[0], base), errors)
     if kospi is not None:
         kospi.index = [d.strftime("%Y%m%d") for d in kospi.index]
-        build_scorecard(base, dates, closes, opens, lows, kospi, kospi_long, reports, bench, breaks, out["generated_at"], highs)
+        build_scorecard(base, dates, closes, opens, lows, kospi, kospi_long, reports, bench, breaks, out["generated_at"], highs, w3_state)
     return 0
 
 
-def build_scorecard(base, dates, closes, opens, lows, kospi, kospi_long, reports, bench, breaks, generated_at, highs=None):
+def build_scorecard(base, dates, closes, opens, lows, kospi, kospi_long, reports, bench, breaks, generated_at, highs=None, w3_state=None):
     """기록 파일 전체로 성적표(scorecard.json)를 만든다. 후보는 실제 기록(live/)이 있으면 그것을 쓴다."""
     history, regimes, backfill_dates, signal_levels, theme_recs, mover_recs = [], {}, [], {}, [], {}
     origins, rest, pool_dates, versions = {}, [], [], {}
@@ -619,7 +623,7 @@ def build_scorecard(base, dates, closes, opens, lows, kospi, kospi_long, reports
         history, closes, kospi, regimes, opens=opens, bench=bench or None, breaks=breaks, origins=origins, entries_out=entries)
     if rest:
         logic.scorecard(rest, closes, kospi, opens=opens, bench=bench or None, breaks=breaks, origins=origins, entries_out=entries)
-    stops = logic.stop_scorecard(history, closes, lows, opens=opens, bench=bench or None, index_closes=kospi, breaks=breaks)
+    stops = logic.stop_scorecard(history, closes, lows, opens=opens, bench=bench or None, index_closes=kospi, breaks=breaks, w3=w3_state)
     extra = logic.scorecard_extra(entries, pool_dates)
     extra["origins"] = {o: sum(1 for v in origins.values() if v == o) for o in ("live", "recalc", "unknown")}
     extra["versions"] = versions

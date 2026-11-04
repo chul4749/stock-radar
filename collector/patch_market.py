@@ -41,6 +41,8 @@ def main(argv):
             out["replay"]["precursor"] = safe("급등 전조", lambda: logic.surge_precursors(long_closes, long_values, long_breaks, eligible=set(universe)), errors)
             w3, w3now = safe("3파 모양", lambda: logic.wave3_study(long_closes, long_breaks, eligible=set(universe)), errors) or (None, {})
             out["replay"]["wave3"] = w3
+            if w3:
+                w3["now"] = {c: {"since": v["since"], "w3x": v["w3x"]} for c, v in w3now.items()}
             for g in ("scalp", "swing", "value"):
                 for x in (out.get("filter") or {}).get(g) or []:
                     if x.get("code") in w3now:

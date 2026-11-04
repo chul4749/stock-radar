@@ -630,3 +630,4 @@ table.mythsum th { font-size: 13px; }
 .tvmk.sell { color: var(--down); transform: translate(-50%, calc(-100% - 3px)); }
 
 .tile svg.wsk { width: 100%; max-width: 320px; height: 110px; display: block; margin: 4px 0 2px; }
+.exit .xw3 { margin: 6px 0 0; padding: 6px 8px; border-radius: 8px; background: var(--neutral-bg); font-size: 13px; line-height: 1.5; }

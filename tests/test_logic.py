@@ -1240,3 +1240,19 @@ def test_wave3_study_splits_market_and_halves():
     assert res is not None and set(res["parts"]) >= {"all", "a", "b"} and res["mk_now"] in ("up", "down")
     assert res["parts"]["a"]["to"] < res["parts"]["b"]["from"]
     assert all(isinstance(v["w3x"], float) for v in now.values())
+
+
+def test_stop_scorecard_w3_sells_half_when_wave3_appears():
+    days = [f"202610{d:02d}" for d in range(1, 31)]
+    a = [100.0 + i for i in range(23)] + [125, 130, 120, 110, 105, 100, 95]   # 걸린 뒤 오르다 꺾임
+    closes = pd.DataFrame({"A": a}, index=days)
+    w3 = pd.DataFrame(False, index=days, columns=["A"])
+    w3.loc[days[24], "A"] = True   # 둘째 날 마감에 3파처럼 보임 → 다음 날 시가(=120)에 절반
+    hist = [(days[22], {"swing": [{"code": "A", "name": "a", "close": 122}]})]
+    st = logic.stop_scorecard(hist, closes, closes - 1, opens=closes, horizons=(5,), cost=0, w3=w3)["swing"]["5"]
+    assert st["w3_hit"] == 100
+    buy, half_px = 125.0, 120.0
+    stop_r = st["stop"]["avg"]
+    assert abs(st["w3"]["avg"] - (0.5 * (half_px / buy - 1) * 100 + 0.5 * stop_r)) < 0.11
+    st0 = logic.stop_scorecard(hist, closes, closes - 1, opens=closes, horizons=(5,), cost=0)["swing"]["5"]
+    assert "w3" not in st0

@@ -729,6 +729,8 @@ function renderToday() {
   if (tops.length) rows.push(["먼저 볼 후보", `<span class="picks">${tops.map((p) => `<span>${p}</span>`).join("")}</span>`]);
   const hits = Object.keys(state.watch).filter((c) => ["swing", "scalp", "value"].some((g) => (f[g] || []).some((y) => y.code === c)));
   if (Object.keys(state.watch).length) rows.push(["관심 종목", hits.length ? `<b>${hits.map((c) => esc(state.watch[c])).join(", ")}</b> 오늘 걸림` : `<span class="na">오늘 걸린 종목 없음</span>`]);
+  const w3w = watchW3();
+  if (w3w.length) rows.push(["관심 종목 3파", `<b>${w3w.map((c) => `<button type="button" class="lnk" data-stock="${c}">★ ${esc(state.watch[c])}</button>`).join(", ")}</b> 3파처럼 보여요${infoBtn("wave3")}<br><small>${esc(w3Past())}</small>`]);
   if (rg) {
     const by = (grade) => ["swing", "scalp", "value"].filter((g) => rg.fit[g].grade === grade).map((g) => TAB_NAME[g]);
     const good = by("good"), bad = by("bad");
@@ -936,7 +938,7 @@ function renderWatch() {
   const rows = codes.map((c) => {
     const groups = ["swing", "scalp", "value"].filter((g) => (f[g] || []).some((y) => y.code === c));
     const name = esc(state.watch[c]);
-    const perf = watchPerf(c);
+    const perf = watchPerf(c) + (watchW3().includes(c) ? ` <span class="tag stay" title="${esc(w3Past())}">3파처럼 보임</span>` : "");
     return groups.length
       ? `<li class="hit"><button class="more" type="button" data-code="${c}">${name}</button> <span class="tag both">${groups.map((g) => TAB_NAME[g]).join("·")}</span>${perf}</li>`
       : `<li class="miss"><button type="button" class="lnk" data-stock="${c}">${name}</button> <small>조건 밖</small>${perf}</li>`;
@@ -1059,7 +1061,8 @@ function exitRisk(x, e, earn) {
   const calc = stop ? `<div class="risk" data-stop="${stop}" data-atr="${atr || ""}">
       <label class="rk-in">내가 산(살) 가격 넣어 보기 <input type="number" inputmode="numeric" min="0" step="1" placeholder="${num(ref)}" aria-label="내가 산 가격 (원)"> 원</label>
       <p class="rk-out" hidden></p></div>` : "";
-  return `<div class="exit">${head}${now}${usual}${calc}
+  const w3 = x.w3 ? `<p class="xw3">📈 <b>지금 3파처럼 보여요</b>${infoBtn("wave3")} — 가진 사람이라면 일부(예: 절반) 수익 확정을 생각해 볼 자리라는 게 파동 이론 쪽 생각이에요.<br><small>${esc(w3Past())}</small></p>` : "";
+  return `<div class="exit">${head}${now}${usual}${w3}${calc}
     <p class="hint rk-note">정리선은 손실을 막아 주는 보장이 아니에요 — 밤사이 나쁜 소식으로 다음 날 아침 크게 낮게 시작하면 정리선보다 더 낮은 가격에 팔려요.${e ? ` 들고 가는 기간은 ${esc(e.hold)}.` : ""}</p>${earn}</div>`;
 }
 document.addEventListener("input", (e) => {
@@ -1178,6 +1181,11 @@ function w3Past() {
   const h = w.hold && w.hold[mk];
   if (h) return `지난 기록(${MK_NAME[mk]}): 이 모양에서 20일 더 들고 있었다면 평균 ${signed(h.h20, 1, "%")}, 보통 ${signed(h.med20, 1, "%")} (100번 중 ${num(h.up20, 0)}번만 올라 있음)${h.verdict === "sell" ? " — 그날 파는 쪽이 나았음" : ""}`;
   return `지난 기록(${MK_NAME[mk]}): 그 뒤 ${fw}일 동안 다른 종목보다 ${signed(x.exc10, 1, "%")}${x.verdict === "few" || x.verdict === "none" ? " — 근거 부족" : ""}`;
+}
+// 관심 종목(★) 중 지금 3파처럼 보이는 것 (★은 이 브라우저에만 있어서 화면에서 맞춰 봄)
+function watchW3() {
+  const now = ((state.data.replay || {}).wave3 || {}).now || {};
+  return Object.keys(state.watch).filter((c) => now[c]);
 }
 function w3Tag(w) {
   if (!w) return "";
@@ -1460,6 +1468,22 @@ function volBlock(ex) {
 }
 
 // 정리 기준을 지켰다면: 그냥 들고 있기 vs 정리선 아래 마감 → 다음 날 아침 첫 가격에 팔고 현금 (5일, 같은 날 사서 같은 날까지)
+// 정리선 + '3파처럼 보이면 절반 정리' (20일): 들고 있기 / 정리선만 / 정리선 + 3파 절반
+function w3StopChart(st) {
+  const gs = ["swing", "scalp", "value"].filter((g) => st[g] && st[g]["20"] && st[g]["20"].w3 && st[g]["20"].hold);
+  if (!gs.length) return "";
+  const best = gs.map((g) => { const a = st[g]["20"]; return a.hold.n >= 30 && a.w3.excess != null && a.stop.excess != null ? [g, a.w3.excess - a.stop.excess] : null; }).filter(Boolean);
+  const tk = best.length ? best.map(([g, d]) => `${TAB_NAME[g]}: 3파에서 절반 정리를 더했더니 정리선만 지킬 때보다 ${signed(d, 1, "%")}${Math.abs(d) < 0.5 ? " (거의 차이 없음)" : ""}`).join(" · ") : "아직 기록이 30번이 안 돼 판단하기 일러요.";
+  return `<h3 class="sub">정리선 + 3파에서 절반 정리 <small>20일, 우리 후보 실제 기록</small>${infoBtn("wave3")}</h3>${take(tk)}
+    <div class="tile wide"><div class="chart-cap">${kindTag(true)}20일 동안: 그냥 들고 있기 / 정리선만 지키기 / 정리선 + 들고 있는 동안 3파처럼 보이면 다음 날 아침 절반 팔기</div>
+    ${colBars(gs.map((g) => { const a = st[g]["20"]; return { label: TAB_NAME[g], sub: `${a.hold.n < 30 ? "⚠ 기록 적음 · " : ""}100번 중 ${a.w3_hit}번 3파 나옴`, bars: [{ v: a.hold.excess, base: true }, { v: a.stop.excess, k: "s" }, { v: a.w3.excess, k: "w" }] }; }),
+      { vs: "지수보다 더 번(덜 번) %", legend: [["들고 있기", "faint"], ["정리선만", "sub"], ["정리선 + 3파 절반", "up"]], color: (b) => b.base ? "faint" : b.k === "s" ? "sub" : "up" })}
+    <div class="chart-cap">${kindTag(false)}가장 나빴던 10% 거래의 평균 (0에 가까울수록 큰 손실을 잘 막음)</div>
+    ${colBars(gs.map((g) => { const a = st[g]["20"]; return { label: TAB_NAME[g], bars: [{ v: a.hold.low10, base: true }, { v: a.stop.low10, k: "s" }, { v: a.w3.low10, k: "w" }] }; }),
+      { vs: "주가가 오른(내린) %, 비용 뺌", legend: [["들고 있기", "faint"], ["정리선만", "sub"], ["정리선 + 3파 절반", "up"]], color: (b) => b.base ? "faint" : b.k === "s" ? "sub" : "up" })}</div>
+    <p class="hint">3파처럼 보였는지는 그날 마감까지의 가격으로만 판단하고(미래 정보 안 씀), 다음 거래되는 날 아침 첫 가격에 절반을 판다고 셈해요. 남은 절반은 정리선 규칙 그대로. 거래 비용은 다른 방법과 똑같이 뺐어요.</p>`;
+}
+
 function stopTable(st) {
   if (!st) return "";
   const gs = ["swing", "scalp", "value"].filter((g) => st[g] && st[g]["5"] && st[g]["5"].hold);
@@ -1484,7 +1508,7 @@ function stopTable(st) {
     <div class="chart-cap">${kindTag(false)}가장 나빴던 10% 거래의 평균 — 덜 깊으면(0에 가까우면) 큰 손실을 더 잘 막은 것</div>${pair("low10", "주가가 오른(내린) %, 비용 뺌")}
     <div class="chart-cap">${kindTag(false)}거래 하나 동안 가장 깊이 빠진 폭의 평균 (마감 가격 기준, 거래별 — 계좌 전체 최대 손실이 아님)</div>${pair("dd", "빠진 폭 %")}
     ${asTable(`<table class="score"><thead><tr><th></th><th>그냥 5일 들고 있기</th><th>정리선 지키기</th><th></th></tr></thead><tbody>${rows}</tbody></table>`)}</div>
-    <p class="hint">정리선 = 카드마다 적힌 가격(걸린 날 값으로 고정). 깨진 다음 날 거래가 없으면 거래되는 첫 날 아침 가격으로, 끝날까지 못 팔면 끝날 마감 가격으로 셈해요 — 빈 자료가 유리한 가격이 되지 않게. 보유 중 권리락·분할로 가격이 끊긴 거래는 양쪽 모두에서 뺐어요.</p>`;
+    <p class="hint">정리선 = 카드마다 적힌 가격(걸린 날 값으로 고정). 깨진 다음 날 거래가 없으면 거래되는 첫 날 아침 가격으로, 끝날까지 못 팔면 끝날 마감 가격으로 셈해요 — 빈 자료가 유리한 가격이 되지 않게. 보유 중 권리락·분할로 가격이 끊긴 거래는 양쪽 모두에서 뺐어요.</p>${w3StopChart(st)}`;
 }
 
 // 그동안 급등주를 얼마나 미리 잡았나, 급등 전에 어떤 신호가 자주 먼저 보였나
