@@ -1783,6 +1783,147 @@ def surge_precursors(closes, values=None, breaks=None, eligible=None, rules=PRE)
             "from": days[0], "to": days[-1], "rules": rules}
 
 
+# '3파처럼 보이는' 모양 (엘리엇 파동을 느슨하게): 마감 가격의 꺾임(지그재그)으로
+# 오름(1) → 덜 빠짐(2, 1의 시작보다 위) → 1의 꼭대기를 넘어 1만큼 이상 오르는 중(3).
+# 파동을 정확히 세는 게 아니라 '그렇게 보이는' 정도. 그 뒤 실제로 어땠는지(wave3_study)로 확인한다.
+WAVE = {"thr_min": 5.0, "thr_max": 25.0, "thr_k": 3.0, "r2": (0.2, 0.9), "len3": 0.8, "min1": 3, "span": 120,
+        "fwd": (5, 10), "dd": 10.0}
+
+
+def wave3_scan(close, rules=WAVE, brk=None):
+    """한 종목 마감 가격 → 날마다 '3파처럼 보이는 중'(state)·'처음 그렇게 보인 날'(event)과 지금 모양.
+    꺾임은 그날까지 확인된 것만 쓴다(미래를 안 봄): 꼭대기에서 thr% 넘게 빠지면 그 꼭대기를 확정.
+    thr = 최근 60일 하루 평균 움직임 × thr_k (thr_min~thr_max %). 가격 끊긴 날엔 처음부터 다시 센다."""
+    import numpy as np
+    c = np.asarray(close, dtype=float)
+    n = len(c)
+    ret = np.abs(np.diff(c, prepend=np.nan) / np.concatenate([[np.nan], c[:-1]]) * 100)
+    mov = pd.Series(ret).rolling(60, min_periods=20).mean().values
+    state, event = np.zeros(n, bool), np.zeros(n, bool)
+    piv, d, ext, ext_i, lo, lo_i, hi, hi_i = [], 0, None, None, None, None, None, None
+    last_ev = None
+    now = None
+    for t in range(n):
+        x = c[t]
+        if brk is not None and brk[t]:
+            piv, d, ext, lo, hi, last_ev = [], 0, None, None, None, None
+        if not np.isfinite(x):
+            continue
+        thr = min(rules["thr_max"], max(rules["thr_min"], rules["thr_k"] * (mov[t] if np.isfinite(mov[t]) else rules["thr_min"] / rules["thr_k"]))) / 100
+        if d == 0:
+            if lo is None or x < lo:
+                lo, lo_i = x, t
+            if hi is None or x > hi:
+                hi, hi_i = x, t
+            if x >= lo * (1 + thr):
+                piv, d, ext, ext_i = [(lo_i, lo, "L")], 1, x, t
+            elif x <= hi * (1 - thr):
+                piv, d, ext, ext_i = [(hi_i, hi, "H")], -1, x, t
+        elif d == 1:
+            if x > ext:
+                ext, ext_i = x, t
+            elif x <= ext * (1 - thr):
+                piv.append((ext_i, ext, "H"))
+                d, ext, ext_i = -1, x, t
+        else:
+            if x < ext:
+                ext, ext_i = x, t
+            elif x >= ext * (1 + thr):
+                piv.append((ext_i, ext, "L"))
+                d, ext, ext_i = 1, x, t
+        if d == 1 and len(piv) >= 3 and [p[2] for p in piv[-3:]] == ["L", "H", "L"]:
+            (i0, l0, _), (i1, h1, _), (i2, l2, _) = piv[-3:]
+            w1 = h1 - l0
+            ok = (l2 > l0 and w1 > 0 and rules["r2"][0] <= (h1 - l2) / w1 <= rules["r2"][1] and x > h1
+                  and x - l2 >= rules["len3"] * w1 and i1 - i0 >= rules["min1"] and t - i0 <= rules["span"])
+            if ok:
+                state[t] = True
+                if last_ev != i2:
+                    event[t], last_ev = True, i2
+                if t == n - 1:
+                    now = {"l0": r1(l0), "h1": r1(h1), "l2": r1(l2), "d0": i0, "d1": i1, "d2": i2,
+                           "w3x": round((x - l2) / w1, 2), "r2": round((h1 - l2) / w1, 2)}
+    return state, event, now
+
+
+def wave3_study(closes, breaks=None, eligible=None, rules=WAVE):
+    """약 1년 기록에서 '3파처럼 보인 첫날'(event) 뒤 5·10일 주가가 같은 날 다른 종목보다 어땠나(exc, 날짜로 묶은 t),
+    10일 안에 그날 마감보다 dd% 넘게 빠진 적이 있나(4파 조정처럼) — 평소와 비교, 기간 앞·뒤 반씩.
+    → (연구 결과, 지금 3파처럼 보이는 종목 {코드: 모양})"""
+    import numpy as np
+    cols = [c for c in closes.columns if eligible is None or c in eligible]
+    if len(closes.index) < 80 or not cols:
+        return None, {}
+    cl = closes[cols].astype(float)
+    br = breaks.reindex(index=cl.index, columns=cols).fillna(False).astype(bool) if breaks is not None else None
+    ev = np.zeros(cl.shape, bool)
+    now = {}
+    days = list(cl.index)
+    for j, c in enumerate(cols):
+        st, e, cur = wave3_scan(cl[c].values, rules, br[c].values if br is not None else None)
+        ev[:, j] = e
+        if cur:
+            cur = {**cur, "d0": days[cur["d0"]], "d1": days[cur["d1"]], "d2": days[cur["d2"]]}
+            first = [days[i] for i in np.where(e)[0]]
+            cur["since"] = first[-1] if first else None
+            now[c] = cur
+    out = {"rules": {k: v for k, v in rules.items()}, "n_now": len(now)}
+    bm = br.values if br is not None else np.zeros(cl.shape, bool)
+    for f in rules["fwd"]:
+        fr = (cl.shift(-f) / cl - 1) * 100
+        fwd_brk = pd.DataFrame(bm, index=cl.index).astype(float)[::-1].rolling(f, min_periods=1).max()[::-1].shift(-1).fillna(1).values > 0
+        fr = fr.where(~fwd_brk)
+        out[f"exc{f}"] = fr.sub(fr.mean(axis=1), axis=0)
+        out[f"ret{f}"] = fr
+    f = max(rules["fwd"])
+    mn = cl[::-1].rolling(f, min_periods=f).min()[::-1].shift(-1)
+    dd = ((mn / cl - 1) * 100 <= -rules["dd"]).where(out[f"ret{f}"].notna())
+    ok = out[f"ret{f}"].notna().values
+    valid = [d for i, d in enumerate(days) if ok[i].any()]
+    if len(valid) < 40:
+        return None, now
+    half = valid[len(valid) // 2]
+    # 상승장·하락장: 전 종목 평균 흐름(같은 비중)이 20일 평균 위/아래인 날 (속설 검증 by_mk와 같은 기준)
+    eq = (1 + cl.pct_change(fill_method=None).where(~pd.DataFrame(bm, index=cl.index, columns=cols)).mean(axis=1).fillna(0)).cumprod()
+    upmk = eq > eq.rolling(20, min_periods=10).mean()
+    res = {"from": valid[0], "to": valid[-1], "n_now": len(now), "mk_now": "up" if bool(upmk.iloc[-1]) else "down", "rules": {**rules, "r2": list(rules["r2"]), "fwd": list(rules["fwd"])}, "parts": {}}
+    evf = pd.DataFrame(ev, index=cl.index, columns=cols)
+    for p, ds in (("all", valid), ("a", [d for d in valid if d < half]), ("b", [d for d in valid if d >= half]),
+                  ("up", [d for d in valid if upmk.get(d, False)]), ("down", [d for d in valid if not upmk.get(d, False)])):
+        if not ds:
+            continue
+        m = evf.loc[ds] & pd.DataFrame(ok, index=cl.index, columns=cols).loc[ds]
+        row = {"n": int(m.values.sum()), "from": ds[0], "to": ds[-1]}
+        for fw in rules["fwd"]:
+            e = out[f"exc{fw}"].loc[ds].where(m)
+            per = e.mean(axis=1).dropna()
+            row[f"exc{fw}"] = round(float(per.mean()), 2) if len(per) else None
+            row[f"t{fw}"] = round(float(per.mean() / (per.std(ddof=1) / np.sqrt(len(per)))), 1) if len(per) > 2 and per.std(ddof=1) > 0 else None
+            r = out[f"ret{fw}"].loc[ds].values[m.values]
+            r = r[~np.isnan(r)]
+            row[f"win{fw}"] = round(float((r > 0).mean() * 100)) if len(r) else None
+        dv = dd.loc[ds]
+        row["dd"] = round(float(dv.values[m.values].astype(float).mean() * 100), 1) if m.values.sum() else None
+        row["dd_base"] = round(float(np.nanmean(dv.values.astype(float)) * 100), 1)
+        res["parts"][p] = row
+    a, b = res["parts"]["a"], res["parts"]["b"]
+    fw = max(rules["fwd"])
+    sig = lambda x: x.get(f"t{fw}") is not None and abs(x[f"t{fw}"]) >= 2 and x["n"] >= 30
+    if sig(a) and sig(b) and (a[f"exc{fw}"] > 0) == (b[f"exc{fw}"] > 0):
+        res["verdict"] = "up" if b[f"exc{fw}"] > 0 else "down"
+    elif min(a["n"], b["n"]) < 30:
+        res["verdict"] = "few"
+    else:
+        res["verdict"] = "none"
+    for k in ("up", "down"):   # 장세별 판정: 그 장에서 우연 아님(|t|≥2, 30건↑)이면 방향
+        x = res["parts"].get(k)
+        if x:
+            x["verdict"] = ("up" if x[f"exc{fw}"] > 0 else "down") if sig(x) else ("few" if x["n"] < 30 else "none")
+    for c, v in now.items():
+        now[c] = {k: (float(x) if isinstance(x, (np.floating, np.integer)) else x) for k, x in v.items()}
+    return res, now
+
+
 # 급등 = 하루 +20% 이상 (SURGE와 같은 정의). mid(+8~20%)는 급등이 아닌 큰 상승 — 비교용
 FOLLOW = {"big": 20.0, "mid": 8.0, "again": 20.0, "rebound": 5.0}
 

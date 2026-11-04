@@ -39,6 +39,12 @@ def main(argv):
         temp["tv_check"] = safe("내 지표 검증", lambda: logic.tv_signal_check(long_closes, long_breaks, eligible=elig), errors)
         if out.get("replay") is not None:
             out["replay"]["precursor"] = safe("급등 전조", lambda: logic.surge_precursors(long_closes, long_values, long_breaks, eligible=set(universe)), errors)
+            w3, w3now = safe("3파 모양", lambda: logic.wave3_study(long_closes, long_breaks, eligible=set(universe)), errors) or (None, {})
+            out["replay"]["wave3"] = w3
+            for g in ("scalp", "swing", "value"):
+                for x in (out.get("filter") or {}).get(g) or []:
+                    if x.get("code") in w3now:
+                        x["w3"] = w3now[x["code"]]
     start = (datetime.strptime(base, "%Y%m%d") - timedelta(days=1100)).strftime("%Y%m%d")
     k3 = safe("코스피 3년", lambda: sources.index_history("1001", start, base), errors)
     hourly = safe("코스피 시간봉", lambda: sources.yahoo_hourly("^KS11"), errors) or []

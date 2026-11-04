@@ -628,3 +628,5 @@ table.mythsum th { font-size: 13px; }
 .tvmk b { font-size: 8px; font-weight: 600; }
 .tvmk.buy { color: var(--up); margin-top: 3px; }
 .tvmk.sell { color: var(--down); transform: translate(-50%, calc(-100% - 3px)); }
+
+.tile svg.wsk { width: 100%; max-width: 320px; height: 110px; display: block; margin: 4px 0 2px; }

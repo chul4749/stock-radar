@@ -436,6 +436,10 @@ def main(argv):
         t = step("급등 전조 찾기")
         replay["precursor"] = safe("급등 전조", lambda: logic.surge_precursors(long_closes, long_values, long_breaks, eligible=set(universe_all)), errors)
         log(f"  {time.time() - t:.0f}초")
+        # '3파처럼 보이는' 모양과 그 뒤 실제 흐름 (엘리엇 파동을 느슨하게)
+        replay["wave3"], wave3_now = safe("3파 모양", lambda: logic.wave3_study(long_closes, long_breaks, eligible=set(universe_all)), errors) or (None, {})
+    else:
+        wave3_now = {}
 
     t = step("운용사 방향 (액티브 ETF)")
     managers = build_managers(base, used_days, listing, closes, errors, sectors=sectors, trust=quality.get("trust"))
@@ -467,6 +471,11 @@ def main(argv):
         for x in items:
             if x["code"] in recent_ds:
                 x["dart_sig"] = recent_ds[x["code"]][-5:]
+            if x["code"] in wave3_now:
+                x["w3"] = wave3_now[x["code"]]
+    for c, v in wave3_now.items():
+        if c in idx["stocks"]:
+            idx["stocks"][c]["w3"] = {"since": v["since"], "w3x": v["w3x"]}
     # 조건 통과 후보 전체의 최소 기록 + 어제와 비교 (새로 들어옴·유지·빠짐) + 우리 기록상 처음 걸린 날
     groups_now = {"scalp": scalp, "swing": swing, "value": value}
     pools = {}

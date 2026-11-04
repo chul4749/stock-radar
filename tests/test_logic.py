@@ -1212,3 +1212,31 @@ def test_surge_precursors_finds_planted_pattern_and_checks_later_half():
     assert out["base"]["a"]["to"] < out["base"]["b"]["from"]            # 앞(찾은 기간)과 뒤(확인 기간)가 겹치지 않음
     assert "exc5" in bd and "ret5_win" in bd
     assert logic.surge_precursors(cl.iloc[:60]) is None
+
+
+def test_wave3_scan_flags_third_leg_after_first_top_and_not_before():
+    import numpy as np
+    # 100 → 130 (1) → 115 (2, 절반 되돌림) → 160 (3) : 130을 넘고 1(30)의 0.8배(24) 넘게 오른 뒤에만 '3파처럼'
+    path = list(np.linspace(100, 100, 30)) + list(np.linspace(100, 130, 10)) + list(np.linspace(130, 115, 6)) + list(np.linspace(115, 160, 12))
+    st, ev, now = logic.wave3_scan(path, {**logic.WAVE, "thr_min": 5.0})
+    first = int(np.argmax(st))
+    assert st.any() and ev.sum() == 1 and ev[first]
+    assert path[first] > 130 and path[first] - 115 >= 0.8 * 30
+    assert now and now["l0"] == 100 and now["h1"] == 130 and now["l2"] == 115 and now["w3x"] >= 1.4
+    # 2가 1의 시작보다 아래로 깨지면 3파로 안 봄
+    bad = list(np.linspace(100, 100, 30)) + list(np.linspace(100, 130, 10)) + list(np.linspace(130, 95, 8)) + list(np.linspace(95, 170, 12))
+    st2, _, _ = logic.wave3_scan(bad, {**logic.WAVE, "thr_min": 5.0})
+    assert not st2.any()
+
+
+def test_wave3_study_splits_market_and_halves():
+    import numpy as np
+    rng = np.random.default_rng(1)
+    days = [f"2026{i:04d}" for i in range(200)]
+    cols = [f"S{i:02d}" for i in range(60)]
+    r = rng.normal(0, 2.5, (200, 60))
+    cl = pd.DataFrame(10000 * np.cumprod(1 + r / 100, axis=0), index=days, columns=cols)
+    res, now = logic.wave3_study(cl)
+    assert res is not None and set(res["parts"]) >= {"all", "a", "b"} and res["mk_now"] in ("up", "down")
+    assert res["parts"]["a"]["to"] < res["parts"]["b"]["from"]
+    assert all(isinstance(v["w3x"], float) for v in now.values())

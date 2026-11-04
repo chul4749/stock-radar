@@ -116,6 +116,7 @@ const INFO = {
   vp: "매물대 = 최근 60영업일 동안 어느 가격대에서 거래가 많았는지(거래대금)를 가로 막대로 나타낸 것. 그 가격에 산 사람이 많다는 뜻입니다.\n· 지금 가격보다 아래 매물: 그 사람들은 이익 중 → 급하게 안 팔고, 가격이 내려오면 '싸다'며 다시 사는 경향 → 받쳐 주는 가격대(지지)\n· 지금 가격보다 위 매물: 그 사람들은 손해 중 → 가격이 올라와 본전이 되면 팔고 나오려는 경향 → 누르는 가격대(저항)\n· 매물대를 뚫고 올라가면 그 위가 가벼워지고, 뚫린 매물대가 다음엔 받쳐 주는 쪽으로 바뀌는 경우가 많음\n· 평균 매수가: 거래대금으로 가중한 60일 평균 가격. 지금 가격이 이보다 위면 최근 산 사람들 대부분이 이익 중\n주의: 하루 거래를 그날 저가~고가에 고르게 펼친 근사이고, 60일보다 오래된 매물은 안 보입니다. 같은 사람이 사고팔기를 반복한 것도 다 들어가요. '왜 이 가격에서 막히나/받치나'를 이해하는 공부 자료로 보세요.",
   follow: "급등한 날(하루 +20%↑) 뒤 며칠이 어떻게 흘렀는지 최근 약 80영업일 실제 기록을 셉니다. 시총·거래대금 기준 이상 종목만.\n· 다음 날도 오름: 급등 다음 날 종가가 또 올랐던 비율\n· 3일 안 또 급등: 다음 3일 중 하루라도 +20% 넘게 오른 비율\n· 하루 쉬고 다시: 다음 날은 보합·하락이었다가 2~3일째 +5% 넘게 오른 비율 (하루 건너 이어지는 모양)\n'평소' 줄은 아무 날·아무 종목이나 같은 방법으로 센 값이라, 급등 줄이 평소보다 높아야 '급등은 이어지는 편'이라고 말할 수 있어요.\n아래 표는 우리 자료가 장 마감 뒤에 나오니 실제로 살 수 있는 '다음 날 아침 첫 가격'에 사서 3·5영업일째 종가에 판 결과입니다 (거래 비용 뺌). 이어지는 경우가 많아도 다음 날 아침 첫 가격가 이미 높게 시작하면 남는 게 적을 수 있어서 따로 봅니다.",
   follow_split: "급등한 날(하루 +20% 이상)을 그날의 모양으로 나눠, 어떤 경우가 그 뒤에 더 잘 이어졌는지 봅니다.\n· 종가가 고가 근처: 장 끝까지 힘이 남아 있었음 / 고가에서 밀림: 오르다 팔려 내려옴\n· 첫 급등 vs 이미 오른 뒤: 전 5일 동안 +10% 넘게 올라 있었는지\n· 거래 배수: 그날 거래대금이 20일 평균의 몇 배인지\n· 큰손: 그날 기관+외국인이 샀는지 팔았는지 (최근 약 25일만 있어 건수가 적음)\n· 시총: 3천억 기준 (지금 시총으로 나눔)\n건수가 적은 줄은 우연일 수 있어 참고만 하세요.",
+  wave3: "엘리엇 파동 이론: 오를 때 5번(1·3·5는 오름, 2·4는 쉼)에 걸쳐 오르고, 그중 3번째 오름이 가장 크고 힘차다는 생각. 3파가 보이면 크게 오른 걸 일부 확정해 두라는 사람도 있어요.\n여기선 파동을 정확히 세지 않고 '그렇게 보이는' 모양만 기계적으로 찾습니다(꺾임 크기는 종목의 평소 움직임에 맞춤). 그리고 그 모양이 나온 뒤 실제로 다른 종목보다 어땠는지, 상승장·하락장 때를 나눠 보여 줍니다.\n파동 이론은 지나고 나서 세기 쉬운 이론이라, 미리 맞히는 힘은 검증된 적이 많지 않습니다.",
   precursor: "급등(하루 +20%↑) 며칠 전에 보일 만한 모양을 여러 개 후보로 두고, 약 1년 기록에서 그 모양이 보인 날 뒤 5일 안에 급등이 나왔던 횟수를 평소(아무 종목·아무 날)와 비교합니다.\n속지 않으려고 세 가지를 봅니다. ① 기간을 반으로 나눠 앞에서 찾은 게 뒤에서도 맞나(과거에만 맞춘 규칙 거르기). ② 원래 크게 출렁이는 종목은 급등도 잦으니, 출렁임이 비슷한 종목끼리 견줘도 잦은가. ③ 급등이 잦아도 그만큼 크게 빠지기도 하면 소용없으니, 그날 마감에 샀다면 5일 뒤 같은 날 다른 종목보다 나았나.\n종가·거래대금만 써서 공시·뉴스로 갑자기 뛰는 급등은 미리 알 수 없습니다.",
   signal_check: "거꾸로도 확인합니다: 그 신호가 뜬 종목들 중 실제로 5일 안에 하루 +20% 넘게 오른 날이 있었던 비율(100번 중 몇 번)이 얼마인지, 아무 신호 없이 고른 종목(평소)보다 몇 배인지.\n급등주에만 신호가 있었던 게 아니라 평범한 종목에도 흔하게 뜨는 신호라면 '평소의 몇 배'가 1에 가까워서 쓸모가 없습니다.",
   exit: "정리선 = 미리 정해 두는 '이 가격 아래로 마감하면 판다'는 가격입니다. 사기 전에 언제 팔지 정해 두려는 것이고, 걸린 날 값으로 정한 뒤 바꾸지 않아요.\n· 스윙: 걸린 날의 20일 평균 가격 (오르는 흐름이 깨짐)\n· 단타: 걸린 날의 저가 (급등시킨 힘이 빠짐)\n· 저평가: 걸린 날까지 최근 10일 중 가장 낮은 가격 (아직 바닥이 아니었음)\n마감 가격으로만 판단해요 — 장중에 잠깐 내려갔다 올라오면 팔지 않고, 마감이 아래면 다음 날 아침 첫 가격에 팝니다.\n정리선은 손실을 막아 주는 보장이 아니에요. 밤사이 나쁜 소식으로 다음 날 아침 크게 낮게 시작하면 더 낮은 가격에 팔려요. 이 규칙을 실제로 지켰다면 어땠는지는 성적표 '정리 기준을 지켰다면'에서 확인합니다.",
@@ -1164,7 +1165,26 @@ function cardHead(x) {
   return `<div class="hd">
       <a class="nm" data-code="${x.code}" href="https://m.stock.naver.com/domestic/stock/${x.code}" target="_blank" rel="noopener">${esc(x.name)}<span class="mk">${esc(x.market)} ${x.code}${x.sector ? " · " + esc(x.sector) : ""}</span></a>
       <div class="px">${starBtn(x)}<b>${num(x.close)}</b><span class="${cls(x.change)}">${signed(x.change, 1, "%")}</span></div>
-    </div>${streakTag(x)}${mgrTag(x.managers)}${dsTag(x.dart_sig)}${x.search_rank ? `<span class="tag known" title="네이버 증권 검색 상위 100개 안. 사람들이 많이 찾아본다는 뜻일 뿐, 순위만으로 늦었다고 볼 근거는 없음">관심 집중 · 검색 ${x.search_rank}위</span>` : ""}${x.overlap ? `<span class="tag both">두 관점 겹침</span>` : ""}`;
+    </div>${streakTag(x)}${mgrTag(x.managers)}${dsTag(x.dart_sig)}${w3Tag(x.w3)}${x.search_rank ? `<span class="tag known" title="네이버 증권 검색 상위 100개 안. 사람들이 많이 찾아본다는 뜻일 뿐, 순위만으로 늦었다고 볼 근거는 없음">관심 집중 · 검색 ${x.search_rank}위</span>` : ""}${x.overlap ? `<span class="tag both">두 관점 겹침</span>` : ""}`;
+}
+
+// '3파처럼 보이는' 모양 (엘리엇 파동을 느슨하게) — 상태만 알려 주고, 지난 기록은 연구 자료 '3파처럼 보이면'에서
+function w3Past() {
+  const w = state.data && state.data.replay && state.data.replay.wave3;
+  if (!w) return "";
+  const mk = w.mk_now, x = w.parts && w.parts[mk];
+  if (!x || x.exc10 == null) return "";
+  const fw = 10;
+  return `지난 기록(${MK_NAME[mk]}): 그 뒤 ${fw}일 동안 다른 종목보다 ${signed(x.exc10, 1, "%")}${x.verdict === "few" || x.verdict === "none" ? " — 근거 부족" : ""}`;
+}
+function w3Tag(w) {
+  if (!w) return "";
+  return `<span class="tag stay" title="오름 → 덜 빠짐 → 앞 꼭대기를 넘어 그만큼 더 오르는 중 (엘리엇 파동 3파를 느슨하게 본 모양). ${esc(w3Past())}">3파처럼 보임</span>`;
+}
+function w3Line(w) {
+  if (!w) return "";
+  const p = w3Past();
+  return `<h3 class="sub">3파처럼 보이는 중 ${infoBtn("wave3")}</h3>${infoBox("wave3")}<p class="interp">지금 처음 그렇게 보인 날 ${w.since ? ymd(w.since).slice(5) : "–"} · 세 번째 오름이 첫 오름의 ${num(w.w3x, 1)}배${p ? `<br><small>${esc(p)}</small>` : ""}</p>`;
 }
 
 // OpenDART '사는' 공시 (최근 10영업일): 임원·주요주주 매수, 5% 큰손 장내매수, 자사주 취득 결정
@@ -1679,7 +1699,37 @@ function renderReplay() {
     ${rp.movers.length > 4 ? `<details class="rules"><summary>급등주 ${rp.movers.length - 4}개 더 보기</summary><ul class="fit movers">${rp.movers.slice(4).map(moverCard).join("")}</ul></details>` : ""}
     <p class="hint">급등 뒤 흐름·가진 종목이 급등했을 때·신호 검증은 아래 <a href="#research">연구 자료</a>로 옮겼어요.</p>`;
   const rb = $("#research-body");
-  if (rb) rb.innerHTML = `<p class="hint kdleg">${kindTag(false)} = 그 종목 주가가 실제로 오르내린 % · ${kindTag(true)} = 같은 기간 지수나 다른 종목보다 몇 % 더(덜) 올랐나</p>${holdBlock(rp.follow && rp.follow.hold)}${ft}${vt}${preBlock(rp.precursor)}`;
+  if (rb) rb.innerHTML = `<p class="hint kdleg">${kindTag(false)} = 그 종목 주가가 실제로 오르내린 % · ${kindTag(true)} = 같은 기간 지수나 다른 종목보다 몇 % 더(덜) 올랐나</p>${holdBlock(rp.follow && rp.follow.hold)}${ft}${vt}${preBlock(rp.precursor)}${waveBlock(rp.wave3)}`;
+}
+
+/* '3파처럼 보이면' 그 뒤 실제 흐름: 상승장·하락장 따로, 기간 앞·뒤 */
+function waveSketch() {
+  // 0→1→2→3 모양 (설명용 그림)
+  const pts = [[8, 62], [70, 30], [105, 46], [190, 8]];
+  const lab = [["0", 8, 74], ["1", 70, 24], ["2", 105, 58], ["3 (지금)", 172, 8]];
+  return `<svg class="wsk" viewBox="0 0 220 80" role="img" aria-label="3파처럼 보이는 모양"><polyline points="${pts.map((p) => p.join(",")).join(" ")}" fill="none" stroke="var(--up)" stroke-width="2"/>
+    <line x1="70" x2="215" y1="30" y2="30" stroke="var(--sub)" stroke-dasharray="3 3" stroke-width="1"/><text x="214" y="27" text-anchor="end" font-size="8" fill="var(--sub)">1의 꼭대기</text>
+    ${lab.map(([t, x, y]) => `<text x="${x}" y="${y}" font-size="9" fill="var(--text)" text-anchor="middle">${t}</text>`).join("")}</svg>`;
+}
+function waveBlock(w) {
+  if (!w || !w.parts) return "";
+  const P = w.parts, mk = w.mk_now, fw = 10;
+  const rows = [["all", "전체"], ["up", "상승장 때"], ["down", "하락장 때"], ["a", "기간 앞 절반"], ["b", "기간 뒤 절반"]].filter(([k]) => P[k] && P[k].exc10 != null);
+  const cur = P[mk], mkNow = mk === "up" ? "상승장" : "하락장";
+  const tk = cur && (cur.verdict === "down" ? `지금은 ${mkNow}이에요. 지난 기록에선 ${MK_NAME[mk]} 3파처럼 보인 종목이 그 뒤 ${fw}일 동안 다른 종목보다 ${signed(cur.exc10, 1, "%")} — 크게 오른 걸 일부라도 확정해 둔 쪽이 나았던 셈이에요.`
+    : cur.verdict === "up" ? `지금은 ${mkNow}이에요. 지난 기록에선 ${MK_NAME[mk]} 3파처럼 보인 종목이 그 뒤에도 다른 종목보다 ${signed(cur.exc10, 1, "%")} 더 올랐어요.`
+    : `지금은 ${mkNow}이에요. ${MK_NAME[mk]} 3파처럼 보인 뒤 흐름은 다른 종목과 차이가 운인지 아직 구분이 안 돼요 (근거 부족).`);
+  const tbl = `<table class="score"><thead><tr><th></th><th>건수</th><th>5일 뒤 (다른 종목보다)</th><th>10일 뒤</th><th>10일 안 −${w.rules.dd}%↓ (100번 중)</th></tr></thead><tbody>
+    ${rows.map(([k, l]) => { const x = P[k]; return `<tr><th>${l}</th><td>${num(x.n)}</td><td>${signed(x.exc5, 1, "%")}<br><small>${chance(x.t5)}</small></td><td>${signed(x.exc10, 1, "%")}<br><small>${chance(x.t10)}</small></td><td>${num(x.dd, 0)}번<br><small>평소 ${num(x.dd_base, 0)}번</small></td></tr>`; }).join("")}</tbody></table>`;
+  return `<h3 class="sub">3파처럼 보이면 그 뒤엔? <small>${ymd(w.from).slice(2)}~${ymd(w.to).slice(2)}, 엘리엇 파동을 느슨하게</small>${infoBtn("wave3")}</h3>${infoBox("wave3")}
+    ${tk ? take(tk) : ""}
+    <div class="tile wide"><div class="chart-cap">이런 모양을 찾았어요 — 지금 ${num(w.n_now)}종목이 이렇게 보여요</div>${waveSketch()}
+      <div class="chart-cap">${kindTag(true)}3파처럼 처음 보인 날 마감에 샀다면, ${fw}일 뒤 주가가 같은 날 다른 종목들보다 몇 % 더 올랐나</div>
+      ${forest(rows.map(([k, l]) => { const x = P[k]; return { label: l + (k === mk ? " ← 지금" : ""), sub: `${num(x.n)}번 · 100번 중 ${num(x.win10, 0)}번 이익`, x: x.exc10, se: x.t10 ? Math.abs(x.exc10 / x.t10) : null }; }), { axis: ["다른 종목보다 못함", "더 오름"], vs: "다른 종목보다" })}
+      <div class="chart-cap">${fw}일 안에 그날 마감보다 −${w.rules.dd}% 넘게 빠진 적이 있었던 횟수 (4파 조정처럼)</div>
+      ${rateRows(rows.filter(([k]) => k === "up" || k === "down").map(([k, l]) => ({ label: l, v: P[k].dd, col: P[k].dd > P[k].dd_base * 1.1 ? "down" : "faint", sub: `같은 장 평소 ${num(P[k].dd_base, 0)}번` })), P.all.dd_base, "평소 (전체)")}
+      ${asTable(tbl)}</div>
+    <p class="hint">모양 정하는 법: 마감 가격이 평소 움직임의 3배(5~25%)만큼 꺾여야 꼭대기·바닥으로 셉니다. 오름(1) → 1의 20~90%만 되돌림(2, 1의 시작보다 위) → 1의 꼭대기를 넘고 1의 0.8배 넘게 오르는 중(3). 파동을 정확히 세는 게 아니라 ‘그렇게 보이는’ 정도라, 같은 차트도 사람마다 다르게 셀 수 있어요. 매수·매도 신호가 아니라 지난 기록이에요.</p>`;
 }
 
 /* 급등 전조 찾기: 앞 기간에서 찾고 뒤 기간에서 다시 확인. 규칙은 자동으로 안 바꿈 */
@@ -2465,7 +2515,7 @@ async function openStock(code) {
       <div class="px">${starBtn({ code, name: s.n, close: s.c, date: db.date })}<b>${num(s.c)}</b><span class="${cls(s.ch)}">${signed(s.ch, 1, "%")}</span></div></div>
     <p class="hint">${ymd(db.date)} 기준 · 시총 ${eokText(s.cap)} · 거래대금 ${num(s.v)}억${tabs.length ? ` · <b>오늘 ${tabs.join("·")} 후보</b>` : ""}</p>
     ${s.x ? `<div class="earnwarn">⚠ 위험 공시·투자주의로 후보에서 뺀 종목: ${s.x.map(esc).join(", ")}</div>` : ""}
-    ${dsLines(s.ds)}
+    ${dsLines(s.ds)}${w3Line(s.w3)}
     ${s.mg ? `<p class="hint">20일 동안 운용사(액티브 ETF): ${s.mg.buy && s.mg.buy.length ? `<b class="up">산 곳 ${s.mg.buy.map(esc).join("·")}</b>` : ""}${s.mg.buy && s.mg.buy.length && s.mg.sell && s.mg.sell.length ? " · " : ""}${s.mg.sell && s.mg.sell.length ? `<b class="down">판 곳 ${s.mg.sell.map(esc).join("·")}</b>` : ""}</p>` : ""}
     <div class="nums">
       <div><small>5일 기관+외국인</small><b class="${cls(s.f5)}">${signed(s.f5, 0, "억")}</b><small>${s.pd}일 순매수</small></div>
