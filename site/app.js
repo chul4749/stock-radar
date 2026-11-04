@@ -1175,6 +1175,8 @@ function w3Past() {
   const mk = w.mk_now, x = w.parts && w.parts[mk];
   if (!x || x.exc10 == null) return "";
   const fw = 10;
+  const h = w.hold && w.hold[mk];
+  if (h) return `지난 기록(${MK_NAME[mk]}): 이 모양에서 20일 더 들고 있었다면 평균 ${signed(h.h20, 1, "%")}, 보통 ${signed(h.med20, 1, "%")} (100번 중 ${num(h.up20, 0)}번만 올라 있음)${h.verdict === "sell" ? " — 그날 파는 쪽이 나았음" : ""}`;
   return `지난 기록(${MK_NAME[mk]}): 그 뒤 ${fw}일 동안 다른 종목보다 ${signed(x.exc10, 1, "%")}${x.verdict === "few" || x.verdict === "none" ? " — 근거 부족" : ""}`;
 }
 function w3Tag(w) {
@@ -1721,10 +1723,18 @@ function waveBlock(w) {
     : `지금은 ${mkNow}이에요. ${MK_NAME[mk]} 3파처럼 보인 뒤 흐름은 다른 종목과 차이가 운인지 아직 구분이 안 돼요 (근거 부족).`);
   const tbl = `<table class="score"><thead><tr><th></th><th>건수</th><th>5일 뒤 (다른 종목보다)</th><th>10일 뒤</th><th>10일 안 −${w.rules.dd}%↓ (100번 중)</th></tr></thead><tbody>
     ${rows.map(([k, l]) => { const x = P[k]; return `<tr><th>${l}</th><td>${num(x.n)}</td><td>${signed(x.exc5, 1, "%")}<br><small>${chance(x.t5)}</small></td><td>${signed(x.exc10, 1, "%")}<br><small>${chance(x.t10)}</small></td><td>${num(x.dd, 0)}번<br><small>평소 ${num(x.dd_base, 0)}번</small></td></tr>`; }).join("")}</tbody></table>`;
-  return `<h3 class="sub">3파처럼 보이면 그 뒤엔? <small>${ymd(w.from).slice(2)}~${ymd(w.to).slice(2)}, 엘리엇 파동을 느슨하게</small>${infoBtn("wave3")}</h3>${infoBox("wave3")}
-    ${tk ? take(tk) : ""}
+  const H = w.hold || {}, hd = H[mk];
+  const hk = hd ? (hd.verdict === "sell" ? `가진 종목이 ${mkNow}에서 3파처럼 보였을 때, 20일 더 들고 있었다면 평균 ${signed(hd.h20, 1, "%")} (보통 ${signed(hd.med20, 1, "%")}, 100번 중 ${num(hd.up20, 0)}번만 그날보다 올라 있었음) — 그날 파는 쪽이 나았어요.`
+    : `가진 종목이 ${mkNow}에서 3파처럼 보였을 때, 20일 더 들고 있었다면 평균 ${signed(hd.h20, 1, "%")}지만 보통은 ${signed(hd.med20, 1, "%")} (100번 중 ${num(hd.up20, 0)}번만 그날보다 올라 있었음). 대부분은 빠지고 몇몇이 크게 올라 평균을 끌어올렸어요 — 절반만 파는 게 둘 사이 절충이에요.`) : "";
+  const methods = [["sell", "그날 다 팔기", () => 0], ["half20", "절반 팔고 20일", (x) => x.half20], ["h20", "20일 더 들고 있기", (x) => x.h20], ["trail", `고점보다 −${w.rules.trail}% 빠지면 팔기`, (x) => x.trail]];
+  const holdChart = H.up && H.down ? `<div class="chart-cap">${kindTag(false)}가진 종목이 3파처럼 보인 날 마감 가격 기준 — 팔기 방법별 평균 주가 변화 (그날 다 팔면 0)</div>
+      ${colBars(methods.map(([k, l, f]) => ({ label: l, bars: [{ v: f(H.up), mk: "up" }, { v: f(H.down), mk: "down" }] })), { vs: "그날 마감 가격보다 몇 %", legend: [["상승장 때", "faint"], ["하락장 때", "sub"]], color: (b) => b.mk === "up" ? "faint" : "sub" })}
+      <p class="hint">20일 더 들고 있었을 때 — 상승장: 보통 ${signed(H.up.med20, 1, "%")} · 100번 중 ${num(H.up.up20, 0)}번 올라 있음 · 그사이 가장 높을 때 평균 ${signed(H.up.best, 1, "%")} / 하락장: 보통 ${signed(H.down.med20, 1, "%")} · 100번 중 ${num(H.down.up20, 0)}번 · 가장 높을 때 ${signed(H.down.best, 1, "%")}. ${H.down.n < 30 || H.up.n < 30 ? "⚠ 건수가 적은 쪽은 운일 수 있음." : ""}</p>` : "";
+  return `<h3 class="sub">3파처럼 보이면 팔아야 하나? <small>${ymd(w.from).slice(2)}~${ymd(w.to).slice(2)}, 엘리엇 파동을 느슨하게</small>${infoBtn("wave3")}</h3>${infoBox("wave3")}
+    ${hk ? take(hk) : tk ? take(tk) : ""}
     <div class="tile wide"><div class="chart-cap">이런 모양을 찾았어요 — 지금 ${num(w.n_now)}종목이 이렇게 보여요</div>${waveSketch()}
-      <div class="chart-cap">${kindTag(true)}3파처럼 처음 보인 날 마감에 샀다면, ${fw}일 뒤 주가가 같은 날 다른 종목들보다 몇 % 더 올랐나</div>
+      ${holdChart}
+      <div class="chart-cap">${kindTag(true)}참고: 이 모양이 나온 날 새로 샀다면, ${fw}일 뒤 주가가 같은 날 다른 종목들보다 몇 % 더 올랐나</div>
       ${forest(rows.map(([k, l]) => { const x = P[k]; return { label: l + (k === mk ? " ← 지금" : ""), sub: `${num(x.n)}번 · 100번 중 ${num(x.win10, 0)}번 이익`, x: x.exc10, se: x.t10 ? Math.abs(x.exc10 / x.t10) : null }; }), { axis: ["다른 종목보다 못함", "더 오름"], vs: "다른 종목보다" })}
       <div class="chart-cap">${fw}일 안에 그날 마감보다 −${w.rules.dd}% 넘게 빠진 적이 있었던 횟수 (4파 조정처럼)</div>
       ${rateRows(rows.filter(([k]) => k === "up" || k === "down").map(([k, l]) => ({ label: l, v: P[k].dd, col: P[k].dd > P[k].dd_base * 1.1 ? "down" : "faint", sub: `같은 장 평소 ${num(P[k].dd_base, 0)}번` })), P.all.dd_base, "평소 (전체)")}

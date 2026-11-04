@@ -1787,7 +1787,7 @@ def surge_precursors(closes, values=None, breaks=None, eligible=None, rules=PRE)
 # 오름(1) → 덜 빠짐(2, 1의 시작보다 위) → 1의 꼭대기를 넘어 1만큼 이상 오르는 중(3).
 # 파동을 정확히 세는 게 아니라 '그렇게 보이는' 정도. 그 뒤 실제로 어땠는지(wave3_study)로 확인한다.
 WAVE = {"thr_min": 5.0, "thr_max": 25.0, "thr_k": 3.0, "r2": (0.2, 0.9), "len3": 0.8, "min1": 3, "span": 120,
-        "fwd": (5, 10), "dd": 10.0}
+        "fwd": (5, 10), "dd": 10.0, "hold": 20, "trail": 7.0}
 
 
 def wave3_scan(close, rules=WAVE, brk=None):
@@ -1844,6 +1844,54 @@ def wave3_scan(close, rules=WAVE, brk=None):
                     now = {"l0": r1(l0), "h1": r1(h1), "l2": r1(l2), "d0": i0, "d1": i1, "d2": i2,
                            "w3x": round((x - l2) / w1, 2), "r2": round((h1 - l2) / w1, 2)}
     return state, event, now
+
+
+def _wave3_hold(cl, ev, bm, upmk, half, rules):
+    """가진 종목이 '3파처럼 보인' 날(마감 가격 기준) 팔기 vs 들고 있기. 그날 다 팔면 0 기준으로,
+    절반 팔기(남은 절반만 따라감)·10일/20일 더 들고 있기·그 뒤 최고 마감에서 trail% 빠지면 팔기(최대 hold일)의 주가 변화(%).
+    다른 종목과 비교가 아니라 '내 돈'이 어떻게 됐나 — 그래서 장세(상승장·하락장)를 꼭 나눠 본다.
+    날짜로 묶은 t: 그날 사건들의 평균을 한 표본으로."""
+    import numpy as np
+    H, tr = rules["hold"], rules["trail"] / 100
+    a = cl.values
+    days = list(cl.index)
+    recs = []
+    for i, j in zip(*np.where(ev)):
+        if i + H >= len(days) or not np.isfinite(a[i, j]) or bm[i + 1:i + H + 1, j].any():
+            continue
+        path = a[i + 1:i + H + 1, j]
+        if not np.isfinite(path).all():
+            continue
+        c0 = a[i, j]
+        pk, sell = c0, path[-1]
+        for x in path:
+            pk = max(pk, x)
+            if x <= pk * (1 - tr):
+                sell = x
+                break
+        recs.append((days[i], bool(upmk.get(days[i], False)), (path[9] / c0 - 1) * 100, (path[-1] / c0 - 1) * 100,
+                     (sell / c0 - 1) * 100, (path.max() / c0 - 1) * 100, (path.min() / c0 - 1) * 100))
+    if not recs:
+        return None
+    df = pd.DataFrame(recs, columns=["d", "up", "h10", "h20", "trail", "best", "worst"])
+    out = {}
+    for k, m in (("all", df.index == df.index), ("up", df["up"]), ("down", ~df["up"]), ("a", df["d"] < half), ("b", df["d"] >= half)):
+        x = df[m]
+        if not len(x):
+            continue
+        row = {"n": len(x)}
+        for c in ("h10", "h20", "trail", "best", "worst"):
+            row[c] = round(float(x[c].mean()), 1)
+        row["half20"] = round(row["h20"] / 2, 1)
+        row["med20"] = round(float(x["h20"].median()), 1)
+        row["up20"] = round(float((x["h20"] > 0).mean() * 100))
+        per = x.groupby("d")["h20"].mean()
+        row["t20"] = round(float(per.mean() / (per.std(ddof=1) / np.sqrt(len(per)))), 1) if len(per) > 2 and per.std(ddof=1) > 0 else None
+        # 판정: 20일 더 들고 있던 게 평균적으로 손해이고 우연 아님 → '파는 쪽이 나았음'
+        row["verdict"] = "few" if len(x) < 30 else ("sell" if row["t20"] is not None and row["t20"] <= -2 else
+                                                    "hold" if row["t20"] is not None and row["t20"] >= 2 else "none")
+        out[k] = row
+    return out
 
 
 def wave3_study(closes, breaks=None, eligible=None, rules=WAVE):
@@ -1915,6 +1963,7 @@ def wave3_study(closes, breaks=None, eligible=None, rules=WAVE):
         res["verdict"] = "few"
     else:
         res["verdict"] = "none"
+    res["hold"] = _wave3_hold(cl, ev, bm, upmk, half, rules)
     for k in ("up", "down"):   # 장세별 판정: 그 장에서 우연 아님(|t|≥2, 30건↑)이면 방향
         x = res["parts"].get(k)
         if x:
