@@ -38,7 +38,11 @@ jobs:
           cp "$RUNNER_TEMP/morning.json" site/data/morning.json
           git add site/data/morning.json
           git diff --cached --quiet || git commit -q -m "data: 아침 요약 $(TZ=Asia/Seoul date +%F)"
-          git push -q origin "$GITHUB_REF_NAME"
+          for i in 1 2 3 4; do   # GitHub가 가끔 push를 500으로 거절 → 최신 위로 다시 올려 재시도
+            git push -q origin "$GITHUB_REF_NAME" && break
+            [ $i = 4 ] && exit 1
+            sleep $((i * 15)); git fetch -q origin "$GITHUB_REF_NAME" && git rebase -q "origin/$GITHUB_REF_NAME" || true
+          done
       # 전 종목 차트·재무(charts/, fin/)는 main 대신 data-cache 브랜치에 둔다 (기록 없이 덮어써서 저장소가 커지지 않음)
       - name: 차트·재무 받기
         run: |

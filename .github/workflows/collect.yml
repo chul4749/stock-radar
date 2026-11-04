@@ -60,7 +60,13 @@ jobs:
             python -m collector.reindex
             git add -A site/data
             git diff --cached --quiet || git commit -q -m "data: $1"
-            git push -q origin "$GITHUB_REF_NAME"
+            # 가끔 GitHub가 push를 거절함(500 Internal Server Error) → 최신 위로 다시 올려 몇 번 더 (수집 40분을 날리지 않게)
+            for i in 1 2 3 4; do
+              git push -q origin "$GITHUB_REF_NAME" && return 0
+              sleep $((i * 15))
+              git fetch -q origin "$GITHUB_REF_NAME" && git rebase -q "origin/$GITHUB_REF_NAME" || true
+            done
+            return 1
           }
           # 과거 기준일은 하루씩 저장해서, 중간에 시간이 다 돼도 끝난 날짜는 남게 한다
           for d in ${{ inputs.dates }}; do

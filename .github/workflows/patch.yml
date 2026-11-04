@@ -47,7 +47,11 @@ jobs:
           cp "$RUNNER_TEMP/day.json" "$f"
           git add "$f"
           git diff --cached --quiet || git commit -q -m "data: ${{ inputs.date }} 시장 지표 추가"
-          git push -q origin "$GITHUB_REF_NAME"
+          for i in 1 2 3 4; do   # GitHub가 가끔 push를 500으로 거절 → 최신 위로 다시 올려 재시도
+            git push -q origin "$GITHUB_REF_NAME" && break
+            [ $i = 4 ] && exit 1
+            sleep $((i * 15)); git fetch -q origin "$GITHUB_REF_NAME" && git rebase -q "origin/$GITHUB_REF_NAME" || true
+          done
         env:
           KRX_ID: ${{ secrets.KRX_ID }}
           KRX_PW: ${{ secrets.KRX_PW }}
