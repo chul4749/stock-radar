@@ -2487,23 +2487,28 @@ function ownBlock(cx, days) {
       <p class="hint">모두 0~100% 같은 눈금이에요. 최대주주가 외국 회사이거나, 5% 큰손이 외국 운용사면 외국인 지분과 겹쳐요.</p></div>`);
   }
   if (fi.length >= 2) {
-    // 절대치로 보이게: 세로축은 0%부터, 10%(작으면 5%)마다 눈금, 점선 = 60일 전 값(기준선)
-    const [a, ia] = fi[0], [b] = fi.at(-1), hi = Math.max(...fi.map(([v]) => v));
-    const step = hi > 30 ? 10 : 5, top = Math.max(step, Math.ceil((hi + step * 0.3) / step) * step);
-    const w = 300, h = 110, y = (v) => h - (v / top) * h;
-    const pts = fi.map(([v, i]) => `${((i / (f.length - 1)) * w).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+    // 등락이 보이게 값 근처로 확대하되, 너무 작은 변화가 크게 보이지 않게 위아래 폭은 최소 2(%) — 눈금에 실제 지분율, 점선 = 60일 전 값(기준선).
+    // 전체(0~100%) 속 위치는 위 가로 막대로 본다
+    const [a, ia] = fi[0], [b] = fi.at(-1), vlo = Math.min(...fi.map(([v]) => v)), vhi = Math.max(...fi.map(([v]) => v));
+    const span = Math.max(2, (vhi - vlo) * 1.3), mid = (vhi + vlo) / 2;
+    const step = [0.25, 0.5, 1, 2, 5, 10].find((t) => span / t <= 5) || 10;
+    let lo = Math.floor((mid - span / 2) / step) * step, top = Math.ceil((mid + span / 2) / step) * step;
+    if (lo < 0) { top -= lo; lo = 0; }
+    if (top > 100) { lo -= top - 100; top = 100; }
+    const w = 300, h = 110, y = (v) => h - ((v - lo) / (top - lo)) * h;
     const grid = [];
-    for (let g = step; g < top; g += step) grid.push(g);
+    for (let g = lo + step; g < top - 1e-9; g += step) grid.push(+g.toFixed(2));
+    const pts = fi.map(([v, i]) => `${((i / (f.length - 1)) * w).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
     const d = b - a;
     parts.push(`<p class="interp">외국인 지분율: ${ymd(days[ia]).slice(5)} <b>${num(a, 2)}%</b> → 지금 <b>${num(b, 2)}%</b> <span class="${cls(d)}">(${d >= 0 ? "+" : "−"}${num(Math.abs(d), 2)})</span></p>` +
-      tipWrap(`<div class="ownch"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="외국인 지분율 추이 (0%부터)">
+      tipWrap(`<div class="ownch"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="외국인 지분율 추이">
         ${grid.map((g) => `<line x1="0" x2="${w}" y1="${y(g).toFixed(1)}" y2="${y(g).toFixed(1)}" stroke="var(--line)" stroke-width="1" vector-effect="non-scaling-stroke"/>`).join("")}
         <line x1="0" x2="${w}" y1="${y(a).toFixed(1)}" y2="${y(a).toFixed(1)}" stroke="var(--sub)" stroke-dasharray="4 3" stroke-width="1" vector-effect="non-scaling-stroke"/>
         <line x1="0" x2="${w}" y1="${h}" y2="${h}" stroke="var(--sub)" stroke-width="1" vector-effect="non-scaling-stroke"/>
         <polyline points="${pts}" fill="none" stroke="var(--text)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>
-        ${[0, ...grid, top].map((g) => `<span class="yl" style="top:${(y(g) / h * 100).toFixed(1)}%">${g}%</span>`).join("")}</div>`,
+        ${[lo, ...grid, top].map((g) => `<span class="yl" style="top:${(y(g) / h * 100).toFixed(1)}%">${num(g, step < 1 ? 2 : 0)}%</span>`).join("")}</div>`,
         days.map(ymd), [["외국인 지분율", f, "%"]]) +
-      `<div class="legend"><span><i style="background:var(--text)"></i>외국인 지분율</span><span><i class="dash"></i>${ymd(days[ia]).slice(5)} 값 (기준선)</span></div>`);
+      `<div class="legend"><span><i style="background:var(--text)"></i>외국인 지분율</span><span><i class="dash"></i>${ymd(days[ia]).slice(5)} 값 (기준선)</span><span class="rng">눈금 ${num(lo, step < 1 ? 2 : 0)}~${num(top, step < 1 ? 2 : 0)}%</span></div>`);
   }
   if (cx.mh && cx.mh.length) {
     parts.push(`<p class="hint">최대주주·특수관계인 지분 <small>(분기 보고서)</small>: ${cx.mh.map(([k, v], i) => { const p = i ? cx.mh[i - 1][1] : null; return `${qLabel(k)} <b>${num(v, 2)}%</b>${p != null && Math.abs(v - p) >= 0.01 ? ` <small class="${cls(v - p)}">(${v - p > 0 ? "+" : "−"}${num(Math.abs(v - p), 2)})</small>` : ""}`; }).join(" · ")}</p>`);
