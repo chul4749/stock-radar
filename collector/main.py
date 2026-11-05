@@ -535,7 +535,16 @@ def main(argv):
         write_live(base, out)
     dates = reindex.write_index()
     write_prices(base, closes, listing, temp.get("index") or {})
-    write_chart_shards(base, closes, logic.net_frame(flows_hist), idx["stocks"], highs, lows, values)
+    # 종목별 지분 추세 (공식 자료만): 외국인 지분율(KRX, 날마다) · 최대주주 지분(정기보고서) · 5% 큰손 지분 공시 — 검색 팝업용
+    own = {}
+    if not backfill:
+        t = step("지분 추세 (외국인·최대주주·5% 큰손)")
+        own["fr"] = safe("외국인 지분율 추세", lambda: long_fratio(base, quality.get("fratio_now")), errors)
+        pri = [x["code"] for g in (scalp, swing, value) for x in g] + sorted(universe_all, key=lambda c: -(universe_all[c].get("cap") or 0))
+        own["mh"] = safe("최대주주 지분", lambda: update_holders(base, list(dict.fromkeys(pri)), errors), errors) or {}
+        own["st"] = (dart_sig or {}).get("stakes") or []
+        log(f"  {time.time() - t:.0f}초")
+    write_chart_shards(base, closes, logic.net_frame(flows_hist), idx["stocks"], highs, lows, values, own)
     for c, m in mg_of.items():   # 검색 화면에도 '운용사가 20일 동안 산·판' 표시
         if c in idx["stocks"]:
             idx["stocks"][c]["mg"] = m
@@ -858,6 +867,8 @@ def update_dart_signals(base, days, errors, keep_days=150, max_detail=400):
     if not sources.opendart_key():
         return store
     checked = set(store.get("checked") or [])
+    if "stakes" not in store:   # 5% 큰손 지분율을 처음 모을 때는 3개월을 다시 훑는다 (이미 받은 '사는' 공시는 접수번호로 걸러짐)
+        checked = set()
     oldest = (datetime.strptime(base, "%Y%m%d") - timedelta(days=88)).strftime("%Y%m%d")
     todo = sorted(d for d in days if d >= oldest and d <= base and d not in checked)
     if not todo:
@@ -870,9 +881,14 @@ def update_dart_signals(base, days, errors, keep_days=150, max_detail=400):
         return store
     done = [d for d in todo if stopped is None or d > stopped]
     seen = {x["rcept"] for x in store["events"]}
+    stakes = [x for x in events if x["kind"] == "stake"]   # 5% 큰손 공식 지분율 (늘림·줄임 모두) — '사는' 공시와 따로 보관
+    events = [x for x in events if x["kind"] != "stake"]
     store["events"] += [x for x in events if x["rcept"] not in seen and (stopped is None or x["date"] > stopped or x["kind"] == "buyback")]
     cut = (datetime.strptime(base, "%Y%m%d") - timedelta(days=keep_days)).strftime("%Y%m%d")
     store["events"] = sorted((x for x in store["events"] if x["date"] >= cut), key=lambda x: x["rcept"])
+    old_st = {x["rcept"]: x for x in store.get("stakes") or []}
+    old_st.update({x["rcept"]: x for x in stakes if x.get("code")})
+    store["stakes"] = sorted((x for x in old_st.values() if x["date"] >= cut), key=lambda x: x["rcept"])
     store["checked"] = sorted(d for d in checked | set(done) if d >= cut)
     with open(os.path.join(DATA, "dart_signals.json"), "w", encoding="utf-8") as f:
         json.dump(store, f, ensure_ascii=False, separators=(",", ":"))
@@ -957,7 +973,7 @@ def _clear_json(d):
             os.remove(os.path.join(d, n))
 
 
-def write_chart_shards(base, closes, net, stocks, highs=None, lows=None, values=None):
+def write_chart_shards(base, closes, net, stocks, highs=None, lows=None, values=None, own=None):
     """전 종목 60일 종가 + 20일 큰손 순매수(억) + 60일 매물대를 _shard로 16개 파일에 나눠 쓴다 (charts/, git 밖, 최신 기준일만)."""
     d = os.path.join(DATA, "charts")
     os.makedirs(d, exist_ok=True)
@@ -973,6 +989,11 @@ def write_chart_shards(base, closes, net, stocks, highs=None, lows=None, values=
     ndays = list(net.index[-NET_DAYS:]) if net is not None and not net.empty else []
     _clear_json(d)
     shards = {}
+    own = own or {}
+    fr = own.get("fr")
+    st_by = {}
+    for x in own.get("st") or []:
+        st_by.setdefault(x["code"], []).append([x["date"], x.get("who"), x.get("rate"), x.get("chg"), x.get("why")])
     for c in stocks:
         if c not in closes.columns:
             continue
@@ -984,6 +1005,14 @@ def write_chart_shards(base, closes, net, stocks, highs=None, lows=None, values=
             vp = logic.volume_profile(highs[c].iloc[-CHART_DAYS:], lows[c].iloc[-CHART_DAYS:], col, values[c].iloc[-CHART_DAYS:])
             if vp:
                 rec["vp"] = vp
+        if fr is not None and c in fr.columns:   # 외국인 지분율(%) — 종가와 같은 날짜 칸
+            f = fr[c].reindex(days)
+            if f.notna().sum() >= 2:
+                rec["f"] = [None if v != v else round(float(v), 2) for v in f]
+        if (own.get("mh") or {}).get(c):          # 최대주주·특수관계인 지분(%) {분기: 값}
+            rec["mh"] = sorted(own["mh"][c].items())
+        if c in st_by:                              # 5% 큰손 지분 공시 [날짜, 보고자, 지분율, 변동, 사유]
+            rec["s5"] = st_by[c][-8:]
         shards.setdefault(_shard(c), {})[c] = rec
     for k, v in shards.items():
         with open(os.path.join(d, f"{k}.json"), "w", encoding="utf-8") as f:
@@ -1038,6 +1067,117 @@ def long_history(base, closes, chg, values=None):
     rt = rt.reindex(cl.index) if rt is not None else None
     va = va.reindex(index=cl.index, columns=cl.columns) if va is not None else None
     return cl, logic.price_breaks(cl, rt), va
+
+
+FR_DAYS = 60   # 외국인 지분율 추세 (화면 차트와 같은 길이)
+
+
+def long_fratio(base, today):
+    """전 종목 외국인 지분율(%) 최근 FR_DAYS 영업일 (KRX 공식, hist/fratio.csv.gz 에 쌓고 모자란 날만 받음)."""
+    days = sources.business_days(base, FR_DAYS)
+    path = os.path.join(HIST, "fratio.csv.gz")
+    try:
+        old = pd.read_csv(path, index_col=0, dtype={0: str})
+        old.index = old.index.astype(str)
+    except (OSError, ValueError):
+        old = None
+    got = {}
+    if today is not None and len(today):
+        got[base] = today
+    have = set(old.index) if old is not None else set()
+    for d in days:
+        if d not in have and d not in got:
+            try:
+                got[d] = sources.foreign_ratio(d)
+            except Exception as e:
+                log(f"  외국인 지분율 {d} 실패: {type(e).__name__}")
+    parts = ([old] if old is not None else []) + ([pd.DataFrame(got).T.astype(float)] if got else [])
+    if not parts:
+        return None
+    fr = pd.concat(parts)
+    fr = fr[~fr.index.duplicated(keep="last")].sort_index()
+    fr = fr.loc[[d for d in fr.index if d >= days[0] and d <= base]] if len(fr) else fr
+    os.makedirs(HIST, exist_ok=True)
+    keep = sorted(set(fr.index))[-(FR_DAYS + 20):]
+    fr.loc[keep].round(2).to_csv(path, compression="gzip")
+    log(f"  외국인 지분율 {len(fr)}일 (새로 받음 {len(got)}일)")
+    return fr
+
+
+HOLDER_BUDGET = 900   # 하루 OpenDART 최대주주 조회 한도 (전체 2만 건 중, 몇 날에 나눠 채움)
+
+
+def _report_periods(base, n=4):
+    """기준일에 이미 지났을 최근 n개 분기(정기보고서): [(연도, 보고서코드, '2026.09'), ...] 최근 것부터."""
+    y, m = int(base[:4]), int(base[4:6])
+    q = (m - 1) // 3   # 지금 분기 바로 전 분기까지
+    out = []
+    while len(out) < n:
+        if q == 0:
+            y, q = y - 1, 4
+        code = {1: "11013", 2: "11012", 3: "11014", 4: "11011"}[q]
+        out.append((y, code, f"{y}.{q * 3:02d}"))
+        q -= 1
+    return out
+
+
+def update_holders(base, codes, errors, budget=HOLDER_BUDGET):
+    """종목별 최대주주·특수관계인 지분율(정기보고서, OpenDART 공식)을 hist/holders.json 에 쌓는다.
+    codes 순서대로(후보 먼저) 아직 없는 분기만 묻고, 비었던 분기는 2주 뒤 다시 확인. 하루 budget 번까지."""
+    if not sources.opendart_key():
+        return {}
+    path = os.path.join(HIST, "holders.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            st = json.load(f)
+    except (OSError, ValueError):
+        st = {}
+    st.setdefault("pts", {})
+    st.setdefault("chk", {})
+    cmap = st.get("corp") or {}
+    if not cmap or st.get("corp_at", "") < (datetime.strptime(base, "%Y%m%d") - timedelta(days=30)).strftime("%Y%m%d"):
+        try:
+            cmap = sources.opendart_corp_codes()
+            st["corp"], st["corp_at"] = cmap, base
+        except Exception as e:
+            errors.append(f"OpenDART 고유번호: {type(e).__name__}")
+            if not cmap:
+                return st["pts"]
+    periods = _report_periods(base)
+    again = (datetime.strptime(base, "%Y%m%d") - timedelta(days=14)).strftime("%Y%m%d")
+    calls = 0
+    for c in codes:
+        cc = cmap.get(c)
+        if not cc:
+            continue
+        pts, chk = st["pts"].setdefault(c, {}), st["chk"].setdefault(c, {})
+        for y, rc, label in periods:
+            if label in pts or chk.get(label, "") >= again:
+                continue
+            if calls >= budget:
+                break
+            try:
+                v = sources.opendart_major_holder(cc, y, rc)
+            except Exception as e:
+                log(f"  최대주주 {c} {label} 실패: {type(e).__name__}")
+                v = None
+                if "020" in str(e):   # 한도 초과 → 오늘은 그만
+                    calls = budget
+                    break
+            calls += 1
+            chk[label] = base
+            if v is not None:
+                pts[label] = v
+            time.sleep(0.05)
+        if calls >= budget:
+            break
+    for k in ("pts", "chk"):
+        st[k] = {c: v for c, v in st[k].items() if v}
+    os.makedirs(HIST, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(st, f, ensure_ascii=False, separators=(",", ":"))
+    log(f"  최대주주 지분 {sum(1 for v in st['pts'].values() if v)}종목 (이번에 {calls}번 조회)")
+    return st["pts"]
 
 
 def load_fin_cache():

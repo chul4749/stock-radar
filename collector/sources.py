@@ -492,7 +492,54 @@ def opendart_signals(bgn, end, cache=None, max_detail=400):
             if q and q > 0 and "장내매수" in (hit.get("report_resn") or ""):
                 out.append({"date": r["rcept_no"][:8], "code": r.get("stock_code"), "name": r["corp_name"], "kind": "major",
                             "rcept": r["rcept_no"], "qty": q, "rate": hit.get("stkrt_irds"), "who": hit.get("repror")})
+    # 5% 큰손의 공식 지분율 (늘림·줄임 모두, 종목별 지분 추세용): majorstock 응답엔 그 회사의 지난 보고가 다 들어 있어 전부 꺼낸다
+    codes = {r["corp_code"]: (r.get("stock_code"), r["corp_name"]) for r in want}
+    for (api, cc), rows_ in cache.items():
+        if api != "majorstock.json" or cc not in codes:
+            continue
+        sc, nm = codes[cc]
+        for h in rows_:
+            if h.get("rcept_no"):
+                out.append({"date": h["rcept_no"][:8], "code": sc, "name": nm, "kind": "stake", "rcept": h["rcept_no"],
+                            "rate": _num(h.get("stkrt")), "chg": _num(h.get("stkrt_irds")),
+                            "who": h.get("repror"), "why": (h.get("report_resn") or "")[:40]})
     return out, calls, stopped
+
+
+def _num(x):
+    try:
+        return float(str(x).replace(",", "").strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def opendart_corp_codes():
+    """상장사 종목코드 → OpenDART 고유번호(corp_code). corpCode.xml(압축)을 한 번 받는다."""
+    import io
+    import zipfile
+    import xml.etree.ElementTree as ET
+    r = retry(lambda: get(f"{OPENDART}/corpCode.xml", params={"crtfc_key": opendart_key()}, timeout=60), tries=3, wait=5)
+    with zipfile.ZipFile(io.BytesIO(r.content)) as z:
+        root = ET.fromstring(z.read(z.namelist()[0]))
+    out = {}
+    for e in root.iter("list"):
+        sc = (e.findtext("stock_code") or "").strip()
+        if sc:
+            out[sc] = e.findtext("corp_code").strip()
+    return out
+
+
+def opendart_major_holder(corp_code, year, reprt_code):
+    """정기보고서의 최대주주·특수관계인 보통주 지분율 합(기말, %) — hyslrSttus. 자료 없으면 None.
+    reprt_code: 11013 1분기 · 11012 반기 · 11014 3분기 · 11011 사업보고서"""
+    rows = opendart("hyslrSttus.json", corp_code=corp_code, bsns_year=str(year), reprt_code=reprt_code).get("list") or []
+    rows = [x for x in rows if "보통" in (x.get("stock_knd") or "보통")]
+    if not rows:
+        return None
+    tot = [x for x in rows if (x.get("nm") or "").replace(" ", "") in ("계", "합계")]
+    vals = [_num(x.get("trmend_posesn_stock_qota_rt")) for x in (tot[:1] or rows)]
+    vals = [v for v in vals if v is not None]
+    return round(sum(vals), 2) if vals else None
 
 
 def dart_web_today(ymd, max_pages=15):

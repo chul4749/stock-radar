@@ -1256,3 +1256,36 @@ def test_stop_scorecard_w3_sells_half_when_wave3_appears():
     assert abs(st["w3"]["avg"] - (0.5 * (half_px / buy - 1) * 100 + 0.5 * stop_r)) < 0.11
     st0 = logic.stop_scorecard(hist, closes, closes - 1, opens=closes, horizons=(5,), cost=0)["swing"]["5"]
     assert "w3" not in st0
+
+
+def test_major_holder_sums_common_total_row(monkeypatch):
+    from collector import sources
+    rows = [{"nm": "홍길동", "stock_knd": "보통주", "trmend_posesn_stock_qota_rt": "20.10"},
+            {"nm": "홍가족", "stock_knd": "보통주", "trmend_posesn_stock_qota_rt": "5.05"},
+            {"nm": "홍길동", "stock_knd": "우선주", "trmend_posesn_stock_qota_rt": "3.00"},
+            {"nm": "계", "stock_knd": "보통주", "trmend_posesn_stock_qota_rt": "25.15"}]
+    monkeypatch.setattr(sources, "opendart", lambda path, **kw: {"status": "000", "list": rows})
+    assert sources.opendart_major_holder("001", 2026, "11012") == 25.15            # '계' 줄이 있으면 그것
+    monkeypatch.setattr(sources, "opendart", lambda path, **kw: {"status": "000", "list": rows[:3]})
+    assert sources.opendart_major_holder("001", 2026, "11012") == 25.15            # 없으면 보통주 합 (우선주 뺌)
+    monkeypatch.setattr(sources, "opendart", lambda path, **kw: {"status": "013"})
+    assert sources.opendart_major_holder("001", 2026, "11012") is None
+
+
+def test_update_holders_budget_and_recheck(tmp_path, monkeypatch):
+    from collector import main, sources
+    monkeypatch.setattr(main, "HIST", str(tmp_path))
+    monkeypatch.setattr(sources, "opendart_key", lambda: "k")
+    monkeypatch.setattr(sources, "opendart_corp_codes", lambda: {"A": "1", "B": "2"})
+    asked = []
+
+    def fake(cc, y, rc):
+        asked.append((cc, rc))
+        return 30.0 if cc == "1" else None
+    monkeypatch.setattr(sources, "opendart_major_holder", fake)
+    monkeypatch.setattr(main.time, "sleep", lambda s: None)
+    pts = main.update_holders("20261105", ["A", "B", "C"], [], budget=5)
+    assert len(asked) == 5 and pts["A"] == {"2026.09": 30.0, "2026.06": 30.0, "2026.03": 30.0, "2025.12": 30.0}
+    asked.clear()
+    main.update_holders("20261106", ["A", "B"], [], budget=10)   # A는 다 있음, B는 못 본 분기만 (비었던 건 2주 뒤)
+    assert asked == [("2", "11012"), ("2", "11013"), ("2", "11011")]

@@ -116,6 +116,7 @@ const INFO = {
   vp: "매물대 = 최근 60영업일 동안 어느 가격대에서 거래가 많았는지(거래대금)를 가로 막대로 나타낸 것. 그 가격에 산 사람이 많다는 뜻입니다.\n· 지금 가격보다 아래 매물: 그 사람들은 이익 중 → 급하게 안 팔고, 가격이 내려오면 '싸다'며 다시 사는 경향 → 받쳐 주는 가격대(지지)\n· 지금 가격보다 위 매물: 그 사람들은 손해 중 → 가격이 올라와 본전이 되면 팔고 나오려는 경향 → 누르는 가격대(저항)\n· 매물대를 뚫고 올라가면 그 위가 가벼워지고, 뚫린 매물대가 다음엔 받쳐 주는 쪽으로 바뀌는 경우가 많음\n· 평균 매수가: 거래대금으로 가중한 60일 평균 가격. 지금 가격이 이보다 위면 최근 산 사람들 대부분이 이익 중\n주의: 하루 거래를 그날 저가~고가에 고르게 펼친 근사이고, 60일보다 오래된 매물은 안 보입니다. 같은 사람이 사고팔기를 반복한 것도 다 들어가요. '왜 이 가격에서 막히나/받치나'를 이해하는 공부 자료로 보세요.",
   follow: "급등한 날(하루 +20%↑) 뒤 며칠이 어떻게 흘렀는지 최근 약 80영업일 실제 기록을 셉니다. 시총·거래대금 기준 이상 종목만.\n· 다음 날도 오름: 급등 다음 날 종가가 또 올랐던 비율\n· 3일 안 또 급등: 다음 3일 중 하루라도 +20% 넘게 오른 비율\n· 하루 쉬고 다시: 다음 날은 보합·하락이었다가 2~3일째 +5% 넘게 오른 비율 (하루 건너 이어지는 모양)\n'평소' 줄은 아무 날·아무 종목이나 같은 방법으로 센 값이라, 급등 줄이 평소보다 높아야 '급등은 이어지는 편'이라고 말할 수 있어요.\n아래 표는 우리 자료가 장 마감 뒤에 나오니 실제로 살 수 있는 '다음 날 아침 첫 가격'에 사서 3·5영업일째 종가에 판 결과입니다 (거래 비용 뺌). 이어지는 경우가 많아도 다음 날 아침 첫 가격가 이미 높게 시작하면 남는 게 적을 수 있어서 따로 봅니다.",
   follow_split: "급등한 날(하루 +20% 이상)을 그날의 모양으로 나눠, 어떤 경우가 그 뒤에 더 잘 이어졌는지 봅니다.\n· 종가가 고가 근처: 장 끝까지 힘이 남아 있었음 / 고가에서 밀림: 오르다 팔려 내려옴\n· 첫 급등 vs 이미 오른 뒤: 전 5일 동안 +10% 넘게 올라 있었는지\n· 거래 배수: 그날 거래대금이 20일 평균의 몇 배인지\n· 큰손: 그날 기관+외국인이 샀는지 팔았는지 (최근 약 25일만 있어 건수가 적음)\n· 시총: 3천억 기준 (지금 시총으로 나눔)\n건수가 적은 줄은 우연일 수 있어 참고만 하세요.",
+  own: "공식 자료로만 보여 줍니다. ① 외국인 지분율: 한국거래소가 매일 내는 외국인 보유 비율. ② 최대주주·특수관계인 지분: 회사가 분기마다 내는 보고서의 기말 지분(보통주). ③ 5% 넘게 가진 큰손(운용사·연기금 등): 지분이 바뀔 때마다 내는 대량보유 공시의 보유 비율.\n기관·개인 전체의 지분율은 공식으로 매일 나오는 자료가 없어 넣지 않았어요(순매수 금액은 위 큰손 순매수 막대). 괄호 안 숫자는 지분율이 몇 %만큼 늘었나(+)·줄었나(−)예요.",
   wave3: "엘리엇 파동 이론: 오를 때 5번(1·3·5는 오름, 2·4는 쉼)에 걸쳐 오르고, 그중 3번째 오름이 가장 크고 힘차다는 생각. 3파가 보이면 크게 오른 걸 일부 확정해 두라는 사람도 있어요.\n여기선 파동을 정확히 세지 않고 '그렇게 보이는' 모양만 기계적으로 찾습니다(꺾임 크기는 종목의 평소 움직임에 맞춤). 그리고 그 모양이 나온 뒤 실제로 다른 종목보다 어땠는지, 상승장·하락장 때를 나눠 보여 줍니다.\n파동 이론은 지나고 나서 세기 쉬운 이론이라, 미리 맞히는 힘은 검증된 적이 많지 않습니다.",
   precursor: "급등(하루 +20%↑) 며칠 전에 보일 만한 모양을 여러 개 후보로 두고, 약 1년 기록에서 그 모양이 보인 날 뒤 5일 안에 급등이 나왔던 횟수를 평소(아무 종목·아무 날)와 비교합니다.\n속지 않으려고 세 가지를 봅니다. ① 기간을 반으로 나눠 앞에서 찾은 게 뒤에서도 맞나(과거에만 맞춘 규칙 거르기). ② 원래 크게 출렁이는 종목은 급등도 잦으니, 출렁임이 비슷한 종목끼리 견줘도 잦은가. ③ 급등이 잦아도 그만큼 크게 빠지기도 하면 소용없으니, 그날 마감에 샀다면 5일 뒤 같은 날 다른 종목보다 나았나.\n종가·거래대금만 써서 공시·뉴스로 갑자기 뛰는 급등은 미리 알 수 없습니다.",
   signal_check: "거꾸로도 확인합니다: 그 신호가 뜬 종목들 중 실제로 5일 안에 하루 +20% 넘게 오른 날이 있었던 비율(100번 중 몇 번)이 얼마인지, 아무 신호 없이 고른 종목(평소)보다 몇 배인지.\n급등주에만 신호가 있었던 게 아니라 평범한 종목에도 흔하게 뜨는 신호라면 '평소의 몇 배'가 1에 가까워서 쓸모가 없습니다.",
@@ -2466,6 +2467,31 @@ function chartFromCloses(days, closes) {
   return { dates: days, close: closes, ma20: ma(20), ma60: ma(60) };
 }
 
+// 지분 추세 (공식 자료만): 외국인 지분율(KRX, 날마다) · 최대주주·특수관계인(분기 보고서) · 5% 큰손 지분 공시(OpenDART)
+const qLabel = (k) => { const [y, m] = k.split("."); return `${y.slice(2)}년 ${Number(m)}월 말`; };
+function ownBlock(cx, days) {
+  const parts = [];
+  const f = cx.f || [], fi = f.map((v, i) => [v, i]).filter(([v]) => v != null);
+  if (fi.length >= 2) {
+    const [a, ia] = fi[0], [b] = fi.at(-1), lo = Math.min(...fi.map(([v]) => v)), hi = Math.max(...fi.map(([v]) => v));
+    const pad = Math.max(0.3, (hi - lo) * 0.15), y0 = lo - pad, y1 = hi + pad, w = 300, h = 70;
+    const pts = fi.map(([v, i]) => `${((i / (f.length - 1)) * w).toFixed(1)},${(h - ((v - y0) / (y1 - y0)) * h).toFixed(1)}`).join(" ");
+    const d = b - a;
+    parts.push(`<p class="interp">외국인 지분율: ${ymd(days[ia]).slice(5)} <b>${num(a, 2)}%</b> → 지금 <b>${num(b, 2)}%</b> <span class="${cls(d)}">(${d >= 0 ? "+" : "−"}${num(Math.abs(d), 2)})</span></p>` +
+      tipWrap(`<div class="ownch"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="외국인 지분율 추이"><polyline points="${pts}" fill="none" stroke="var(--text)" stroke-width="1.8" vector-effect="non-scaling-stroke"/></svg><span class="yl t">${num(y1 - pad, 2)}%</span><span class="yl b">${num(y0 + pad, 2)}%</span></div>`,
+        days.map(ymd), [["외국인 지분율", f, "%"]]));
+  }
+  if (cx.mh && cx.mh.length) {
+    parts.push(`<p class="hint">최대주주·특수관계인 지분 <small>(분기 보고서)</small>: ${cx.mh.map(([k, v], i) => { const p = i ? cx.mh[i - 1][1] : null; return `${qLabel(k)} <b>${num(v, 2)}%</b>${p != null && Math.abs(v - p) >= 0.01 ? ` <small class="${cls(v - p)}">(${v - p > 0 ? "+" : "−"}${num(Math.abs(v - p), 2)})</small>` : ""}`; }).join(" · ")}</p>`);
+  }
+  if (cx.s5 && cx.s5.length) {
+    parts.push(`<p class="hint">5% 넘게 가진 큰손의 지분 공시 <small>(최근 150일)</small></p><ul class="plain">${cx.s5.slice().reverse().map(([d, who, r, ch, why]) =>
+      `<li>${ymd(d).slice(5)} <b>${esc(who || "–")}</b> ${r == null ? "" : `${num(r, 2)}%`}${ch ? ` <small class="${cls(ch)}">(${ch > 0 ? "+" : "−"}${num(Math.abs(ch), 2)})</small>` : ""}${why ? ` <small>${esc(why)}</small>` : ""}</li>`).join("")}</ul>`);
+  }
+  if (!parts.length) return "";
+  return `<h3 class="sub">지분 추세 <small>공식 자료만</small>${infoBtn("own")}</h3>${infoBox("own")}${parts.join("")}`;
+}
+
 function netBars(days, vals) {
   const max = Math.max(1, ...vals.map((v) => Math.abs(v || 0)));
   const cols = vals.map((v) => `<div class="nb"><i style="height:${Math.max(2, (Math.abs(v || 0) / max) * 50)}%;${(v || 0) >= 0 ? "bottom:50%" : "top:50%"};background:var(--${(v || 0) >= 0 ? "up" : "down"})"></i></div>`).join("");
@@ -2558,6 +2584,7 @@ async function openStock(code) {
     </div>
     <p class="hint">흐름: ${trend}${s.dr != null ? ` · 60일 고점보다 −${num(s.dr, 1)}%` : ""}</p>
     ${chartHtml}
+    ${cx ? ownBlock(cx, chs.days.slice(-cx.c.length)) : ""}
     ${cx ? surgeNote(chs.days.slice(-cx.c.length), cx.c) : ""}
     ${cx && cx.vp ? vpBlock(cx.vp) : ""}
     ${cx ? mythNow(cx.c, cx.vp, fin) : ""}
