@@ -2472,14 +2472,38 @@ const qLabel = (k) => { const [y, m] = k.split("."); return `${y.slice(2)}년 ${
 function ownBlock(cx, days) {
   const parts = [];
   const f = cx.f || [], fi = f.map((v, i) => [v, i]).filter(([v]) => v != null);
+  // 지금 지분 한눈에: 0~100% 같은 눈금 위 가로 막대 (외국인·최대주주·5% 큰손 — 서로 겹칠 수 있음)
+  const bars = [];
+  if (fi.length) bars.push(["외국인 전체", fi.at(-1)[0], "KRX · 매일"]);
+  if (cx.mh && cx.mh.length) bars.push(["최대주주·특수관계인", cx.mh.at(-1)[1], `${qLabel(cx.mh.at(-1)[0])} 보고서`]);
+  const lastBy = {};
+  (cx.s5 || []).forEach(([d, who, r]) => { if (who && r != null) lastBy[who] = [d, r]; });
+  Object.entries(lastBy).sort((p, q) => q[1][1] - p[1][1]).slice(0, 3).forEach(([who, [d, r]]) => bars.push([who, r, `5% 공시 ${ymd(d).slice(5)}`]));
+  if (bars.length) {
+    parts.push(`<div class="ownbars">${bars.map(([l, v, sub]) => `<div class="rd"><div class="dl">${esc(l)}<small>${sub}</small></div>
+      <div class="rt">${[25, 50, 75].map((g) => `<i class="og" style="left:${g}%"></i>`).join("")}<span class="rbar" style="width:${Math.min(100, v).toFixed(1)}%;background:var(--sub)"></span></div>
+      <b class="dv">${num(v, 2)}%</b></div>`).join("")}
+      <div class="dax"><span>0%</span><span>50%</span><span>100%</span></div>
+      <p class="hint">모두 0~100% 같은 눈금이에요. 최대주주가 외국 회사이거나, 5% 큰손이 외국 운용사면 외국인 지분과 겹쳐요.</p></div>`);
+  }
   if (fi.length >= 2) {
-    const [a, ia] = fi[0], [b] = fi.at(-1), lo = Math.min(...fi.map(([v]) => v)), hi = Math.max(...fi.map(([v]) => v));
-    const pad = Math.max(0.3, (hi - lo) * 0.15), y0 = lo - pad, y1 = hi + pad, w = 300, h = 70;
-    const pts = fi.map(([v, i]) => `${((i / (f.length - 1)) * w).toFixed(1)},${(h - ((v - y0) / (y1 - y0)) * h).toFixed(1)}`).join(" ");
+    // 절대치로 보이게: 세로축은 0%부터, 10%(작으면 5%)마다 눈금, 점선 = 60일 전 값(기준선)
+    const [a, ia] = fi[0], [b] = fi.at(-1), hi = Math.max(...fi.map(([v]) => v));
+    const step = hi > 30 ? 10 : 5, top = Math.max(step, Math.ceil((hi + step * 0.3) / step) * step);
+    const w = 300, h = 110, y = (v) => h - (v / top) * h;
+    const pts = fi.map(([v, i]) => `${((i / (f.length - 1)) * w).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+    const grid = [];
+    for (let g = step; g < top; g += step) grid.push(g);
     const d = b - a;
     parts.push(`<p class="interp">외국인 지분율: ${ymd(days[ia]).slice(5)} <b>${num(a, 2)}%</b> → 지금 <b>${num(b, 2)}%</b> <span class="${cls(d)}">(${d >= 0 ? "+" : "−"}${num(Math.abs(d), 2)})</span></p>` +
-      tipWrap(`<div class="ownch"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="외국인 지분율 추이"><polyline points="${pts}" fill="none" stroke="var(--text)" stroke-width="1.8" vector-effect="non-scaling-stroke"/></svg><span class="yl t">${num(y1 - pad, 2)}%</span><span class="yl b">${num(y0 + pad, 2)}%</span></div>`,
-        days.map(ymd), [["외국인 지분율", f, "%"]]));
+      tipWrap(`<div class="ownch"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="외국인 지분율 추이 (0%부터)">
+        ${grid.map((g) => `<line x1="0" x2="${w}" y1="${y(g).toFixed(1)}" y2="${y(g).toFixed(1)}" stroke="var(--line)" stroke-width="1" vector-effect="non-scaling-stroke"/>`).join("")}
+        <line x1="0" x2="${w}" y1="${y(a).toFixed(1)}" y2="${y(a).toFixed(1)}" stroke="var(--sub)" stroke-dasharray="4 3" stroke-width="1" vector-effect="non-scaling-stroke"/>
+        <line x1="0" x2="${w}" y1="${h}" y2="${h}" stroke="var(--sub)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+        <polyline points="${pts}" fill="none" stroke="var(--text)" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>
+        ${[0, ...grid, top].map((g) => `<span class="yl" style="top:${(y(g) / h * 100).toFixed(1)}%">${g}%</span>`).join("")}</div>`,
+        days.map(ymd), [["외국인 지분율", f, "%"]]) +
+      `<div class="legend"><span><i style="background:var(--text)"></i>외국인 지분율</span><span><i class="dash"></i>${ymd(days[ia]).slice(5)} 값 (기준선)</span></div>`);
   }
   if (cx.mh && cx.mh.length) {
     parts.push(`<p class="hint">최대주주·특수관계인 지분 <small>(분기 보고서)</small>: ${cx.mh.map(([k, v], i) => { const p = i ? cx.mh[i - 1][1] : null; return `${qLabel(k)} <b>${num(v, 2)}%</b>${p != null && Math.abs(v - p) >= 0.01 ? ` <small class="${cls(v - p)}">(${v - p > 0 ? "+" : "−"}${num(Math.abs(v - p), 2)})</small>` : ""}`; }).join(" · ")}</p>`);

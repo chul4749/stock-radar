@@ -631,7 +631,8 @@ table.mythsum th { font-size: 13px; }
 
 .tile svg.wsk { width: 100%; max-width: 320px; height: 110px; display: block; margin: 4px 0 2px; }
 .exit .xw3 { margin: 6px 0 0; padding: 6px 8px; border-radius: 8px; background: var(--neutral-bg); font-size: 13px; line-height: 1.5; }
-.ownch { position: relative; margin: 2px 0 6px; }
-.ownch svg { width: 100%; height: 70px; display: block; }
-.ownch .yl { position: absolute; left: 2px; font-size: 10px; color: var(--faint); background: var(--card); padding: 0 2px; pointer-events: none; }
-.ownch .yl.t { top: 0; } .ownch .yl.b { bottom: 0; }
+.ownch { position: relative; margin: 2px 0 4px; }
+.ownch svg { width: 100%; height: 110px; display: block; overflow: visible; }
+.ownch .yl { position: absolute; left: 2px; transform: translateY(-50%); font-size: 10px; color: var(--faint); background: var(--card); padding: 0 2px; line-height: 1.2; pointer-events: none; }
+.ownbars { margin: 4px 0 8px; }
+.ownbars .rt .og { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); }
