@@ -128,7 +128,7 @@ const INFO = {
   track: "어제(바로 전 기록) 화면 상위 10개와 비교한 것입니다.\n· 새로 들어옴 / 유지: 어제도 상위 10개에 있었나\n· 점수 변화: 점수를 만드는 항목(큰손·거래·상승폭 등)마다 얼마나 바뀌었는지 — 실제 계산 값에서만 나눈 것이라, 적힌 원인 말고 다른 이유를 지어내지 않습니다\n· 우리 기록상 처음: 우리가 가진 기록 중 이 탭에 처음 걸린 날 (기록을 시작하기 전 일은 모름). 그 사이 권리락·분할로 가격이 끊겼으면 '추적 불가'",
   earn_season: "회사들은 분기가 끝나면 정해진 기한 안에 실적을 발표합니다 (1분기 5/15, 반기 8/14, 3분기 11/14, 1년 결산 3/31까지).\n발표 전에는 결과를 모르니, 좋든 나쁘든 발표 날 주가가 크게 움직일 수 있습니다. 조건에 맞아 산 종목도 실적 한 번에 기준이 깨질 수 있어 미리 알려 드립니다.\n'발표 예고 공시'는 회사가 실적 발표 날짜를 미리 알린 경우입니다.",
   fg_cnn: "미국 CNN이 매일 내는 '시장 심리 온도계'. 7가지 지표(주가가 평균보다 얼마나 위인지, 신고가·신저가 종목 수, 오른·내린 종목 거래량, 옵션, VIX, 국채 대비 주식 수익, 정크본드 금리 차)를 0~100으로 바꿔 평균 낸 값입니다.\n0에 가까울수록 겁먹은 장(극도의 공포), 100에 가까울수록 들뜬 장(극도의 탐욕). 미국 시장 기준이에요.",
-  morning: "새벽에 끝난 미국 시장 결과로 오늘 아침 한국 시장 분위기를 미리 짐작해 봅니다.\n· 한국 ETF(EWY): 미국에 상장된 한국 주식 묶음이라 밤사이 외국인 시각이 가장 잘 보입니다 (가장 크게 반영)\n· 나스닥·미국 반도체: 삼성전자·SK하이닉스 같은 큰 종목과 같이 움직이는 경우가 많음\n· 공포지수(VIX)·환율: 오르면 부담\n짐작일 뿐이고, 장이 열리면 다르게 움직일 수 있습니다.",
+  morning: "새벽에 끝난 미국 시장 결과로 오늘 아침 한국 시장 분위기를 미리 짐작해 봅니다.\n· 한국 ETF(EWY): 미국에 상장된 한국 주식 묶음이라 밤사이 외국인 시각이 가장 잘 보입니다 (가장 크게 반영)\n· 나스닥·미국 반도체: 삼성전자·SK하이닉스 같은 큰 종목과 같이 움직이는 경우가 많음\n· 공포지수(VIX)·환율: 오르면 부담\n짐작일 뿐이고, 장이 열리면 다르게 움직일 수 있습니다.\n결론에는 맨 위 6개(한국 ETF·나스닥·S&P·반도체·VIX·원/달러)만 쓰고, 아래 묶음(다른 나라 지수·금리·원자재·암호화폐)은 참고로만 보여 줍니다. 색은 좋고 나쁨이 아니라 방향(▲ 빨강 오름, ▼ 파랑 내림).",
   wake: "싼 종목도 시장이 관심을 안 주면 몇 년이고 싼 채로 남습니다 (가치 함정). 특히 한국 시장에서 흔합니다.\n그래서 '다시 주목받기 시작했나'를 따로 봅니다:\n· 큰손(기관+외국인)이 최근 5일 동안 샀나\n· 최근 3일 안에 기사·공시 같은 소식이 있나\n· 거래가 평소보다 늘었나\n· 최근 10일 바닥에서 5% 이상 올라왔나\n· 최근 2주 안에 증권사 리포트가 나왔나 (오랫동안 없다가 나오면 더 의미 있음)\n2개 이상이면 '움직일 계기가 생긴' 쪽입니다. 점수(강도)에는 넣지 않았고, 정말 성적이 나은지는 성적표의 '저평가 조건별 성적'에서 확인합니다.",
   score_value: "강도: 이 종목이 조건에 얼마나 강하게 걸렸는지 0~100점입니다. 지금까지 같은 탭에 걸린 종목들 중 어디쯤인지로 매깁니다.\n저평가 계산 (100점 만점을 나눠 가짐):\n· 낙폭 25%: 최근 고점보다 많이 빠졌나 (50% 빠지면 만점)\n· 싸짐 15%: 평소(1년)보다 얼마나 싸게 거래되나\n· PER 35%: 버는 돈에 비해 싼가 (PER 5 이하면 만점)\n· 이익 25%: 이익이 줄지 않고 버티거나 늘었나\n'싸면서 돈은 잘 버는 회사'가 위로 오게 했습니다.",
   futures: "외국인이 '코스피 선물'을 산 금액에서 판 금액을 뺀 값입니다.\n선물은 '앞으로 지수가 오를지 내릴지'에 거는 상품이라, 외국인의 방향 생각이 잘 드러납니다.\n· 며칠 연속 사면(+): 지수가 오를 쪽으로 보는 중\n· 며칠 연속 팔면(−): 내릴 쪽으로 보는 중\n한국 장의 방향을 먼저 알려 주는 지표로 많이 봅니다.",
@@ -2048,12 +2048,13 @@ const FG_ZONES = [[25, "#2563eb", "극도의 공포"], [45, "#60a5fa", "공포"]
 const fgColor = (v) => (FG_ZONES.find(([t]) => v <= t) || FG_ZONES[4])[1];
 const fgWord = (v) => (FG_ZONES.find(([t]) => v <= t) || FG_ZONES[4])[2];
 // 아침 요약 한 칸: 이름·날짜 → 값 → ▲▼ 변화 (오르면 빨강, 내리면 파랑 — 좋고 나쁨이 아니라 방향)
-function mCell(x) {
+function mCell(x, common) {
   const up = x.change > 0, dn = x.change < 0, c = up ? "up" : dn ? "down" : "";
   const dv = Math.abs(x.value - x.prev);
   const delta = x.how === "diff" ? `${up ? "▲" : dn ? "▼" : ""} ${num(Math.abs(x.change), 3)}` : `${up ? "▲" : dn ? "▼" : ""} ${num(dv, dv >= 100 ? 0 : 2)} (${signed(x.change, 2, "%")})`;
-  return `<div class="mc${x.key === "ewy" ? " key" : ""}" title="${esc(x.desc || "")}"><small>${esc(x.name)} · ${x.date.slice(5).replace("-", "/")}</small>
-    <b>${num(x.value, x.value >= 1000 ? 2 : x.value >= 10 ? 2 : 3)}<i>${esc(x.unit || "")}</i></b><span class="${c}">${delta}</span></div>`;
+  const own = x.date !== common ? ` <em>${x.date.slice(5).replace("-", "/")}</em>` : "";   // 묶음의 기준 날짜와 다를 때만
+  return `<div class="mc" title="${esc(x.desc || "")}"><small>${esc(x.name)}${own}</small>
+    <b>${num(x.value, x.value >= 10000 ? 0 : x.value >= 10 ? 2 : 3)}<i>${esc(x.unit || "")}</i></b><span class="${c}">${delta}</span></div>`;
 }
 function fgBlock(fg) {
   if (!fg || fg.score == null) return "";
@@ -2069,18 +2070,21 @@ function fgBlock(fg) {
   const chip = (v) => v == null ? "–" : `<span class="fgc" style="background:${fgColor(v)}">${fgWord(v)}</span>`;
   const cmp = [["전날", fg.prev], ["1주 전", fg.week_ago], ["1달 전", fg.month_ago], ["1년 전", fg.year_ago]].filter(([, v]) => v != null)
     .map(([l, v]) => { const d = fg.score - v; return `<tr><th>${l}</th><td><b>${num(v, 1)}</b></td><td>${chip(v)}</td><td class="${cls(d)}">${d > 0 ? "▲" : d < 0 ? "▼" : ""} ${num(Math.abs(d), 1)}</td></tr>`; }).join("");
-  const parts = (fg.parts || []).map((p) => `<div class="rd"><div class="dl">${esc(p.name)}<small>${esc(p.desc)}</small></div>
-    <div class="rt"><span class="rbar" style="width:${Math.max(2, p.score).toFixed(0)}%;background:${fgColor(p.score)}"></span><i class="rbase" style="left:50%"></i></div>
-    <b class="dv">${num(p.score, 0)}<small class="vs">${FG_KO[p.rating] || fgWord(p.score)}</small></b></div>`).join("");
+  const parts = (fg.parts || []).map((p) => `<div class="fgp" title="${esc(p.desc)}"><span class="n">${esc(p.name)}</span>
+    <span class="t"><i style="width:${Math.max(2, p.score).toFixed(0)}%;background:${fgColor(p.score)}"></i><em></em></span>
+    <b>${num(p.score, 0)}</b><span class="w" style="color:${fgColor(p.score)}">${FG_KO[p.rating] || fgWord(p.score)}</span></div>`).join("");
   const sp = fg.spark || [], n = sp.length, w = 300, h = 60;
   const band = FG_ZONES.map(([to, col], i) => { const lo = i ? FG_ZONES[i - 1][0] : 0; return `<rect x="0" width="${w}" y="${(h - to / 100 * h).toFixed(1)}" height="${((to - lo) / 100 * h).toFixed(1)}" fill="${col}" opacity=".13"/>`; }).join("");
   const line = n > 1 ? tipWrap(`<svg class="fgl" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-label="최근 ${n}일 흐름">${band}<polyline points="${sp.map((v, i) => `${(i / (n - 1) * w).toFixed(1)},${(h - v / 100 * h).toFixed(1)}`).join(" ")}" fill="none" stroke="var(--text)" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>`,
     (fg.spark_dates || []).map((d) => d.slice(5).replace("-", "/")), [["공포·탐욕", sp, ""]]) +
     `<div class="barlab"><span style="text-align:left">${(fg.spark_dates || [""])[0].slice(5).replace("-", "/")}</span><span style="text-align:right">${(fg.spark_dates || []).slice(-1)[0]?.slice(5).replace("-", "/") || ""}</span></div>` : "";
-  return `<div class="tile wide fgbox"><div class="l">CNN 공포·탐욕 지수 <small>${fg.date ? fg.date.slice(5).replace("-", "/") + " 기준 · " : ""}0 극도의 공포 ~ 100 극도의 탐욕</small>${infoBtn("fg_cnn")}</div>${infoBox("fg_cnn")}
-    <div class="fgtop"><div class="fgl1">${gauge}<p class="fgs" style="color:${fgColor(fg.score)}"><b>${num(fg.score, 0)}</b> ${FG_KO[fg.rating] || fgWord(fg.score)}</p></div>
-      <div><small class="sub">과거와 비교 (화살표 = 지금이 그때보다 높은/낮은 쪽)</small><table class="score fgt">${cmp}</table>${line}</div></div>
-    ${parts ? `<div class="chart-cap">구성 지표 ${(fg.parts || []).length}개 <small>(50 = 중립, 막대가 길수록 탐욕 쪽)</small></div><div class="dbars">${parts}</div>` : ""}</div>`;
+  const leg = FG_ZONES.map(([, col, w]) => `<span><i style="background:${col}"></i>${w}</span>`).join("");
+  return `<div class="mg fgbox"><div class="mh"><b>CNN 공포·탐욕 지수</b> <small>${fg.date ? fg.date.slice(5).replace("-", "/") + " 기준 · " : ""}0 극도의 공포 ~ 100 극도의 탐욕</small>${infoBtn("fg_cnn")}</div>${infoBox("fg_cnn")}
+    <div class="fgrow">
+      <div class="fg1">${gauge}<p class="fgs" style="color:${fgColor(fg.score)}"><b>${num(fg.score, 0)}</b> ${FG_KO[fg.rating] || fgWord(fg.score)}</p><div class="fgleg">${leg}</div></div>
+      <div class="fg2"><small class="cap">과거와 비교 (화살표 = 지금이 그때보다 높은/낮은 쪽)</small><table class="fgt">${cmp}</table>${line ? `<small class="cap">최근 ${sp.length}거래일 흐름 (바탕색 = 구간)</small>${line}` : ""}</div>
+      ${parts ? `<div class="fg3"><small class="cap">구성 지표 ${(fg.parts || []).length}개 <span class="sub">(50 = 중립)</span></small>${parts}</div>` : ""}
+    </div></div>`;
 }
 
 function renderMorning() {
@@ -2096,15 +2100,26 @@ function renderMorning() {
   const wd = new Date(`${m.date.slice(0, 4)}-${m.date.slice(4, 6)}-${m.date.slice(6, 8)}T12:00:00+09:00`).getDay();
   if (wd === 0 || wd === 6) sm.text = (sm.text || "").replace("오늘 아침", "다음 장(월요일) 시작");
   const color = sm.tone === "up" ? "var(--up)" : sm.tone === "down" ? "var(--down)" : "var(--text)";
-  const grp = (g) => m.items.filter((x) => (x.group || (x.key === "usdkrw" ? "rate" : "idx")) === g || (g === "idx" && x.group === "kr"));
-  const card = (title, list) => list.length ? `<div class="mg"><div class="l">${title}</div><div class="mcells">${list.map(mCell).join("")}</div></div>` : "";
+  const KEY = ["ewy", "nasdaq", "sp500", "sox", "vix", "usdkrw"];
+  const keyNums = KEY.map((k) => m.items.find((x) => x.key === k)).filter(Boolean).map((x) => {
+    const c = x.change > 0 ? "up" : x.change < 0 ? "down" : "";
+    return `<div><small>${esc(x.name.replace(" (공포지수)", ""))}</small><b class="${c}">${x.change > 0 ? "▲" : x.change < 0 ? "▼" : ""}${num(Math.abs(x.change), 2)}%</b><small class="faint">${num(x.value, x.value < 100 ? 2 : 0)}</small></div>`;
+  }).join("");
+  const grp = (g) => m.items.filter((x) => !KEY.includes(x.key) || ["sp500", "nasdaq", "sox", "usdkrw"].includes(x.key)).filter((x) => (x.group || "idx") === g);
+  const card = (title, list) => {
+    if (!list.length) return "";
+    const cnt = {};
+    list.forEach((x) => { cnt[x.date] = (cnt[x.date] || 0) + 1; });
+    const common = Object.keys(cnt).sort((p, q) => cnt[q] - cnt[p] || (p < q ? 1 : -1))[0];
+    return `<div class="mg"><div class="mh"><b>${title}</b> <small>${common.slice(5).replace("-", "/")} 마감</small></div><div class="mcells">${list.map((x) => mCell(x, common)).join("")}</div></div>`;
+  };
   el.hidden = false;
-  el.innerHTML = `<h2>아침 요약 <small>${m.at.slice(5, 10).replace("-", "/")} ${m.at.slice(11, 16)} · 새벽 미국장 마감 기준</small>${infoBtn("morning")}</h2>${infoBox("morning")}
-    <div class="tile wide"><p class="msum" style="color:${color}"><b>${esc(sm.label || "")}</b></p><p class="hint" style="margin:2px 0 4px">${esc(sm.text || "")}</p>
-    <p class="hint">판단엔 한국 ETF·나스닥·S&P·반도체·공포지수(VIX)·원/달러만 써요. 나머지는 참고로 보여 줘요. ▲ 빨강 = 오름, ▼ 파랑 = 내림 (좋고 나쁨이 아니라 방향).</p></div>
+  el.innerHTML = `<h2>아침 요약 <small>${m.at.slice(5, 10).replace("-", "/")} ${m.at.slice(11, 16)} · 새벽 미국장 마감 기준</small>${infoBtn("morning")}<span class="mlegend">오름 <b class="up">▲ 빨강</b> · 내림 <b class="down">▼ 파랑</b></span></h2>${infoBox("morning")}
+    <div class="tile wide msumbox"><p class="msum" style="color:${color}"><b>${esc(sm.label || "")}</b></p><p class="hint" style="margin:2px 0 8px">${esc(sm.text || "")}</p>
+    <div class="nums mnums">${keyNums}</div></div>
     <div class="mgrid">${card("주요국 지수", grp("idx"))}${card("금리·환율", grp("rate"))}${card("원자재·암호화폐", grp("cmd"))}</div>
     ${fgBlock(m.fg)}
-    <p class="hint">짐작일 뿐, 장이 열리면 다를 수 있습니다. 날짜는 각 시장의 현지 마감일이에요 (비트코인·이더리움은 24시간 거래라 한국 아침 값).</p>`;
+    <p class="hint">짐작일 뿐, 장이 열리면 다를 수 있어요. 날짜는 각 시장의 현지 마감일 (비트코인·이더리움은 24시간 거래라 한국 아침 값).</p>`;
 }
 
 function featureTable(all) {
