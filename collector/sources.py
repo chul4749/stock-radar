@@ -283,6 +283,36 @@ def cnn_fear_greed(base_iso):
     }
 
 
+FG_PARTS = [("market_momentum_sp500", "시장 모멘텀", "S&P 500이 125일 평균보다 얼마나 위인지"),
+            ("stock_price_strength", "주가 강도", "52주 신고가 종목 수 − 신저가 종목 수"),
+            ("stock_price_breadth", "주가 폭", "오른 종목 거래량 − 내린 종목 거래량"),
+            ("put_call_options", "풋/콜 옵션", "하락에 거는 옵션이 많으면 공포"),
+            ("market_volatility_vix", "변동성 (VIX)", "VIX가 50일 평균보다 높으면 공포"),
+            ("safe_haven_demand", "안전자산 수요", "주식보다 국채 수익이 좋으면 공포"),
+            ("junk_bond_demand", "정크본드 수요", "위험한 회사채 금리 차가 벌어지면 공포")]
+
+
+def cnn_fear_greed_full():
+    """CNN 공포·탐욕지수 전체 (아침 요약용): 지금·전날·1주·1달·1년 전, 구성 지표 7개, 최근 60일."""
+    r = retry(lambda: get("https://production.dataviz.cnn.io/index/fearandgreed/graphdata",
+                          headers={"Referer": "https://edition.cnn.com/", "Accept": "application/json"}))
+    d = r.json()
+    fg = d["fear_and_greed"]
+    hist = d["fear_and_greed_historical"]["data"]
+    rnd = lambda v: None if v is None else round(float(v), 1)
+    parts = []
+    for key, name, desc in FG_PARTS:
+        x = d.get(key) or {}
+        if x.get("score") is not None:
+            parts.append({"key": key, "name": name, "desc": desc, "score": rnd(x["score"]), "rating": x.get("rating")})
+    return {"date": (fg.get("timestamp") or "")[:10], "score": rnd(fg.get("score")), "rating": fg.get("rating"),
+            "prev": rnd(fg.get("previous_close")), "week_ago": rnd(fg.get("previous_1_week")),
+            "month_ago": rnd(fg.get("previous_1_month")), "year_ago": rnd(fg.get("previous_1_year")),
+            "parts": parts,
+            "spark": [rnd(p["y"]) for p in hist[-60:]],
+            "spark_dates": [datetime.utcfromtimestamp(p["x"] / 1000).strftime("%Y-%m-%d") for p in hist[-60:]]}
+
+
 # ---------------------------------------------------------------- 뉴스·공시
 
 NEWS_QUERIES = [

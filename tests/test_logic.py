@@ -1289,3 +1289,18 @@ def test_update_holders_budget_and_recheck(tmp_path, monkeypatch):
     asked.clear()
     main.update_holders("20261106", ["A", "B"], [], budget=10)   # A는 다 있음, B는 못 본 분기만 (비었던 건 2주 뒤)
     assert asked == [("2", "11012"), ("2", "11013"), ("2", "11011")]
+
+
+def test_morning_groups_rates_diff_and_jpykrw(tmp_path, monkeypatch):
+    from collector import morning, sources
+    monkeypatch.setattr(morning, "DATA", str(tmp_path))
+    vals = {"KRW=X": [1300, 1326], "JPY=X": [150, 156], "^TNX": [4.95, 4.99], "EWY": [150, 147]}
+    monkeypatch.setattr(sources, "yahoo_daily", lambda s: [("2026-11-04", float(vals.get(s, [100, 101])[0])), ("2026-11-05", float(vals.get(s, [100, 101])[1]))])
+    monkeypatch.setattr(sources, "cnn_fear_greed_full", lambda: {"score": 35, "parts": []})
+    assert morning.main() == 0
+    import json
+    out = json.load(open(tmp_path / "morning.json"))
+    it = {x["key"]: x for x in out["items"]}
+    assert it["us10y"]["how"] == "diff" and abs(it["us10y"]["change"] - 0.04) < 1e-9          # 금리는 % 변화가 아니라 차이
+    assert abs(it["jpykrw"]["value"] - 1326 / 156 * 100) < 0.01 and it["jpykrw"]["group"] == "rate"
+    assert out["items"][0]["key"] == "ewy" and out["fg"]["score"] == 35 and out["summary"]["tone"] in ("up", "down", "neutral")

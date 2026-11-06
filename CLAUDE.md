@@ -87,7 +87,9 @@
     `holdings_diff`(새로 담음·늘림·줄임·모두 뺌, 10% 이상) → `manager_moves`(종목별로 몇 곳이 같은 방향). 20일 2곳 이상 매수는 성적표 그룹 `mgr`
     `enrich_manager_moves`(계속 사는 중·비중 3% 이상·그 뒤 주가·투신 5일·잘하는 운용사 → 정렬 점수), `manager_skill`(운용사별 액티브 ETF 60일 성적 − KODEX 200), `sector_tilt`(늘리는·줄이는 업종)
     히트맵(`theme_heat`): 테마 × 최근 20일, 날마다 구성 종목 큰손 순매수(시총 대비 %)와 대표 ETF 등락. 화면은 '큰손 돈/ETF 가격' 전환, 빨강·파랑 + 회색 0(시총 히트맵은 대형주에 묻혀 안 씀)
-  - `morning.py` — 아침 요약: 야후 차트로 미국장 마감(EWY·나스닥·S&P·반도체·VIX·환율) → `site/data/morning.json` (`logic.morning_summary`)
+  - `morning.py` — 아침 요약: 야후 차트로 미국장 마감 → `site/data/morning.json`. `ITEMS` 묶음(주요국 지수 EWY·S&P·나스닥·반도체·닛케이·대만·상하이·VIX / 금리·환율 미 국채 10·30년(값 차이 `diff`)·원/달러·엔/달러·원/엔(계산)·원/유로 / 원자재·암호화폐 금·WTI·은·구리·비트코인·이더리움)
+    + CNN 공포·탐욕 전체(`sources.cnn_fear_greed_full`: 전날·1주·1달·1년 전, 구성 지표 7개, 60일). 출발 판단(`logic.morning_summary`)은 EWY·나스닥·S&P·반도체·VIX·원/달러만 — 나머지는 보여 주기만.
+    화면 `renderMorning`(묶음 카드 `mCell`: ▲빨강 오름·▼파랑 내림 = 방향만, 각 시장 현지 마감일) · `fgBlock`(반원 바늘·비교표·구성 지표 막대·60일 띠)
   - `util.py` — KST, EOK(억), log
 - `site/` — 빌드 없는 정적 페이지 (`index.html`, `app.js`, `style.css`), 데이터는 `site/data/`
 - `probe/` — 데이터 출처 접속 시험 스크립트. 결과는 `docs/data-sources.md`에 정리
