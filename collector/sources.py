@@ -668,6 +668,13 @@ def yahoo_daily(symbol, rng="1mo"):
     for ts, c in zip(res["timestamp"], closes):
         if c is not None:
             out.append((datetime.fromtimestamp(ts + off, tz=timezone.utc).strftime("%Y-%m-%d"), float(c)))
+    # 야후가 가끔 마지막 날 종가 칸을 비워 둠(마감 직후·정정 중) → 그날을 통째로 잃지 않게 메타의 마지막 가격으로 채운다
+    meta = res["meta"]
+    px, t = meta.get("regularMarketPrice"), meta.get("regularMarketTime")
+    if px and t:
+        d = datetime.fromtimestamp(t + off, tz=timezone.utc).strftime("%Y-%m-%d")
+        if not out or d > out[-1][0]:
+            out.append((d, float(px)))
     return out
 
 

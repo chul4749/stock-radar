@@ -1304,3 +1304,18 @@ def test_morning_groups_rates_diff_and_jpykrw(tmp_path, monkeypatch):
     assert it["us10y"]["how"] == "diff" and abs(it["us10y"]["change"] - 0.04) < 1e-9          # 금리는 % 변화가 아니라 차이
     assert abs(it["jpykrw"]["value"] - 1326 / 156 * 100) < 0.01 and it["jpykrw"]["group"] == "rate"
     assert out["items"][0]["key"] == "ewy" and out["fg"]["score"] == 35 and out["summary"]["tone"] in ("up", "down", "neutral")
+
+
+def test_yahoo_daily_fills_missing_last_close_from_meta(monkeypatch):
+    from collector import sources
+    day = 86400
+    t0 = 1793750400   # 2026-11-04 00:00 UTC
+    body = {"chart": {"result": [{"meta": {"gmtoffset": 0, "regularMarketPrice": 131.65, "regularMarketTime": t0 + day + 75600},
+                                  "timestamp": [t0 - day, t0, t0 + day], "indicators": {"quote": [{"close": [150.0, 152.12, None]}]}}]}}
+
+    class R:
+        def json(self):
+            return body
+    monkeypatch.setattr(sources, "get", lambda *a, **k: R())
+    rows = sources.yahoo_daily("EWY")
+    assert rows[-1] == ("2026-11-05", 131.65) and rows[-2] == ("2026-11-04", 152.12)
