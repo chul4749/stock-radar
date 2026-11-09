@@ -447,19 +447,26 @@ def _signal_temp(close_above=False, rising=False):
             "korea_vol": {"value": 30, "spark": [40, 45, 50, 48, 44, 40, 36, 33, 31, 30]},
             "futures": {"streak": 4, "d5": 3000, "d5_eok": 6000},
             "flows": {"KOSPI": {"foreign": {"d5": 500}, "inst": {"d5": 200}}},
-            "thermo": {"score": 40, "history": {"week": {"score": 25}}}}
+            "thermo": {"score": 40, "history": {"week": {"score": 25}}},
+            "vix": {"value": 20, "spark": [30, 32, 28, 25, 24, 22, 21, 20, 20, 20]},
+            "hy_spread": {"value": 3.0, "spark": [3.4, 3.3, 3.2, 3.1, 3.1, 3.0]}}
 
 
 def test_entry_signals_levels():
     t = _signal_temp()
     sig = logic.entry_signals(t)
-    assert sig["level"] == 2 and sig["stages"][0]["met"] == 3 and "추세 확인" in sig["next"]
+    assert sig["level"] == 2 and sig["stages"][0]["met"] == 5 and sig["stages"][0]["need"] == 3 and "추세 확인" in sig["next"]
+    assert all(c["q"] for st in sig["stages"] for c in st["checks"])
+    t = _signal_temp()
+    t["vix"]["value"], t["hy_spread"]["spark"][-1] = 32, 3.6        # VIX·스프레드가 나빠져도 5개 중 3개면 1단계 통과
+    assert logic.entry_signals(t)["stages"][0]["met"] == 3 and logic.entry_signals(t)["level"] == 2
     t = _signal_temp(close_above=True, rising=True)
     assert logic.entry_signals(t)["level"] == 3
     t = _signal_temp()
     t["breadth"]["new_lows"][-1] = 500
     t["credit_balance"]["forced"]["value"] = 900
-    assert logic.entry_signals(t)["level"] == 0      # 1단계를 못 넘으면 뒤 단계가 맞아도 0
+    t["vix"]["value"] = 32
+    assert logic.entry_signals(t)["level"] == 0      # 1단계(5개 중 3개)를 못 넘으면 뒤 단계가 맞아도 0
 
 
 def test_regime_transition_distance():

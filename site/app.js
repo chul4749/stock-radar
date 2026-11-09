@@ -132,7 +132,7 @@ const INFO = {
   wake: "싼 종목도 시장이 관심을 안 주면 몇 년이고 싼 채로 남습니다 (가치 함정). 특히 한국 시장에서 흔합니다.\n그래서 '다시 주목받기 시작했나'를 따로 봅니다:\n· 큰손(기관+외국인)이 최근 5일 동안 샀나\n· 최근 3일 안에 기사·공시 같은 소식이 있나\n· 거래가 평소보다 늘었나\n· 최근 10일 바닥에서 5% 이상 올라왔나\n· 최근 2주 안에 증권사 리포트가 나왔나 (오랫동안 없다가 나오면 더 의미 있음)\n2개 이상이면 '움직일 계기가 생긴' 쪽입니다. 점수(강도)에는 넣지 않았고, 정말 성적이 나은지는 성적표의 '저평가 조건별 성적'에서 확인합니다.",
   score_value: "강도: 이 종목이 조건에 얼마나 강하게 걸렸는지 0~100점입니다. 지금까지 같은 탭에 걸린 종목들 중 어디쯤인지로 매깁니다.\n저평가 계산 (100점 만점을 나눠 가짐):\n· 낙폭 25%: 최근 고점보다 많이 빠졌나 (50% 빠지면 만점)\n· 싸짐 15%: 평소(1년)보다 얼마나 싸게 거래되나\n· PER 35%: 버는 돈에 비해 싼가 (PER 5 이하면 만점)\n· 이익 25%: 이익이 줄지 않고 버티거나 늘었나\n'싸면서 돈은 잘 버는 회사'가 위로 오게 했습니다.",
   futures: "외국인이 '코스피 선물'을 산 금액에서 판 금액을 뺀 값입니다.\n선물은 '앞으로 지수가 오를지 내릴지'에 거는 상품이라, 외국인의 방향 생각이 잘 드러납니다.\n· 며칠 연속 사면(+): 지수가 오를 쪽으로 보는 중\n· 며칠 연속 팔면(−): 내릴 쪽으로 보는 중\n한국 장의 방향을 먼저 알려 주는 지표로 많이 봅니다.",
-  signals: "많이 떨어진 뒤 시장이 회복하고 있는지를 세 단계로 확인합니다.\n1단계 투매 진정: 마구 팔던 게 잦아드는지 (신저가 종목·강제 매도 감소, 출렁임 감소)\n2단계 수급 전환: 큰손이 다시 사기 시작하는지 (외국인 선물·주식 순매수, 분위기 회복)\n3단계 추세 확인: 지수가 다시 오르는 흐름인지 (20일 평균 가격 회복)\n지금 상태를 보여 줄 뿐이고, 단계마다 얼마를 사라는 안내는 하지 않습니다 (그런 나눠 사기 규칙이 실제로 나았는지 확인한 적이 없어서).",
+  signals: "많이 떨어진 뒤 시장이 회복하고 있는지를 세 단계로 확인합니다.\n1단계 투매 진정: 마구 팔던 게 잦아드는지 (신저가 종목·강제 매도 감소, 한국 출렁임·미국 VIX 진정, 미국 위험 회사채 금리 차(신용스프레드)가 더 안 벌어짐 — 5개 중 3개)\n2단계 수급 전환: 큰손이 다시 사기 시작하는지 (외국인 선물·주식 순매수, 분위기 회복)\n3단계 추세 확인: 지수가 다시 오르는 흐름인지 (20일 평균 가격 회복)\n지금 상태를 보여 줄 뿐이고, 단계마다 얼마를 사라는 안내는 하지 않습니다 (그런 나눠 사기 규칙이 실제로 나았는지 확인한 적이 없어서).",
   transition: "지금 장(예: 하락장)이 다음 장(예: 횡보·전환)으로 바뀌려면 무엇이 필요한지, 지금 얼마나 남았는지입니다.\n핵심은 코스피가 20일 평균선(최근 20일 종가 평균) 위로 올라서느냐입니다. 평균선까지 2% 안쪽으로 가까워지면 '전환 임박'이 뜹니다.",
   loan: "개인이 증권사에서 돈을 빌려 산 주식 금액(빚투)입니다.\n· 많이 쌓여 있을수록: 주가가 빠질 때 강제로 팔리는 물량이 커질 수 있음\n하루 늦게 발표되는 자료입니다.",
   forced: "빌려서 산 주식 대금을 제때 못 갚아 증권사가 강제로 판 금액(반대매매)입니다.\n· 갑자기 늘면: 좋은 종목까지 같이 떨어지는 투매가 나오는 중\n· 줄어들면: 투매가 잦아드는 중\n하루 늦게 발표되는 자료입니다.",
@@ -807,7 +807,8 @@ function renderTurn() {
   const lv = (state.score || {}).signal_levels || {};
   const ds = Object.keys(lv).sort().filter((d) => d <= state.data.base_date).slice(-20);
   const strip = ds.length > 1 ? `<div class="rgstrip"><div class="cells">${ds.map((d) => `<i style="background:${SIG_COLOR[lv[d]]}" title="${ymd(d)} ${lv[d]}단계"></i>`).join("")}</div><small>최근 ${ds.length}일 신호 단계 (회색 0 → 초록 3)</small></div>` : "";
-  const stageCards = sig.stages.map((st, i) => `<li class="${st.pass ? "fit-good" : i === sig.level ? "fit-ok" : ""}"><div class="row"><b>${i + 1}단계 · ${esc(st.name)}</b><span>${st.met}/${st.checks.length} ${st.pass ? "통과" : `(${st.need}개 필요)`}</span></div>${checkList(st.checks)}</li>`).join("");
+  const stageCards = sig.stages.map((st, i) => `<li class="qstage${st.pass ? " pass" : ""}"><div class="row"><b>${i + 1}단계 · ${esc(st.name)}</b><span class="cnt">${st.met}/${st.checks.length}${st.pass ? " 통과" : ` <small>(${st.need}개면 통과)</small>`}</span></div>
+      <div class="qbar"><i style="width:${(st.met / st.checks.length * 100).toFixed(0)}%"></i><em style="left:${(st.need / st.checks.length * 100).toFixed(0)}%"></em></div>${qList(st.checks)}</li>`).join("");
   const sigBox = `<div class="sum ${sig.level >= 2 ? "calm" : sig.level === 1 ? "neutral" : "fear"}">
       <div class="row"><span class="t">시장 회복 확인 단계 ${infoBtn("signals")}</span><span class="lv">${sig.level}/3단계</span></div>
       <div class="lamps">${lights}</div>
@@ -851,6 +852,9 @@ function mismatch(grade, x) {
   return "";
 }
 
+// 점검표 모양: 동그라미(맞으면 채움) + 질문 + 작은 설명 + 지금 값 (자료로 자동 판정 — 직접 체크하는 칸 아님)
+const qList = (items) => `<ul class="qchk">${items.map((c) => `<li class="${c.ok ? "ok" : "no"}"><i>${c.ok ? "✓" : ""}</i>
+  <div><b>${esc(c.q || c.label)}</b>${c.q ? `<small>${esc(c.label)}</small>` : ""}</div><span>${esc(c.value)}</span></li>`).join("")}</ul>`;
 const checkList = (items) => `<ul class="chk">${items.map((c) =>
   `<li class="${c.ok ? "ok" : "no"}"><span>${c.ok ? "✓" : "✗"} ${esc(c.label)}</span><b>${esc(c.value)}</b></li>`).join("")}</ul>`;
 
@@ -986,6 +990,16 @@ function renderOverlap() {
   $("#overlap").innerHTML = `<div class="overlap">두 관점에 함께 걸린 종목: ${names.join(", ")}<br><small>돈이 들어오는 흐름(스윙·단타)과 공포 속 저평가에 동시에 해당</small></div>`;
 }
 
+// 급락장 점검 ①: 이익 전망을 20% 낮춰 잡아도 싼가 (올해 추정 EPS가 있으면 그것, 없으면 지난 이익 기준)
+const STRESS = 0.8;
+function stressLine(x) {
+  if (!x.per || x.per <= 0) return "";
+  const fwd = x.eps_fwd_ratio && x.eps_fwd_ratio > 0 ? x.per / x.eps_fwd_ratio : null;
+  const base = fwd ?? x.per, hard = base / STRESS;
+  const word = hard <= 10 ? "그래도 싼 편" : hard <= 15 ? "보통 수준" : "싸다고 보기 어려움";
+  return `<p class="xstress">📉 이익 전망을 20% 낮춰 잡아도 PER <b>${num(hard, 1)}배</b> — ${word}
+    <small>(${fwd != null ? `올해 추정 이익 기준 ${num(fwd, 1)}배` : `지난 이익 기준 ${num(x.per, 1)}배 · 추정 이익 없음`} → 이익 ×0.8. 10배 이하 = 싼 편, 15배 넘음 = 비싼 편이라는 대략의 눈금)</small></p>`;
+}
 function valueCard(x) {
   const news = newsList(x.news);
   return `<article class="card">
@@ -999,6 +1013,7 @@ function valueCard(x) {
       <div><small>5일 기관+외국인</small><b class="${cls(x.flow5_eok)}">${signed(x.flow5_eok, 0, "억")}</b></div>
     </div>
     ${x.flow && x.flow.daily ? `<div class="l" style="font-size:12px;color:var(--sub)">최근 5일 기관+외국인 순매수 (억)</div>${bars(x.flow.daily)}` : ""}
+    ${stressLine(x)}
     ${exitBlock(x)}
     ${scoreRow(x)}
     <ul class="checks">${x.checks.map((c) => `<li><span>${esc(c.label)}</span><span>${esc(c.value)}</span></li>`).join("")}</ul>

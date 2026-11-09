@@ -1167,33 +1167,42 @@ def entry_signals(t):
     week = (th.get("history") or {}).get("week")
     tr = rg["trend"]
 
-    def chk(label, ok, value):
-        return {"label": label, "ok": bool(ok), "value": value}
+    vx = t.get("vix") or {}
+    vx_recent = [v for v in (vx.get("spark") or [])[-10:] if v is not None]
+    hy = t.get("hy_spread") or {}
+    hy_sp = [v for v in (hy.get("spark") or []) if v is not None]
+
+    def chk(label, ok, value, q=None):
+        return {"label": label, "ok": bool(ok), "value": value, "q": q}
 
     lows_avg = sum(lows[-6:-1]) / 5 if len(lows) >= 6 else None
     big5 = ((fl.get("foreign") or {}).get("d5") or 0) + ((fl.get("inst") or {}).get("d5") or 0) if fl else None
     stages = [
-        {"name": "투매 진정", "need": 2, "checks": [
+        {"name": "투매 진정", "need": 3, "checks": [
             chk("바닥을 새로 뚫는 종목(신저가)이 최근 5일 평균보다 적음", lows_avg is not None and lows[-1] < lows_avg,
-                f"{lows[-1]} / 평균 {lows_avg:.0f}" if lows_avg is not None else "–"),
+                f"{lows[-1]} / 평균 {lows_avg:.0f}" if lows_avg is not None else "–", "신저가 종목이 줄어드는가?"),
             chk("빚 때문에 강제로 팔리는 물량(반대매매)이 평소(20일 평균) 이하", fo.get("avg20") and fo["value"] <= fo["avg20"],
-                f"{fo['value']:,.0f}억 / 평균 {fo['avg20']:,.0f}억" if fo.get("avg20") else "–"),
-            chk("출렁임(변동성)이 최근 10일 최고보다 10% 이상 줄어듦", kv_recent and kv["value"] <= max(kv_recent) * 0.9,
-                f"{kv['value']}% / 최고 {max(kv_recent)}%" if kv_recent else "–"),
+                f"{fo['value']:,.0f}억 / 평균 {fo['avg20']:,.0f}억" if fo.get("avg20") else "–", "강제로 팔리는 물량이 멈췄는가?"),
+            chk("코스피 출렁임(VKOSPI 대신 20일 실제 변동성)이 최근 10일 최고보다 10% 이상 줄어듦", kv_recent and kv["value"] <= max(kv_recent) * 0.9,
+                f"{kv['value']}% / 최고 {max(kv_recent)}%" if kv_recent else "–", "한국 시장 출렁임이 진정되는가?"),
+            chk("미국 공포지수(VIX)가 최근 10일 최고보다 10% 이상 내려옴", vx_recent and vx.get("value") is not None and vx["value"] <= max(vx_recent) * 0.9,
+                f"{vx['value']} / 최고 {max(vx_recent)}" if vx_recent and vx.get("value") is not None else "–", "VIX가 진정되는가?"),
+            chk("미국 위험 회사채 금리 차(하이일드 스프레드)가 1주 전보다 더 벌어지지 않음", len(hy_sp) >= 6 and hy_sp[-1] <= hy_sp[-6],
+                f"{hy_sp[-1]}% / 1주 전 {hy_sp[-6]}%" if len(hy_sp) >= 6 else "–", "신용스프레드가 안정되는가?"),
         ]},
         {"name": "수급 전환", "need": 2, "checks": [
             chk("외국인이 선물을 사는 쪽으로 돌아섬 (3일 연속 또는 5일 합계 순매수)",
                 fu and ((fu.get("streak") or 0) >= 3 or (fu.get("d5") or 0) > 0),
                 (f"{fu['streak']:+d}일째 · 5일 {fu.get('d5_eok') if fu.get('d5_eok') is not None else fu.get('d5'):+,}" +
-                 ("억" if fu.get("d5_eok") is not None else "계약")) if fu else "–"),
+                 ("억" if fu.get("d5_eok") is not None else "계약")) if fu else "–", "외국인이 선물을 다시 사는가?"),
             chk("외국인+기관이 최근 5일 동안 주식을 판 것보다 더 삼", big5 is not None and big5 > 0,
-                f"{big5:+,.0f}억" if big5 is not None else "–"),
+                f"{big5:+,.0f}억" if big5 is not None else "–", "큰손이 주식을 다시 사는가?"),
             chk("시장 온도가 1주 전보다 올라감", week and th.get("score") is not None and th["score"] > week["score"],
-                f"{th.get('score')}점 / 1주 전 {week['score']}점" if week else "–"),
+                f"{th.get('score')}점 / 1주 전 {week['score']}점" if week else "–", "시장 분위기가 나아지는가?"),
         ]},
         {"name": "추세 확인", "need": 2, "checks": [
-            chk("코스피가 20일 평균 가격 위", tr["close"] > tr["ma20"], f"{tr['close']:,.0f} / {tr['ma20']:,.0f}"),
-            chk("20일 평균 가격이 다시 오르는 중", tr["ma20_rising"], f"{tr['ma20_slope']:+.2f}%"),
+            chk("코스피가 20일 평균 가격 위", tr["close"] > tr["ma20"], f"{tr['close']:,.0f} / {tr['ma20']:,.0f}", "코스피가 20일 평균 위로 올라왔는가?"),
+            chk("20일 평균 가격이 다시 오르는 중", tr["ma20_rising"], f"{tr['ma20_slope']:+.2f}%", "20일 평균이 다시 오르는가?"),
         ]},
     ]
     level = 0
