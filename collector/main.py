@@ -101,6 +101,10 @@ def main(argv):
         if oc is not None:
             bench[mk] = oc
 
+    # 아침 요약 예측 vs 그날 실제 (코스피·코스닥 시가·종가) — morning_log.json 에 결과를 붙인다
+    if len(bench) == 2:   # 지난 기준일 재계산 때도 써도 됨 (그날까지의 실제 결과만 붙음)
+        safe("아침 예측 결과", lambda: update_morning_log(base, bench), errors)
+
     # 200일 이동평균용 긴 종가 기록: data-cache 의 hist/ 에 쌓아 두고 모자란 날만 받는다 (처음 한 번만 오래 걸림)
     t = step("긴 종가 기록 (200일선)")
     long_closes, long_breaks, long_values = safe("긴 종가 기록", lambda: long_history(base, closes, chg, values), errors) or (None, None, None)
@@ -1067,6 +1071,28 @@ def long_history(base, closes, chg, values=None):
     rt = rt.reindex(cl.index) if rt is not None else None
     va = va.reindex(index=cl.index, columns=cl.columns) if va is not None else None
     return cl, logic.price_breaks(cl, rt), va
+
+
+def update_morning_log(base, bench):
+    path = os.path.join(DATA, "morning_log.json")
+    try:
+        with open(path, encoding="utf-8") as f:
+            st = json.load(f)
+    except (OSError, ValueError):
+        return
+    opens = {mk: v[0] for mk, v in bench.items()}
+    closes = {mk: v[1] for mk, v in bench.items()}
+    n = 0
+    for d, x in st.get("days", {}).items():
+        if x.get("res") or d > base:
+            continue
+        r = logic.morning_result(x.get("tone"), opens, closes, d)
+        if r:
+            x["res"] = r
+            n += 1
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(st, f, ensure_ascii=False, separators=(",", ":"))
+    log(f"  아침 예측 결과 {n}일 붙임")
 
 
 FR_DAYS = 60   # 외국인 지분율 추세 (화면 차트와 같은 길이)

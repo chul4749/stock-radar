@@ -7,7 +7,7 @@ const signed = (v, d = 1, unit = "") => (v == null ? "–" : (v > 0 ? "+" : "") 
 const cls = (v) => (v == null ? "na" : v > 0 ? "up" : v < 0 ? "down" : "");
 const ymd = (s) => `${s.slice(0, 4)}.${s.slice(4, 6)}.${s.slice(6, 8)}`;
 
-let state = { data: null, tab: "swing", score: null, expAll: false, watch: {}, watchFrom: {}, prices: null, morning: null, latest: null };
+let state = { data: null, tab: "swing", score: null, expAll: false, watch: {}, watchFrom: {}, prices: null, morning: null, mlog: null, latest: null };
 try {
   state.tab = localStorage.getItem("tab") || "swing";
   state.expAll = localStorage.getItem("expAll") === "1";
@@ -38,6 +38,8 @@ async function init() {
       .then((p) => { state.prices = p; renderWatch(); }).catch(() => {});
     fetch("data/morning.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null))
       .then((m) => { state.morning = m; renderMorning(); }).catch(() => {});
+    fetch("data/morning_log.json", { cache: "no-cache" }).then((r) => (r.ok ? r.json() : null))
+      .then((l) => { state.mlog = l; renderMorning(); }).catch(() => {});
   } catch (e) {
     $("#cards").innerHTML = `<div class="empty">${esc(e.message || "데이터가 아직 없습니다")}</div>`;
   }
@@ -2102,14 +2104,28 @@ function fgBlock(fg) {
     </div></div>`;
 }
 
+// 아침 요약 예측 성적: 그날 코스피 '아침 출발'(시가 ÷ 전날 종가) 방향이 맞았나 + 마감까지 같은 방향이었나
+function mlogBlock(lg) {
+  const rows = Object.entries(lg).filter(([, x]) => x.res).sort((a, b) => (a[0] < b[0] ? 1 : -1));
+  if (!rows.length) return "";
+  const n = rows.length, hit = rows.filter(([, x]) => x.res.hit).length, hitC = rows.filter(([, x]) => x.res.hit_close).length;
+  const TONE = { up: ["상승", "up"], down: ["하락", "down"], neutral: ["방향 없음", ""] };
+  const list = rows.slice(0, 10).map(([d, x]) => { const [w, c] = TONE[x.tone] || ["–", ""]; const r = x.res.kospi;
+    return `<tr><th>${ymd(d).slice(5)}</th><td class="${c}">${w}</td><td class="${cls(r.open)}">${signed(r.open, 2, "%")}</td><td class="${cls(r.close)}">${signed(r.close, 2, "%")}</td><td>${x.res.hit ? "✓" : "✗"}</td></tr>`; }).join("");
+  return `<details class="mg mlog"><summary><b>예측이 맞았나</b> <small>최근 ${n}번 중 아침 출발 방향 <b>${hit}번</b> 맞음 · 마감까지 같은 방향 ${hitC}번${n < 30 ? ` · ⚠ 아직 ${n}번뿐 — 운일 수 있음` : ""}</small></summary>
+    <table class="fgt"><thead><tr><th></th><th>예측</th><th>코스피 출발</th><th>마감</th><th></th></tr></thead><tbody>${list}</tbody></table>
+    <p class="hint">출발 = 그날 아침 첫 가격이 전날 마감보다 몇 %. '방향 없음' 예측은 출발이 ±0.5% 안이면 맞음으로 셌어요. 장 열리기 전(9시 전)에 만든 예측만 기록해요.</p></details>`;
+}
+
 function renderMorning() {
   const m = state.morning, el = $("#morning");
   if (!el) return;
-  // 가장 최근 수집일을 보고 있고, 그 뒤 아침에 만든 요약일 때만 (저녁 수집 뒤엔 숨김)
-  if (!m || !state.data || state.data.base_date !== state.latest || m.date <= state.data.base_date || !m.items.length) {
+  // 가장 최근 날짜를 볼 때는 늘 보여 준다 (저녁 수집 뒤에도 — 그날 실제 결과와 같이). 지난 날짜를 볼 땐 숨김
+  if (!m || !state.data || state.data.base_date !== state.latest || !m.items.length) {
     el.hidden = true;
     return;
   }
+  const lg = (state.mlog && state.mlog.days) || {}, res = (lg[m.date] || {}).res;
   const sm = { ...(m.summary || {}) };
   // 주말에 만든 요약이면 '오늘 아침' 대신 '다음 장'으로
   const wd = new Date(`${m.date.slice(0, 4)}-${m.date.slice(4, 6)}-${m.date.slice(6, 8)}T12:00:00+09:00`).getDay();
@@ -2131,7 +2147,10 @@ function renderMorning() {
   el.hidden = false;
   el.innerHTML = `<h2>아침 요약 <small>${m.at.slice(5, 10).replace("-", "/")} ${m.at.slice(11, 16)} · 새벽 미국장 마감 기준</small>${infoBtn("morning")}<span class="mlegend">오름 <b class="up">▲ 빨강</b> · 내림 <b class="down">▼ 파랑</b></span></h2>${infoBox("morning")}
     <div class="tile wide msumbox"><p class="msum" style="color:${color}"><b>${esc(sm.label || "")}</b></p><p class="hint" style="margin:2px 0 8px">${esc(sm.text || "")}</p>
+    ${res ? `<p class="mres ${res.hit ? "hit" : "miss"}">${res.hit ? "✓ 맞음" : "✗ 빗나감"} — 실제 코스피 아침 출발 <b class="${cls(res.kospi.open)}">${signed(res.kospi.open, 2, "%")}</b> · 마감 <b class="${cls(res.kospi.close)}">${signed(res.kospi.close, 2, "%")}</b>${res.kosdaq ? ` <small>(코스닥 출발 ${signed(res.kosdaq.open, 2, "%")} · 마감 ${signed(res.kosdaq.close, 2, "%")})</small>` : ""}</p>`
+      : m.date <= (state.data.base_date || "") ? `<p class="hint">실제 결과는 저녁 수집 때 붙어요.</p>` : ""}
     <div class="nums mnums">${keyNums}</div></div>
+    ${mlogBlock(lg)}
     <div class="mgrid">${card("주요국 지수", grp("idx"))}${card("금리·환율", grp("rate"))}${card("원자재·암호화폐", grp("cmd"))}</div>
     ${fgBlock(m.fg)}
     <p class="hint">짐작일 뿐, 장이 열리면 다를 수 있어요. 날짜는 각 시장의 현지 마감일 (비트코인·이더리움은 24시간 거래라 한국 아침 값).</p>`;

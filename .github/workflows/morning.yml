@@ -33,10 +33,12 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           python -m collector.morning
           cp site/data/morning.json "$RUNNER_TEMP/morning.json"
+          [ -f site/data/morning_log.json ] && cp site/data/morning_log.json "$RUNNER_TEMP/morning_log.json"
           git fetch -q origin "$GITHUB_REF_NAME"
           git checkout -q -f -B "$GITHUB_REF_NAME" "origin/$GITHUB_REF_NAME"
           cp "$RUNNER_TEMP/morning.json" site/data/morning.json
-          git add site/data/morning.json
+          [ -f "$RUNNER_TEMP/morning_log.json" ] && cp "$RUNNER_TEMP/morning_log.json" site/data/morning_log.json
+          git add site/data/morning.json site/data/morning_log.json 2>/dev/null || git add site/data/morning.json
           git diff --cached --quiet || git commit -q -m "data: 아침 요약 $(TZ=Asia/Seoul date +%F)"
           for i in 1 2 3 4; do   # GitHub가 가끔 push를 500으로 거절 → 최신 위로 다시 올려 재시도
             git push -q origin "$GITHUB_REF_NAME" && break

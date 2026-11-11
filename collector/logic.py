@@ -1258,6 +1258,31 @@ def morning_summary(items):
             "text": " · ".join(parts) + f" → 오늘 아침 {label}"}
 
 
+def morning_result(tone, opens, closes, day):
+    """아침 요약 예측(tone)을 그날 실제 코스피·코스닥과 맞춰 본다.
+    opens/closes: {시장: Series(index=YYYYMMDD)}. 출발 = 그날 시가 ÷ 전날 종가, 마감 = 그날 종가 ÷ 전날 종가.
+    맞음 기준은 '출발'(아침 첫 가격) 방향 — 예측이 '출발 가능성'이라서. 큰 방향 없음은 코스피 출발이 ±0.5% 안이면 맞음."""
+    out = {}
+    for mk in ("KOSPI", "KOSDAQ"):
+        o, c = opens.get(mk), closes.get(mk)
+        if o is None or c is None or day not in c.index:
+            continue
+        i = list(c.index).index(day)
+        if i == 0:
+            continue
+        prev = float(c.iloc[i - 1])
+        if not prev:
+            continue
+        out[mk.lower()] = {"open": round((float(o[day]) / prev - 1) * 100, 2), "close": round((float(c[day]) / prev - 1) * 100, 2)}
+    k = out.get("kospi")
+    if not k:
+        return None
+    g = k["open"]
+    out["hit"] = (g > 0) if tone == "up" else (g < 0) if tone == "down" else (abs(g) < 0.5)
+    out["hit_close"] = (k["close"] > 0) if tone == "up" else (k["close"] < 0) if tone == "down" else (abs(k["close"]) < 0.5)
+    return out
+
+
 # ---------------------------------------------------------------- 업종·테마 ETF
 
 THEME_RULES = {"overheat20": 20.0, "flow_days": 3, "breadth": 60,

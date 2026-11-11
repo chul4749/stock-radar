@@ -691,3 +691,8 @@ table.mythsum th { font-size: 13px; }
 .qchk li > span { font-size: 11.5px; color: var(--sub); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .xstress { margin: 8px 0 0; padding: 7px 9px; border-radius: 8px; background: var(--neutral-bg); font-size: 13px; line-height: 1.5; }
 .xstress small { display: block; color: var(--sub); font-size: 11px; }
+.mres { margin: 0 0 8px; padding: 6px 9px; border-radius: 8px; font-size: 13px; background: var(--neutral-bg); }
+.mres.hit { border-left: 3px solid #16a34a; } .mres.miss { border-left: 3px solid var(--faint); }
+.mres small { color: var(--sub); }
+.mlog { margin: 0 0 10px; } .mlog summary { cursor: pointer; font-size: 13px; } .mlog summary small { color: var(--sub); font-weight: 400; }
+.mlog .fgt td, .mlog .fgt th { text-align: center; } .mlog .fgt th:first-child { text-align: left; }

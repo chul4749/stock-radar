@@ -43,8 +43,37 @@ def _item(key, name, desc, group, unit, how, rows):
             "prev": round(c0, 3 if c0 < 10 else 2), "change": chg, "spark": [round(c, 3 if c < 10 else 2) for _, c in rows[-20:]]}
 
 
+LOG = "morning_log.json"
+
+
+def log_prediction(out, keep=250):
+    """그날 아침 예측을 morning_log.json 에 남긴다 (저녁 수집이 실제 코스피·코스닥 결과를 붙임). 같은 날 다시 돌리면 덮어씀."""
+    path = os.path.join(DATA, LOG)
+    try:
+        with open(path, encoding="utf-8") as f:
+            st = json.load(f)
+    except (OSError, ValueError):
+        st = {"days": {}}
+    sm = out["summary"]
+    keep_res = (st["days"].get(out["date"]) or {}).get("res")
+    st["days"][out["date"]] = {"at": out["at"], "tone": sm.get("tone"), "label": sm.get("label"), "score": sm.get("score"),
+                               "text": sm.get("text"), **({"res": keep_res} if keep_res else {})}
+    st["days"] = dict(sorted(st["days"].items())[-keep:])
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(st, f, ensure_ascii=False, separators=(",", ":"))
+
+
 def main():
     now = datetime.now(KST)
+    # 늦게 도는 예약 실행(GitHub 예약이 몇 시간씩 밀림)이 장 전에 만든 그날 요약을 장중 값으로 덮지 않게
+    try:
+        with open(os.path.join(DATA, "morning.json"), encoding="utf-8") as f:
+            old = json.load(f)
+        if old.get("date") == now.strftime("%Y%m%d") and int(old.get("at", "T99")[11:13]) < 9 <= now.hour and not os.environ.get("FORCE"):
+            log("오늘 장 전에 만든 아침 요약이 이미 있어 건너뜀")
+            return 0
+    except (OSError, ValueError):
+        pass
     items, errors, raw = [], [], {}
     for key, name, sym, desc, group, unit, how in ITEMS:
         if not sym:
@@ -80,6 +109,8 @@ def main():
     os.makedirs(DATA, exist_ok=True)
     with open(os.path.join(DATA, "morning.json"), "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
+    if items and now.hour < 9:   # 장 열리기 전에 만든 예측만 기록 (실제 결과와 맞춰 볼 것)
+        log_prediction(out)
     log(f"저장 morning.json: {out['summary']['text']}")
     return 0 if items else 1
 

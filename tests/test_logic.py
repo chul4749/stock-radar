@@ -1326,3 +1326,26 @@ def test_yahoo_daily_fills_missing_last_close_from_meta(monkeypatch):
     monkeypatch.setattr(sources, "get", lambda *a, **k: R())
     rows = sources.yahoo_daily("EWY")
     assert rows[-1] == ("2026-11-05", 131.65) and rows[-2] == ("2026-11-04", 152.12)
+
+
+def test_morning_result_hits_on_open_direction():
+    idx = ["20261109", "20261110", "20261111"]
+    closes = {"KOSPI": pd.Series([100.0, 102.0, 101.0], index=idx), "KOSDAQ": pd.Series([50.0, 51.0, 50.5], index=idx)}
+    opens = {"KOSPI": pd.Series([99.0, 103.0, 100.0], index=idx), "KOSDAQ": pd.Series([49.0, 51.5, 50.0], index=idx)}
+    r = logic.morning_result("up", opens, closes, "20261110")
+    assert r["kospi"] == {"open": 3.0, "close": 2.0} and r["hit"] and r["hit_close"]
+    r = logic.morning_result("up", opens, closes, "20261111")       # 출발 102→100 = −1.96% → 상승 예측은 빗나감
+    assert not r["hit"] and abs(r["kospi"]["open"] + 1.96) < 0.01
+    assert logic.morning_result("neutral", opens, closes, "20261111")["hit"] is False
+    assert logic.morning_result("up", opens, closes, "20261109") is None      # 전날 값 없음
+    assert logic.morning_result("up", opens, closes, "20261112") is None      # 장 안 열린 날
+
+
+def test_morning_log_keeps_result_on_rerun(tmp_path, monkeypatch):
+    from collector import morning
+    import json
+    monkeypatch.setattr(morning, "DATA", str(tmp_path))
+    (tmp_path / "morning_log.json").write_text(json.dumps({"days": {"20261111": {"tone": "down", "res": {"hit": True}}}}))
+    morning.log_prediction({"date": "20261111", "at": "2026-11-11T07:39+09:00", "summary": {"tone": "up", "label": "상승 출발 가능성"}})
+    d = json.loads((tmp_path / "morning_log.json").read_text())["days"]["20261111"]
+    assert d["tone"] == "up" and d["res"] == {"hit": True}
