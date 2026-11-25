@@ -80,6 +80,7 @@ jobs:
           KRX_ID: ${{ secrets.KRX_ID }}
           KRX_PW: ${{ secrets.KRX_PW }}
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
+          ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
       # 차트·재무를 data-cache 브랜치에 저장: 커밋 하나짜리로 강제로 덮어씀 (예전 기록이 남지 않음)
       - name: 차트·재무 저장
         if: always()

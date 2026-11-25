@@ -55,6 +55,7 @@ jobs:
         env:
           KRX_ID: ${{ secrets.KRX_ID }}
           KRX_PW: ${{ secrets.KRX_PW }}
+          ECOS_API_KEY: ${{ secrets.ECOS_API_KEY }}
       - name: 긴 종가 기록 저장
         run: |
           [ -d site/data/hist ] || exit 0
