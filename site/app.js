@@ -559,6 +559,63 @@ const MACRO_VIEW = [
   ["kr_cpi", "한국 CPI 물가 상승률", 2, "점선 = 한국은행 목표 2%", (x) => `목표 2%보다 ${x.value > 2 ? "높아요" : "낮아요"} · 지난달보다 ${x.chg_1m > 0 ? "올랐어요" : x.chg_1m < 0 ? "내렸어요" : "같아요"}`],
 ];
 
+// 지표마다 '무엇인가 · 시장이 받아들이는 상징 · 오를 때/내릴 때 주식에는' (원래 뜻 — 지금 값이 그렇다는 뜻 아님)
+const MACRO_DESC = {
+  fed: ["미국 중앙은행(연준)이 정하는 정책 금리. 전 세계 돈값의 출발점이에요.",
+    "돈을 풀까(인하) 조일까(인상)를 보여 주는 가장 직접적인 신호. '금리 인하 사이클'은 보통 주식에 우호적인 환경으로 받아들여져요.",
+    "올리면: 빚 내서 투자하기 비싸지고 미래 이익의 현재 가치가 줄어 성장주부터 부담", "내리면: 돈이 풀려 주식에 우호적 — 다만 경기가 나빠서 급히 내리는 거면 오히려 하락 신호일 수 있음"],
+  us2y: ["미국 정부가 2년 동안 돈을 빌리는 금리. 시장이 앞으로 1~2년 기준금리를 어떻게 볼지 가장 민감하게 비춰요.",
+    "'시장이 예상하는 연준의 다음 행동'. 기준금리보다 먼저 움직여서, 기준금리보다 많이 낮으면 시장이 인하를 기대한다는 뜻이에요.",
+    "오르면: 금리를 생각보다 늦게·덜 내릴 거라는 쪽", "내리면: 금리 인하 기대가 커지는 쪽"],
+  us10y: ["미국 정부가 10년 동안 돈을 빌리는 금리. 집 대출·회사채 등 전 세계 장기 금리의 기준이에요.",
+    "'주식의 경쟁 상대'. 위험 없이 10년 동안 이만큼 받을 수 있으니, 이게 높을수록 주식(특히 먼 미래 이익을 보고 사는 성장주)의 매력이 줄어요.",
+    "빠르게 오르면: 주가, 특히 성장주·기술주에 부담 (한국 반도체·2차전지도 영향)", "내리면: 성장주에 숨통 — 다만 경기 걱정 때문에 내리는 거면 다른 이야기"],
+  spread: ["10년 금리에서 2년 금리를 뺀 값. 보통은 오래 빌릴수록 이자가 높아서 플러스예요.",
+    "'경기 침체 경보'로 유명한 지표. 마이너스(역전)는 시장이 '앞으로 경기가 나빠져 금리를 내릴 것'이라고 본다는 뜻이고, 과거 미국 침체 전에 자주 나왔어요. 다만 역전 뒤 실제 침체까지 1~2년 걸리거나 오지 않은 적도 있어요.",
+    "마이너스에서 플러스로 돌아설 때: 오히려 침체가 가까워졌다는 신호로 보는 사람도 많음(역사적으로 침체 직전에 역전이 풀리곤 했음)", "더 깊은 마이너스: 경기 둔화 걱정이 커지는 쪽"],
+  cpi: ["미국 소비자가 사는 물건·서비스 값이 1년 전보다 몇 % 올랐는지. 매달 발표돼 시장을 가장 크게 흔드는 지표 중 하나예요.",
+    "'금리를 내릴 수 있나'를 가르는 숫자. 연준 목표는 2%. 목표보다 높게 버티면 금리 인하가 늦어진다는 뜻으로 받아들여져요.",
+    "예상보다 높게 나오면: 금리 인하가 늦어질 걱정 → 주가 하락·달러 강세가 흔함", "낮게 나오면: 금리 인하 기대 → 주가에 우호적"],
+  core_cpi: ["CPI에서 값이 크게 출렁이는 식료품·에너지를 뺀 물가. '진짜 바닥에 깔린 물가 흐름'을 봐요.",
+    "연준과 시장이 실제로 더 무게를 두는 쪽. 기름값 때문에 CPI가 내려도 근원이 안 내리면 '아직 멀었다'로 받아들여요.",
+    "높게 버티면: 금리 인하가 늦어질 근거", "꾸준히 내려오면: 금리 인하 여지"],
+  core_pce: ["개인이 실제로 쓴 돈 기준으로 잰 물가(식료품·에너지 뺌). 연준이 공식 목표(2%)로 삼는 지표예요.",
+    "'연준의 성적표'. CPI가 먼저 나와 보통 반응은 작지만, 연준이 금리를 정할 때 직접 보는 숫자예요.",
+    "2%보다 높으면: 연준이 금리를 서둘러 내리기 어려움", "2% 가까이 오면: '목표 달성' → 금리 인하 명분"],
+  unrate: ["일하고 싶은 사람 중 일자리를 못 구한 사람의 비율.",
+    "'경기가 식고 있나'의 대표 신호. 천천히 움직이다가 한번 오르기 시작하면 빠르게 오르는 경우가 많아서, 몇 달 새 0.5%p쯤 오르면 침체 경보로 보는 사람이 많아요(삼 법칙).",
+    "빠르게 오르면: 경기 침체 걱정 → 금리는 내려가도 주가엔 부담일 수 있음", "낮게 유지되면: 경기 튼튼 — 다만 너무 뜨거우면 물가·금리 걱정"],
+  kr_base: ["한국은행이 정하는 정책 금리.",
+    "한국 돈값의 출발점. 미국 기준금리와의 차이(한미 금리차)가 환율과 외국인 자금 흐름을 움직이는 중요한 변수예요.",
+    "올리면: 대출 부담 늘고 내수·부동산에 부담", "내리면: 돈이 풀려 주식에 우호적 — 다만 미국보다 너무 낮아지면 원화 약세 압력"],
+  kr3y: ["한국 정부가 3년 동안 돈을 빌리는 금리. 한국 시장이 앞으로 1~3년 기준금리를 어떻게 보는지 비춰요.",
+    "'한국은행의 다음 행동에 대한 시장 예상'. 기준금리보다 많이 낮으면 인하를 기대한다는 뜻이에요.",
+    "오르면: 인하 기대가 줄어드는 쪽", "내리면: 인하 기대가 커지는 쪽"],
+  kr10y: ["한국 정부가 10년 동안 돈을 빌리는 금리. 미국 10년 금리를 크게 따라가요.",
+    "한국 장기 돈값. 주식과 견주는 '위험 없는 수익'이라 높을수록 주식 매력이 줄어요.",
+    "빠르게 오르면: 성장주에 부담", "내리면: 성장주에 숨통"],
+  kr_cpi: ["한국 소비자 물가가 1년 전보다 몇 % 올랐는지. 한국은행 목표도 2%예요.",
+    "'한국은행이 금리를 내릴 수 있나'를 가르는 숫자.",
+    "목표보다 높게 버티면: 금리 인하가 늦어짐", "목표 근처면: 금리 인하 여지"],
+};
+
+// 지금 판 한 줄 읽기 (숫자 대신 말로)
+function macroDesc(k) {
+  const d = MACRO_DESC[k];
+  if (!d) return "";
+  return `<details class="mdesc"${state.expAll ? " open" : ""}><summary>📖 뜻·상징</summary><div class="exp"><p><b>무엇</b> ${esc(d[0])}</p><p><b>상징</b> ${esc(d[1])}</p><p><b>▲</b> ${esc(d[2])}</p><p><b>▼</b> ${esc(d[3])}</p></div></details>`;
+}
+
+function macroRead(mc) {
+  const out = [];
+  const pce = mc.core_pce || mc.core_cpi;
+  if (pce) out.push(pce.value > 2.5 ? "미국 물가가 목표(2%)보다 아직 높아 금리를 빨리 내리기 어려운 판" : pce.value > 2 ? "미국 물가가 목표(2%) 가까이 내려온 판" : "미국 물가가 목표(2%) 아래");
+  if (mc.fed && mc.fed.chg_1y != null) out.push(mc.fed.chg_1y < 0 ? "연준은 1년 동안 금리를 내리는 중" : mc.fed.chg_1y > 0 ? "연준은 1년 동안 금리를 올리는 중" : "연준 금리는 1년째 그대로");
+  if (mc.spread) out.push(mc.spread.value < 0 ? "장단기 금리 역전(경기 둔화 걱정 모양)" : "장단기 금리차는 플러스(보통 모양)");
+  if (mc.unrate && mc.unrate.chg_1y != null && mc.unrate.chg_1y >= 0.5) out.push("실업률이 1년 새 눈에 띄게 오름(경기 식는 신호일 수 있음)");
+  return out;
+}
+
 function macroTile(t) {
   const mc = t.macro;
   if (!mc) return "";
@@ -568,11 +625,18 @@ function macroTile(t) {
     const c1 = x.chg_1m == null ? "" : `${isRate ? "1달" : "지난달"} ${signed(x.chg_1m, 2, "%p")}`;
     const cy = x.chg_1y == null ? "" : ` · 1년 ${signed(x.chg_1y, 2, "%p")}`;
     return `<div class="mac"><div class="mh"><b>${name}</b> <small>${asof}</small></div><div class="mv">${num(x.value, 2)}%</div>` +
-      `<div class="s">${c1}${cy}${refTxt ? ` · ${refTxt}` : ""}</div>${macroChart(x, ref, "%")}<p class="interp">${esc(read(x))}</p></div>`;
+      `<div class="s">${c1}${cy}${refTxt ? ` · ${refTxt}` : ""}</div>${macroChart(x, ref, "%")}<p class="interp">${esc(read(x))}</p>${macroDesc(k)}</div>`;
   };
   const us = MACRO_VIEW.filter(([k]) => mc[k] && !k.startsWith("kr")).map(cell).join("");
   const kr = MACRO_VIEW.filter(([k]) => mc[k] && k.startsWith("kr")).map(cell).join("");
-  const cells = (us ? `<h4 class="sub">미국</h4><div class="macgrid">${us}</div>` : "") + (kr ? `<h4 class="sub">한국</h4><div class="macgrid">${kr}</div>` : "");
+  // 한미 금리차: 한국 기준금리 − 미국 기준금리(상단)
+  const gap = mc.kr_base && mc.fed ? mc.kr_base.value - mc.fed.value : null;
+  const gapLine = gap == null ? "" : `<div class="krus"><p><b>한미 금리차</b> 한국 ${num(mc.kr_base.value, 2)}% − 미국 ${num(mc.fed.value, 2)}% = <b class="${cls(gap)}">${signed(gap, 2, "%p")}</b></p>` +
+    `<p class="interp">${gap < 0 ? "한국 금리가 미국보다 낮아요(역전)" : gap > 0 ? "한국 금리가 미국보다 높아요" : "두 나라 금리가 같아요"}</p>` +
+    `<details class="mdesc"><summary>📖 뜻·상징</summary><div class="exp"><p><b>무엇</b> 두 나라 기준금리의 차이.</p><p><b>상징</b> 돈은 이자를 더 주는 곳으로 가려는 성질이 있어서, 한국 금리가 미국보다 많이 낮을수록 달러로 바꿔 나가려는 힘(원화 약세)이 커진다고 봐요. 원화가 약해지면 외국인이 한국 주식을 파는 경우가 많아 국내 증시에 부담 요인으로 꼽혀요.</p><p><b>주의</b> 금리차만으로 환율이 정해지진 않아요(무역·경기·위험 회피 심리도 큼). 차이가 커져도 원화가 버틴 때도 많아요.</p></div></details></div>`;
+  const read = macroRead(mc);
+  const readBox = read.length ? `<div class="mread"><b>지금 판 읽기</b><ul>${read.map((r) => `<li>${esc(r)}</li>`).join("")}</ul></div>` : "";
+  const cells = readBox + (us ? `<h4 class="sub">미국</h4><div class="macgrid">${us}</div>` : "") + (kr ? `<h4 class="sub">한국</h4>${gapLine}<div class="macgrid">${kr}</div>` : "");
   const ev = upcomingEvents(60);
   const evList = ev.length ? `<h4 class="sub">앞으로 60일 미국 발표 <small>한국 시각</small></h4><ul class="evlist">${ev.map((e) =>
     `<li><span class="when">${evWhen(e.at)} <small>${evLeft(e.at)}</small></span><span class="what">${evName(e)}</span><details><summary>왜 중요?</summary><p class="exp">${esc(EV_DESC[e.kind])}</p></details></li>`).join("")}</ul>` : "";

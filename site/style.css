@@ -741,3 +741,13 @@ div.xexp { padding: 8px 10px; border-radius: 8px; background: var(--neutral-bg);
 .expbar .eb-lab { display: flex; justify-content: space-between; font-size: 10px; color: var(--faint); }
 .expbar .legend { margin-top: 2px; }
 .expbar .legend i { width: 8px; height: 8px; border-radius: 50%; }
+
+.mdesc { margin-top: 4px; font-size: 12px; }
+.mdesc summary { color: var(--sub); cursor: pointer; }
+.mdesc .exp p { margin: 0 0 4px; }
+.mdesc .exp b { margin-right: 4px; }
+.mread { margin: 8px 0 4px; padding: 8px 10px; border-radius: 8px; background: var(--neutral-bg); font-size: 13px; }
+.mread ul { margin: 4px 0 0; padding-left: 18px; }
+.krus { font-size: 13px; margin: 4px 0 8px; }
+.krus p { margin: 0; }
+.macgrid .mac:has(details[open]) { grid-column: 1 / -1; }   /* 뜻·상징을 펼치면 칸을 한 줄 전체로 */
