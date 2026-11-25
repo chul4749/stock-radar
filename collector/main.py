@@ -1283,7 +1283,8 @@ def kr_macro(base, errors):
     d0 = (datetime.strptime(base, "%Y%m%d") - timedelta(days=1100)).strftime("%Y%m%d")
     out = {}
     for key, stat, cyc, item, kind, lag, _name in logic.MACRO_KR:
-        start, end = (d0, base) if cyc == "D" else (d0[:6], base[:6])
+        # 월별은 1년 전 대비를 3년치 그리려면 4년 넘게 필요
+        start, end = (d0, base) if cyc == "D" else (f"{int(base[:4]) - 5}01", base[:6])
         rows = safe(f"한국 지표 {stat}", lambda: sources.ecos(stat, cyc, start, end, item), errors)
         m = logic.macro_series(rows, kind, lag, iso_b)
         if m:
