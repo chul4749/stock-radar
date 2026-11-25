@@ -1,4 +1,4 @@
-"""이미 수집한 기준일 파일에 시장 지표만 덧붙인다 (200일선 위·아래 종목 수, 내 지표 차트·검증, 급등 전조 찾기).
+"""이미 수집한 기준일 파일에 시장 지표만 덧붙인다 (200일선 위·아래 종목 수, 내 지표 차트·검증, 급등 전조 찾기, 미국 금리·물가·발표 일정).
 후보·기업 정보·기록 출처는 건드리지 않는다 — 다시 수집하면 그날 보던 '지금' 정보가 빠지기 때문.
 실행: python -m collector.patch_market YYYYMMDD"""
 import json
@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 from . import logic, sources
-from .main import DATA, _json_default, _limit_requests_timeout, long_history, safe
+from .main import DATA, _json_default, _limit_requests_timeout, long_history, safe, us_events
 from .util import log
 
 
@@ -56,11 +56,20 @@ def main(argv):
         tfs = safe("내 지표 코스피", lambda: logic.tv_timeframes(ks, hourly), errors) or {}
         temp["tv"] = tfs.get("d")
         temp["tv_tf"] = tfs
+    iso = f"{base[:4]}-{base[4:6]}-{base[6:]}"
+    macro = {}
+    for key, sid, kind, lag, _name in logic.MACRO:
+        m = logic.macro_series(safe(f"미국 지표 {sid}", lambda: sources.fred(sid), errors), kind, lag, iso)
+        if m:
+            macro[key] = m
+    if macro:
+        temp["macro"] = macro
+    temp["us_events"] = us_events(base, errors)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"), default=_json_default)
     for e in errors:
         log(f"  오류: {e}")
-    log(f"  {base}: " + ", ".join(k for k in ("ma200", "tv", "tv_tf", "tv_check") if temp.get(k)))
+    log(f"  {base}: " + ", ".join(k for k in ("ma200", "tv", "tv_tf", "tv_check", "macro", "us_events") if temp.get(k)))
     return 1 if not any(temp.get(k) for k in ("ma200", "tv")) else 0
 
 
