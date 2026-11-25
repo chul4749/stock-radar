@@ -77,7 +77,7 @@ function render() {
   renderRules();
   renderMorning();
   const n = d.filter.news_count;
-  $("#sources").textContent = `데이터: KRX(시세·수급), 구글 뉴스 ${n.google}건 · 네이버 ${n.naver}건 · DART 공시 ${n.dart}건, CBOE(VIX), FRED(하이일드), CNN(공포·탐욕). 네이버·CNN은 비공식 경로라 바뀌면 빠질 수 있습니다.`;
+  $("#sources").textContent = `데이터: KRX(시세·수급), 구글 뉴스 ${n.google}건 · 네이버 ${n.naver}건 · DART 공시 ${n.dart}건, CBOE(VIX), FRED(하이일드·미국 금리·물가·발표 달력), 연준(FOMC 일정), CNN(공포·탐욕). 네이버·CNN은 비공식 경로라 바뀌면 빠질 수 있습니다.`;
   $("#errors").textContent = d.errors && d.errors.length ? `수집 실패: ${d.errors.join(", ")}` : "";
 }
 
@@ -85,6 +85,8 @@ function render() {
 /* ---------------- 지표 설명(ⓘ)과 한 줄 해석 ---------------- */
 
 const INFO = {
+  usev: "미국에서 큰 지표가 나오는 날입니다. 한국 시각으로 밤·새벽에 나와서 그다음 날 한국 장에 반영돼요.\n· CPI: 미국 소비자 물가 — 예상보다 높으면 '금리를 늦게 내리겠다'는 걱정에 크게 흔들리기 쉬움\n· 고용 보고서: 일자리 수·실업률 — 너무 좋아도(금리 걱정) 너무 나빠도(경기 걱정) 흔들림\n· PCE: 연준이 직접 보는 물가 — 보통 CPI보다 반응이 작음\n· FOMC: 미국 기준금리 결정 — 점도표가 같이 나오는 회의는 더 크게 흔들리기 쉬움\n발표 전날 새로 사거나 크게 늘리면 결과 하나에 크게 휘둘릴 수 있다는 정도로 참고하세요. 일정은 연준·FRED 발표 달력에서 받아요.",
+  macro: "미국 금리와 물가가 지금 어느 쪽으로 가고 있는지 보는 배경 자료입니다.\n· 기준금리: 연준이 정하는 금리. 내리면 돈이 풀리는 쪽\n· 국채 2년: 시장이 보는 앞으로 1~2년 기준금리\n· 국채 10년: 전 세계 금리의 기준 — 오르면 성장주에 부담\n· 10년−2년 금리차: 마이너스(역전)면 시장이 경기 둔화를 걱정한다는 뜻으로 많이 봄 (꼭 침체가 온다는 뜻은 아님)\n· CPI·근원 CPI·근원 PCE: 1년 전보다 물가가 몇 % 올랐나. 연준 목표는 2% (근원 = 값이 크게 출렁이는 식료품·에너지를 뺀 것)\n· 실업률: 빠르게 오르면 경기가 식는 신호일 수 있음\n몇 달 단위로 천천히 움직여서 며칠~몇 주 매매 신호로 쓰기엔 약해요. 온도 점수에는 넣지 않습니다.",
   thermo: "지금 시장 분위기가 '겁먹은 쪽'인지 '들뜬 쪽'인지 0~100점으로 보여 줍니다.\n· 25점 아래: 다들 겁먹음 (극단적 공포)\n· 50점 근처: 보통\n· 75점 위: 다들 들뜸 (극단적 탐욕)\n아래 '무엇으로 계산했나'의 여러 지표를 점수로 바꿔 평균했습니다. 공포가 크다고 바로 바닥이라는 뜻은 아닙니다.",
   korea_vol: "코스피200이 최근 20일 동안 하루하루 얼마나 크게 오르내렸는지입니다.\n· 높을수록: 장이 크게 출렁임 = 불안\n· 낮을수록: 잔잔함\n원래는 'VKOSPI(한국 공포지수)'를 보는데, 구할 수 없어 대신 씁니다.",
   vix: "미국 증시의 '공포지수'입니다. 앞으로 한 달 동안 미국 주가가 얼마나 출렁일지 시장이 예상하는 값입니다.\n· 20 아래: 평온\n· 20~30: 경계\n· 30 위: 불안\n미국 장이 흔들리면 다음 날 한국 장도 영향을 받습니다.",
@@ -462,6 +464,113 @@ function ma200Tile(m) {
     ${read ? `<p class="interp">${read}</p>` : ""}${infoBox("ma200")}</div>`;
 }
 
+/* ---------------- 미국 금리·물가 추이와 발표 일정 ---------------- */
+
+// 무엇인지 + 왜 흔들리는지 (원래 뜻 — 지금 값이 그렇다는 뜻 아님)
+const EV_DESC = {
+  cpi: "미국 소비자 물가(지난달분). 예상보다 높게 나오면 '금리를 늦게 내리겠다'는 걱정에 주가가 크게 흔들리기 쉬워요.",
+  jobs: "미국 일자리 수·실업률(지난달분). 너무 좋으면 금리 걱정, 너무 나쁘면 경기 걱정 — 어느 쪽이든 크게 움직일 수 있어요.",
+  pce: "연준이 물가 목표(2%)로 직접 보는 지표(지난달분). CPI가 먼저 나와서 보통 반응은 CPI보다 작아요.",
+  fomc: "미국 기준금리 결정. 성명과 의장 기자회견 뒤 크게 움직여요. '점도표'가 같이 나오는 회의는 위원들이 보는 앞으로의 금리 길이 공개돼 더 크게 흔들리기 쉬워요.",
+};
+const WD = ["일", "월", "화", "수", "목", "금", "토"];
+
+// 일정 시각은 한국 시각 문자열('2026-12-10T22:30+09:00') 그대로 읽는다 — 보는 사람 기기 시간대와 무관하게
+const evParts = (at) => {
+  const [y, mo, d] = at.slice(0, 10).split("-").map(Number), h = Number(at.slice(11, 13)), mi = at.slice(14, 16);
+  return { y, mo, d, h, mi, wd: new Date(Date.UTC(y, mo - 1, d)).getUTCDay() };
+};
+const dayPart = (h) => (h < 6 ? "새벽" : h < 12 ? "아침" : h < 18 ? "낮" : "밤");
+const kstDayNo = (ms) => Math.floor((ms + 9 * 3600e3) / 86400e3);   // 한국 날짜 번호
+
+// '12/10(목) 밤 10:30'
+function evWhen(at) {
+  const p = evParts(at), h12 = p.h % 12 === 0 ? 12 : p.h % 12;
+  return `${p.mo}/${p.d}(${WD[p.wd]}) ${dayPart(p.h)} ${h12}:${p.mi}`;
+}
+
+// 지금(보는 사람 시계) 기준 남은 때: '오늘 밤', '내일 새벽', 'D-5' — 날짜는 한국 날짜로 센다
+function evLeft(at, now = Date.now()) {
+  const p = evParts(at), gap = kstDayNo(Date.UTC(p.y, p.mo - 1, p.d) - 9 * 3600e3) - kstDayNo(now);
+  return gap === 0 ? `오늘 ${dayPart(p.h)}` : gap === 1 ? `내일 ${dayPart(p.h)}` : `D-${gap}`;
+}
+
+const evName = (e) => `${e.name}${e.ref ? ` <small>${e.ref}월분</small>` : ""}${e.kind === "fomc" && e.sep ? ` <small>· 점도표</small>` : ""}`;
+
+// 아직 안 지난 일정 (발표 1시간 뒤까지는 '방금'으로 남김)
+function upcomingEvents(days) {
+  const ev = (state.data.temperature || {}).us_events || [], now = Date.now();
+  return ev.filter((e) => { const t = new Date(e.at).getTime(); return t > now - 3600e3 && t < now + days * 86400e3; });
+}
+
+// 오늘 한눈에 한 줄: 7일 안 발표 (없으면 다음 하나)
+function eventRow() {
+  if (state.data.base_date !== state.latest) return null;
+  let list = upcomingEvents(7), far = false;
+  if (!list.length) { list = upcomingEvents(90).slice(0, 1); far = true; }
+  if (!list.length) return null;
+  const items = list.slice(0, 4).map((e) => {
+    const left = evLeft(e.at), soon = /^오늘|^내일/.test(left);
+    return `<span class="ev${soon ? " soon" : ""}"><b>${left}</b> ${evName(e)} <small>${evWhen(e.at)}</small></span>`;
+  }).join("");
+  return ["미국 발표 일정", `<span class="evs">${items}</span>${far ? " <small>(7일 안엔 없음)</small>" : ""}${infoBtn("usev")}${infoBox("usev")}`];
+}
+
+// 아침 요약 경고: 앞으로 24시간 안 발표
+function eventWarn() {
+  const list = upcomingEvents(1);
+  if (!list.length) return "";
+  return `<p class="evwarn">⚠ ${list.map((e) => `<b>${evLeft(e.at)} ${evWhen(e.at).split(" ").pop()}</b> ${evName(e)}`).join(" · ")} 발표 — 결과에 따라 다음 장이 크게 흔들릴 수 있어요.</p>`;
+}
+
+// 작은 추이 그림: 값 선 + 기준선(물가 목표 2%, 금리차 0) + 위아래 눈금
+function macroChart(x, ref, unit) {
+  const v = x.spark, n = v.length;
+  if (n < 2) return "";
+  const w = 200, h = 64;
+  let lo = Math.min(...v, ref ?? Infinity), hi = Math.max(...v, ref ?? -Infinity);
+  if (hi - lo < 0.5) { const c = (hi + lo) / 2; lo = c - 0.25; hi = c + 0.25; }
+  const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+  const y = (val) => h - ((val - lo) / (hi - lo)) * h;
+  const pts = v.map((val, i) => `${((i / (n - 1)) * w).toFixed(1)},${y(val).toFixed(1)}`).join(" ");
+  const refLine = ref == null ? "" : `<line x1="0" x2="${w}" y1="${y(ref).toFixed(1)}" y2="${y(ref).toFixed(1)}" stroke="var(--sub)" stroke-width="1" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/>`;
+  const svg = `<div class="mch"><svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="추이">${refLine}<polyline points="${pts}" fill="none" stroke="var(--text)" stroke-width="1.6" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>` +
+    `<div class="ylab"><span class="hi">${num(hi, 1)}</span><span class="lo">${num(lo, 1)}</span></div></div>`;
+  const lab = (d) => `${d.slice(2, 4)}.${d.slice(5, 7)}${x.kind === "rate" ? `.${d.slice(8, 10)}` : ""}`;
+  return tipWrap(svg, x.dates.map(lab), [["값", v, unit]]) +
+    `<div class="barlab"><span style="text-align:left">${lab(x.dates[0])}</span><span style="text-align:right">${lab(x.dates[n - 1])}</span></div>`;
+}
+
+const MACRO_VIEW = [
+  // key, 짧은 이름, 기준선, 기준선 뜻, 해석
+  ["fed", "기준금리 (상단)", null, "", (x) => (x.chg_1y < 0 ? "1년 동안 내렸어요 (돈 풀기 쪽)" : x.chg_1y > 0 ? "1년 동안 올렸어요 (돈 조이기 쪽)" : "1년 동안 그대로")],
+  ["us2y", "국채 2년", null, "", (x) => "앞으로 1~2년 기준금리를 시장이 어떻게 보는지 가장 잘 비춰요"],
+  ["us10y", "국채 10년", null, "", (x) => (x.chg_1m > 0.2 ? "한 달 새 빠르게 오름 — 성장주에 부담" : x.chg_1m < -0.2 ? "한 달 새 빠르게 내림" : "한 달 새 큰 변화 없음")],
+  ["spread", "10년 − 2년 금리차", 0, "점선 = 0", (x) => (x.value < 0 ? "마이너스(역전) — 시장이 경기 둔화를 걱정할 때 나오는 모양" : "플러스 — 보통 모양")],
+  ["cpi", "CPI 물가 상승률", 2, "점선 = 목표 2%", (x) => `목표 2%보다 ${x.value > 2 ? "높아요" : "낮아요"} · 지난달보다 ${x.chg_1m > 0 ? "올랐어요" : x.chg_1m < 0 ? "내렸어요" : "같아요"}`],
+  ["core_cpi", "근원 CPI", 2, "점선 = 목표 2%", (x) => `목표 2%보다 ${x.value > 2 ? "높아요" : "낮아요"} · 지난달보다 ${x.chg_1m > 0 ? "올랐어요" : x.chg_1m < 0 ? "내렸어요" : "같아요"}`],
+  ["core_pce", "근원 PCE", 2, "점선 = 목표 2%", (x) => `연준 목표 2%보다 ${x.value > 2 ? "높아요" : "낮아요"}`],
+  ["unrate", "실업률", null, "", (x) => (x.chg_1y > 0.3 ? "1년 새 눈에 띄게 오름 — 경기 식는 신호일 수 있음" : "1년 새 큰 변화 없음")],
+];
+
+function macroTile(t) {
+  const mc = t.macro;
+  if (!mc) return "";
+  const cells = MACRO_VIEW.filter(([k]) => mc[k]).map(([k, name, ref, refTxt, read]) => {
+    const x = mc[k], isRate = x.kind === "rate";
+    const asof = isRate ? x.date.slice(5).replace("-", "/") : `${x.date.slice(0, 4)}년 ${Number(x.date.slice(5, 7))}월분`;
+    const c1 = x.chg_1m == null ? "" : `${isRate ? "1달" : "지난달"} ${signed(x.chg_1m, 2, "%p")}`;
+    const cy = x.chg_1y == null ? "" : ` · 1년 ${signed(x.chg_1y, 2, "%p")}`;
+    return `<div class="mac"><div class="mh"><b>${name}</b> <small>${asof}</small></div><div class="mv">${num(x.value, 2)}%</div>` +
+      `<div class="s">${c1}${cy}${refTxt ? ` · ${refTxt}` : ""}</div>${macroChart(x, ref, "%")}<p class="interp">${esc(read(x))}</p></div>`;
+  }).join("");
+  const ev = upcomingEvents(60);
+  const evList = ev.length ? `<h4 class="sub">앞으로 60일 미국 발표 <small>한국 시각</small></h4><ul class="evlist">${ev.map((e) =>
+    `<li><span class="when">${evWhen(e.at)} <small>${evLeft(e.at)}</small></span><span class="what">${evName(e)}</span><details><summary>왜 중요?</summary><p class="exp">${esc(EV_DESC[e.kind])}</p></details></li>`).join("")}</ul>` : "";
+  return `<div class="tile wide"><div class="l">미국 금리·물가 추이 ${infoBtn("macro")}</div>${infoBox("macro")}<div class="macgrid">${cells}</div>${evList}` +
+    `<p class="hint">금리는 최근 2년(주 1회), 물가·실업률은 최근 3년(월별). 보여 주기만 하고 온도 점수에는 넣지 않아요. 출처 FRED·연준.</p></div>`;
+}
+
 // 내 지표 (트레이딩뷰 Pine 스크립트를 옮김): 코스피 종가 + EMA 9·21, BUY/SELL 신호, 지금 상태, 여러 종목에서 따라 했을 때 실제 성적
 const tvLab = (d) => d.length > 8 ? `${ymd(d)} ${d.slice(8)}시` : ymd(d);
 const TV_TF = { d: "일봉", w: "주봉", h4: "4시간봉" };
@@ -650,6 +759,7 @@ function renderTemp() {
     tiles.push(tile("반대매매 (강제 매도)", eokText(f.value), `미수금 ${eokText(f.unpaid)} 중 ${num(f.ratio, 1)}% · 20일 평균 ${eokText(f.avg20)}`, f.spark, { key: "forced", date: f.date }));
   }
   if (!cb.loan && !cb.forced) tiles.push(tile("신용잔고·반대매매", `<span class="na">–</span>`, "이번 기준일엔 받지 못함", null));
+  if (t.macro) tiles.push(macroTile(t));
   $("#tiles").innerHTML = tiles.join("");
 }
 
@@ -713,6 +823,8 @@ function renderToday() {
     const miss = th && th.missing && th.missing.length ? ` <small>· 지표 ${th.parts.length}개로 계산 (빠짐: ${th.missing.map(esc).join(", ")})</small>` : "";
     rows.push(["시장 상태", `${rg ? `<b>${esc(rg.label)}</b> <small>코스피 20일 ${signed(rg.trend.chg20, 1, "%")}</small>` : ""}${th ? `${rg ? "<br>" : ""}온도 <b style="color:${THERMO_COLOR(th.score)}">${th.score}점 ${esc(th.label)}</b> <small>(0 몹시 겁먹음 ~ 100 과열, 보조 요약)</small>${miss}` : ""}`]);
   }
+  const evr = eventRow();
+  if (evr) rows.push(evr);
   const sg = t.signals, tn = t.transition;
   if (sg) rows.push(["시장 회복 확인", sg.applies ? `<b style="color:${SIG_COLOR[sg.level]}">${sg.level}/3단계</b> <small>${esc(SIG_STATE[sg.level])}</small>` : `<span class="na">상승 추세라 해당 없음</span>`]);
   // 어제와 달라진 후보 (전체 기록을 남기기 전 날짜는 연속일로 대신)
@@ -2149,7 +2261,7 @@ function renderMorning() {
     <div class="tile wide msumbox"><p class="msum" style="color:${color}"><b>${esc(sm.label || "")}</b></p><p class="hint" style="margin:2px 0 8px">${esc(sm.text || "")}</p>
     ${res ? `<p class="mres ${res.hit ? "hit" : "miss"}">${res.hit ? "✓ 맞음" : "✗ 빗나감"} — 실제 코스피 아침 출발 <b class="${cls(res.kospi.open)}">${signed(res.kospi.open, 2, "%")}</b> · 마감 <b class="${cls(res.kospi.close)}">${signed(res.kospi.close, 2, "%")}</b>${res.kosdaq ? ` <small>(코스닥 출발 ${signed(res.kosdaq.open, 2, "%")} · 마감 ${signed(res.kosdaq.close, 2, "%")})</small>` : ""}</p>`
       : m.date <= (state.data.base_date || "") ? `<p class="hint">실제 결과는 저녁 수집 때 붙어요.</p>` : ""}
-    <div class="nums mnums">${keyNums}</div></div>
+    <div class="nums mnums">${keyNums}</div>${eventWarn()}</div>
     ${mlogBlock(lg)}
     <div class="mgrid">${card("주요국 지수", grp("idx"))}${card("금리·환율", grp("rate"))}${card("원자재·암호화폐", grp("cmd"))}</div>
     ${fgBlock(m.fg)}

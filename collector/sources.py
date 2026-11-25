@@ -256,6 +256,45 @@ def fred(series_id):
     return rows
 
 
+MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August",
+          "September", "October", "November", "December"]
+
+
+def fomc_meetings():
+    """연준 FOMC 달력 → [(연, 시작 (월,일), 끝 (월,일), 점도표 있음)]. 성명은 마지막 날 오후 2시(미 동부).
+    probe/macro_calendar.py 로 확인 (2026-11). 서면 결정(notation vote)은 뺀다."""
+    t = get("https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm", timeout=30).text
+    heads = [(m.start(), int(m.group(1))) for m in re.finditer(r'<h4><a id="\d+">(\d{4}) FOMC Meetings</a></h4>', t)]
+    out = []
+    for i, (pos, year) in enumerate(heads):
+        seg = t[pos: heads[i + 1][0] if i + 1 < len(heads) else len(t)]
+        for mon, day in re.findall(r'fomc-meeting__month[^>]*>\s*<strong>([^<]+)</strong>.*?fomc-meeting__date[^>]*>([^<]+)<', seg, re.S):
+            mon, day = mon.strip(), day.strip()
+            m = re.match(r"(\d{1,2})(?:-(\d{1,2}))?(\*)?$", day)
+            if not m:
+                continue          # 'notation vote' 등
+            names = mon.split("/")
+            try:
+                m1 = next(k + 1 for k, n in enumerate(MONTHS) if n.startswith(names[0][:3]))
+                m2 = next(k + 1 for k, n in enumerate(MONTHS) if n.startswith(names[-1][:3]))
+            except StopIteration:
+                continue
+            d1, d2 = int(m.group(1)), int(m.group(2) or m.group(1))
+            out.append((year, (m1, d1), (m2, d2), bool(m.group(3))))
+    return out
+
+
+def fred_release_dates(rid, year):
+    """FRED 발표 달력(HTML)에서 그 해 발표일 ['YYYY-MM-DD']. CPI rid=10, 고용 rid=50, 개인소득·지출(PCE) rid=54.
+    BLS 일정 페이지는 자동 접속을 막아(403) FRED 를 쓴다 (probe/macro_calendar.py, 2026-11)."""
+    t = get("https://fred.stlouisfed.org/releases/calendar", ua=False, timeout=30, params={"rid": rid, "y": year}).text
+    found = set()
+    for mon, day, y in re.findall(r"(" + "|".join(MONTHS) + r") (\d{1,2}), (\d{4})", t):
+        if int(y) == year:
+            found.add(f"{y}-{MONTHS.index(mon) + 1:02d}-{int(day):02d}")
+    return sorted(found)
+
+
 def cnn_fear_greed(base_iso):
     """CNN 공포·탐욕지수. 1년치 일별 기록에서 기준일 전 미국 장 마감값을 고른다.
 

@@ -77,6 +77,99 @@ def series_stat(rows, days_back=5, year=252):
     }
 
 
+# 미국 거시 지표 (FRED, 키 없이). 보여 주기만 하고 온도 점수·필터엔 안 넣는다.
+# kind: rate = 일별 금리(%), yoy = 월별 물가지수 → 1년 전 대비 상승률(%), level = 월별 값 그대로(%)
+# lag = 관측 월 끝에서 실제 발표까지 대략 며칠 (재계산 때 그 날 아직 안 나온 값을 쓰지 않게)
+MACRO = [
+    ("fed", "DFEDTARU", "rate", 0, "미국 기준금리 (상단)"),
+    ("us2y", "DGS2", "rate", 0, "미국 국채 2년"),
+    ("us10y", "DGS10", "rate", 0, "미국 국채 10년"),
+    ("spread", "T10Y2Y", "rate", 0, "10년 − 2년 금리차"),
+    ("cpi", "CPIAUCSL", "yoy", 15, "CPI 물가 상승률"),
+    ("core_cpi", "CPILFESL", "yoy", 15, "근원 CPI (식료품·에너지 뺌)"),
+    ("core_pce", "PCEPILFE", "yoy", 31, "근원 PCE (연준이 보는 물가)"),
+    ("unrate", "UNRATE", "level", 8, "실업률"),
+]
+
+
+def _month_released(obs_iso, lag, base_iso):
+    """월별 관측(그 달 1일 날짜)이 기준일까지 발표됐을까: 다음 달 1일 + lag일 ≤ 기준일."""
+    d = datetime.strptime(obs_iso, "%Y-%m-%d")
+    nxt = (d.replace(day=28) + timedelta(days=4)).replace(day=1)
+    return (nxt + timedelta(days=lag)).strftime("%Y-%m-%d") <= base_iso
+
+
+def macro_series(rows, kind, lag, base_iso):
+    """FRED [(날짜, 값)] → 화면용 추이. 기준일에 알 수 있던 값만 쓴다.
+
+    rate: 최근 2년 일별을 주 1회로 줄여 그림, 1달·1년 전 대비 변화(%p).
+    yoy: 1년 전 대비 상승률(%) 최근 3년, 직전 달 대비 변화(%p).
+    level: 값 그대로 최근 3년.
+    """
+    if not rows:
+        return None
+    if kind == "rate":
+        rows = [r for r in rows if r[0] < base_iso]
+        if len(rows) < 30:
+            return None
+        start = (datetime.strptime(base_iso, "%Y-%m-%d") - timedelta(days=730)).strftime("%Y-%m-%d")
+        rows = [r for r in rows if r[0] >= start]
+        vals = [v for _, v in rows]
+        pts = rows[::-5][::-1]          # 마지막 값이 꼭 들어가게 뒤에서부터 5일 간격
+        ago = lambda n: vals[-1 - n] if len(vals) > n else None
+        m1, y1 = ago(21), vals[0] if len(vals) > 240 else None
+        return {"kind": kind, "date": rows[-1][0], "value": round(vals[-1], 2),
+                "chg_1m": round(vals[-1] - m1, 2) if m1 is not None else None,
+                "chg_1y": round(vals[-1] - y1, 2) if y1 is not None else None,
+                "dates": [d for d, _ in pts], "spark": [round(v, 2) for _, v in pts]}
+    rows = [r for r in rows if _month_released(r[0], lag, base_iso)]
+    if kind == "yoy":
+        rows = [(rows[i][0], (rows[i][1] / rows[i - 12][1] - 1) * 100) for i in range(12, len(rows))]
+    rows = rows[-36:]
+    if len(rows) < 2:
+        return None
+    return {"kind": kind, "date": rows[-1][0], "value": round(rows[-1][1], 2),
+            "chg_1m": round(rows[-1][1] - rows[-2][1], 2),
+            "chg_1y": round(rows[-1][1] - rows[-13][1], 2) if len(rows) >= 13 else None,
+            "dates": [d for d, _ in rows], "spark": [round(v, 2) for _, v in rows]}
+
+
+# 미국 주요 발표 (미 동부 시각). ref = 발표 달의 몇 달 전 자료인지
+US_EVENTS = {
+    "cpi": {"name": "미국 CPI (물가)", "hm": (8, 30), "ref": 1},
+    "jobs": {"name": "미국 고용 보고서", "hm": (8, 30), "ref": 1},
+    "pce": {"name": "미국 PCE (연준이 보는 물가)", "hm": (8, 30), "ref": 1},
+    "fomc": {"name": "FOMC 금리 결정", "hm": (14, 0), "ref": 0},
+}
+
+
+def us_events(releases, fomc, base_iso, back=3, ahead=120):
+    """발표 일정 → 한국 시각 목록. releases = {kind: ['YYYY-MM-DD' (미 동부 날짜)]},
+    fomc = [(연, 시작, 끝, 점도표)]. 기준일 back일 전 ~ ahead일 뒤만."""
+    from zoneinfo import ZoneInfo
+    ny, seoul = ZoneInfo("America/New_York"), ZoneInfo("Asia/Seoul")
+    base = datetime.strptime(base_iso, "%Y-%m-%d")
+    lo, hi = base - timedelta(days=back), base + timedelta(days=ahead)
+    items = [(k, d, None) for k, ds in releases.items() for d in ds]
+    for y, (m1, d1), (m2, d2), sep in fomc:
+        yy = y + 1 if m2 < m1 else y      # 12월~1월에 걸친 회의
+        items.append(("fomc", f"{yy}-{m2:02d}-{d2:02d}", sep))
+    out = []
+    for kind, d, sep in items:
+        spec = US_EVENTS[kind]
+        local = datetime.strptime(d, "%Y-%m-%d").replace(hour=spec["hm"][0], minute=spec["hm"][1], tzinfo=ny)
+        if not (lo <= local.replace(tzinfo=None) <= hi):
+            continue
+        k = local.astimezone(seoul)
+        e = {"kind": kind, "name": spec["name"], "at": k.strftime("%Y-%m-%dT%H:%M+09:00"), "et": local.strftime("%Y-%m-%d %H:%M")}
+        if spec["ref"]:
+            e["ref"] = (local.month - spec["ref"] - 1) % 12 + 1      # 몇 월분 자료
+        if kind == "fomc":
+            e["sep"] = bool(sep)                                       # 점도표(경제 전망) 함께 나옴
+        out.append(e)
+    return sorted(out, key=lambda e: e["at"])
+
+
 FUT_MULT = 250_000  # 코스피200 선물 1포인트 = 25만 원
 
 

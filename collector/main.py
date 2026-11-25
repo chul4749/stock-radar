@@ -384,6 +384,16 @@ def main(argv):
         rows = [r for r in rows if r[0] < iso(base)] if rows else rows
         if rows:
             temp[key] = logic.series_stat(rows)
+    # 미국 금리·물가·고용 추이 (보여 주기만, 온도 점수엔 안 넣음) + 다가오는 발표 일정
+    macro = {}
+    for key, sid, kind, lag, _name in logic.MACRO:
+        rows = safe(f"미국 지표 {sid}", lambda: sources.fred(sid), errors)
+        m = logic.macro_series(rows, kind, lag, iso(base))
+        if m:
+            macro[key] = m
+    if macro:
+        temp["macro"] = macro
+    temp["us_events"] = us_events(base, errors)
     # 신용잔고·반대매매: 금융투자협회 FreeSIS (T+1 공표라 기준일 전날까지가 최신). 1년 백분위를 위해 400일치
     kofia_from = (datetime.strptime(base, "%Y%m%d") - timedelta(days=400)).strftime("%Y%m%d")
     loans = safe("신용잔고", lambda: sources.kofia("STATSCU0100000070BO", kofia_from, base), errors)
@@ -1262,6 +1272,29 @@ def load_record(d):
     with open(path, encoding="utf-8") as f:
         rec = json.load(f)
     return rec, ("live" if path == lp else logic.classify_record(rec, d))
+
+
+def us_events(base, errors):
+    """미국 CPI·고용·PCE 발표일(FRED 달력)과 FOMC(연준 달력) → 한국 시각 일정.
+    못 받은 종류는 바로 전 기록 파일의 일정을 그대로 쓴다 (일정은 미리 공개돼 잘 안 바뀜)."""
+    y = int(base[:4])
+    rel = {}
+    for kind, rid in (("cpi", 10), ("jobs", 50), ("pce", 54)):
+        ds = []
+        for yy in (y, y + 1):
+            ds += safe(f"발표일 {kind} {yy}", lambda: sources.fred_release_dates(rid, yy), errors) or []
+        if ds:
+            rel[kind] = ds
+    fomc = safe("FOMC 일정", sources.fomc_meetings, errors) or []
+    ev = logic.us_events(rel, fomc, f"{base[:4]}-{base[4:6]}-{base[6:]}")
+    got = set(rel) | ({"fomc"} if fomc else set())
+    if got != {"cpi", "jobs", "pce", "fomc"}:
+        prev = sorted(n[:8] for n in os.listdir(DATA) if n[:8].isdigit() and n.endswith(".json") and n[:8] < base)
+        if prev:
+            with open(os.path.join(DATA, f"{prev[-1]}.json"), encoding="utf-8") as f:
+                old = json.load(f).get("temperature", {}).get("us_events") or []
+            ev = sorted(ev + [e for e in old if e["kind"] not in got], key=lambda e: e["at"])
+    return ev
 
 
 def build_changes(base, used_days, groups_now, pools, idx, closes, breaks, top=10):

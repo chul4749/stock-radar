@@ -1349,3 +1349,38 @@ def test_morning_log_keeps_result_on_rerun(tmp_path, monkeypatch):
     morning.log_prediction({"date": "20261111", "at": "2026-11-11T07:39+09:00", "summary": {"tone": "up", "label": "상승 출발 가능성"}})
     d = json.loads((tmp_path / "morning_log.json").read_text())["days"]["20261111"]
     assert d["tone"] == "up" and d["res"] == {"hit": True}
+
+
+def test_macro_series_yoy_waits_for_release():
+    # 월별 지수: 매달 1%씩 오름 → 1년 전 대비 약 12.7%. 10월분은 11/15 이후에야 쓴다
+    rows, v = [], 100.0
+    for y in (2024, 2025, 2026):
+        for m in range(1, 13):
+            rows.append((f"{y}-{m:02d}-01", v))
+            v *= 1.01
+    a = logic.macro_series(rows, "yoy", 15, "2026-11-14")
+    b = logic.macro_series(rows, "yoy", 15, "2026-11-16")
+    assert a["date"] == "2026-09-01" and b["date"] == "2026-10-01"
+    assert abs(b["value"] - 12.68) < 0.01 and abs(b["chg_1m"]) < 0.01
+    assert len(b["spark"]) <= 36
+
+
+def test_macro_series_rate_uses_days_before_base():
+    from datetime import date, timedelta
+    d0 = date(2024, 1, 1)
+    rows = [((d0 + timedelta(days=i)).isoformat(), 3 + i / 1000) for i in range(1100)]
+    m = logic.macro_series(rows, "rate", 0, "2026-11-25")
+    assert m["date"] < "2026-11-25" and m["dates"][-1] == m["date"]
+    assert m["chg_1m"] > 0 and m["chg_1y"] > 0
+
+
+def test_us_events_converts_to_kst_and_dst():
+    ev = logic.us_events({"cpi": ["2026-12-10", "2026-07-14"]}, [(2026, (12, 8), (12, 9), True)], "2026-11-25")
+    kinds = [(e["kind"], e["at"]) for e in ev]
+    # 12월은 미 동부 표준시(UTC-5): 08:30 → 한국 22:30, FOMC 14:00 → 다음 날 04:00. 7월분은 기간 밖이라 빠짐
+    assert kinds == [("fomc", "2026-12-10T04:00+09:00"), ("cpi", "2026-12-10T22:30+09:00")]
+    cpi = next(e for e in ev if e["kind"] == "cpi")
+    assert cpi["ref"] == 11
+    assert next(e for e in ev if e["kind"] == "fomc")["sep"] is True
+    summer = logic.us_events({"jobs": ["2026-07-02"]}, [], "2026-06-20")
+    assert summer[0]["at"] == "2026-07-02T21:30+09:00"      # 서머타임(UTC-4)이면 한국 21:30
