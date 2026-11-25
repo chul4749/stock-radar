@@ -77,7 +77,7 @@ function render() {
   renderRules();
   renderMorning();
   const n = d.filter.news_count;
-  $("#sources").textContent = `데이터: KRX(시세·수급), 구글 뉴스 ${n.google}건 · 네이버 ${n.naver}건 · DART 공시 ${n.dart}건, CBOE(VIX), FRED(하이일드·미국 금리·물가·발표 달력), 연준(FOMC 일정), CNN(공포·탐욕). 네이버·CNN은 비공식 경로라 바뀌면 빠질 수 있습니다.`;
+  $("#sources").textContent = `데이터: KRX(시세·수급), 구글 뉴스 ${n.google}건 · 네이버 ${n.naver}건 · DART 공시 ${n.dart}건, CBOE(VIX), FRED(하이일드·미국 금리·물가·발표 달력), 연준(FOMC 일정), 한국은행 ECOS(한국 금리·물가), CNN(공포·탐욕). 네이버·CNN은 비공식 경로라 바뀌면 빠질 수 있습니다.`;
   $("#errors").textContent = d.errors && d.errors.length ? `수집 실패: ${d.errors.join(", ")}` : "";
 }
 
@@ -551,24 +551,32 @@ const MACRO_VIEW = [
   ["core_cpi", "근원 CPI", 2, "점선 = 목표 2%", (x) => `목표 2%보다 ${x.value > 2 ? "높아요" : "낮아요"} · 지난달보다 ${x.chg_1m > 0 ? "올랐어요" : x.chg_1m < 0 ? "내렸어요" : "같아요"}`],
   ["core_pce", "근원 PCE", 2, "점선 = 목표 2%", (x) => `연준 목표 2%보다 ${x.value > 2 ? "높아요" : "낮아요"}`],
   ["unrate", "실업률", null, "", (x) => (x.chg_1y > 0.3 ? "1년 새 눈에 띄게 오름 — 경기 식는 신호일 수 있음" : "1년 새 큰 변화 없음")],
+  // 한국 (한국은행 ECOS)
+  ["kr_base", "한국 기준금리", null, "", (x) => (x.chg_1y < 0 ? "1년 동안 내렸어요" : x.chg_1y > 0 ? "1년 동안 올렸어요" : "1년 동안 그대로")],
+  ["kr3y", "국고채 3년", null, "", (x) => "앞으로 1~3년 한국 금리를 시장이 어떻게 보는지 비춰요"],
+  ["kr10y", "국고채 10년", null, "", (x) => (x.chg_1m > 0.2 ? "한 달 새 빠르게 오름" : x.chg_1m < -0.2 ? "한 달 새 빠르게 내림" : "한 달 새 큰 변화 없음")],
+  ["kr_cpi", "한국 CPI 물가 상승률", 2, "점선 = 한국은행 목표 2%", (x) => `목표 2%보다 ${x.value > 2 ? "높아요" : "낮아요"} · 지난달보다 ${x.chg_1m > 0 ? "올랐어요" : x.chg_1m < 0 ? "내렸어요" : "같아요"}`],
 ];
 
 function macroTile(t) {
   const mc = t.macro;
   if (!mc) return "";
-  const cells = MACRO_VIEW.filter(([k]) => mc[k]).map(([k, name, ref, refTxt, read]) => {
+  const cell = ([k, name, ref, refTxt, read]) => {
     const x = mc[k], isRate = x.kind === "rate";
-    const asof = isRate ? x.date.slice(5).replace("-", "/") : `${x.date.slice(0, 4)}년 ${Number(x.date.slice(5, 7))}월분`;
+    const asof = isRate ? x.date.slice(5).replace("-", "/") : `${Number(x.date.slice(5, 7))}월분`;
     const c1 = x.chg_1m == null ? "" : `${isRate ? "1달" : "지난달"} ${signed(x.chg_1m, 2, "%p")}`;
     const cy = x.chg_1y == null ? "" : ` · 1년 ${signed(x.chg_1y, 2, "%p")}`;
     return `<div class="mac"><div class="mh"><b>${name}</b> <small>${asof}</small></div><div class="mv">${num(x.value, 2)}%</div>` +
       `<div class="s">${c1}${cy}${refTxt ? ` · ${refTxt}` : ""}</div>${macroChart(x, ref, "%")}<p class="interp">${esc(read(x))}</p></div>`;
-  }).join("");
+  };
+  const us = MACRO_VIEW.filter(([k]) => mc[k] && !k.startsWith("kr")).map(cell).join("");
+  const kr = MACRO_VIEW.filter(([k]) => mc[k] && k.startsWith("kr")).map(cell).join("");
+  const cells = (us ? `<h4 class="sub">미국</h4><div class="macgrid">${us}</div>` : "") + (kr ? `<h4 class="sub">한국</h4><div class="macgrid">${kr}</div>` : "");
   const ev = upcomingEvents(60);
   const evList = ev.length ? `<h4 class="sub">앞으로 60일 미국 발표 <small>한국 시각</small></h4><ul class="evlist">${ev.map((e) =>
     `<li><span class="when">${evWhen(e.at)} <small>${evLeft(e.at)}</small></span><span class="what">${evName(e)}</span><details><summary>왜 중요?</summary><p class="exp">${esc(EV_DESC[e.kind])}</p></details></li>`).join("")}</ul>` : "";
-  return `<div class="tile wide"><div class="l">미국 금리·물가 추이 ${infoBtn("macro")}</div>${infoBox("macro")}<div class="macgrid">${cells}</div>${evList}` +
-    `<p class="hint">금리는 최근 2년(주 1회), 물가·실업률은 최근 3년(월별). 보여 주기만 하고 온도 점수에는 넣지 않아요. 출처 FRED·연준.</p></div>`;
+  return `<div class="tile wide"><div class="l">금리·물가 추이 (미국·한국) ${infoBtn("macro")}</div>${infoBox("macro")}${cells}${evList}` +
+    `<p class="hint">금리는 최근 2년(주 1회), 물가·실업률은 최근 3년(월별). 보여 주기만 하고 온도 점수에는 넣지 않아요. 출처 FRED·연준·한국은행 ECOS.</p></div>`;
 }
 
 // 내 지표 (트레이딩뷰 Pine 스크립트를 옮김): 코스피 종가 + EMA 9·21, BUY/SELL 신호, 지금 상태, 여러 종목에서 따라 했을 때 실제 성적

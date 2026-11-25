@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 from . import logic, sources
-from .main import DATA, _json_default, _limit_requests_timeout, long_history, safe, us_events
+from .main import DATA, _json_default, _limit_requests_timeout, long_history, safe, us_events, kr_macro
 from .util import log
 
 
@@ -62,6 +62,7 @@ def main(argv):
         m = logic.macro_series(safe(f"미국 지표 {sid}", lambda: sources.fred(sid), errors), kind, lag, iso)
         if m:
             macro[key] = m
+    macro.update(kr_macro(base, errors))
     if macro:
         temp["macro"] = macro
     temp["us_events"] = us_events(base, errors)

@@ -92,6 +92,15 @@ MACRO = [
 ]
 
 
+# 한국 (한국은행 ECOS, Secrets ECOS_API_KEY). (키, 통계표, 주기, 항목, 종류, 발표 지연일, 이름)
+MACRO_KR = [
+    ("kr_base", "722Y001", "D", "0101000", "rate", 0, "한국 기준금리"),
+    ("kr3y", "817Y002", "D", "010200000", "rate", 0, "국고채 3년"),
+    ("kr10y", "817Y002", "D", "010210000", "rate", 0, "국고채 10년"),
+    ("kr_cpi", "901Y009", "M", "0", "yoy", 5, "한국 CPI 물가 상승률"),     # 통계청 발표 매달 초(2~5일)
+]
+
+
 def _month_released(obs_iso, lag, base_iso):
     """월별 관측(그 달 1일 날짜)이 기준일까지 발표됐을까: 다음 달 1일 + lag일 ≤ 기준일."""
     d = datetime.strptime(obs_iso, "%Y-%m-%d")

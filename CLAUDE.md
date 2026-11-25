@@ -64,7 +64,7 @@
     최대주주·특수관계인 보통주 지분 정기보고서(`sources.opendart_major_holder` hyslrSttus, `update_holders` → hist/holders.json, 최근 4분기, 후보 먼저·하루 `HOLDER_BUDGET`번, 빈 분기는 2주 뒤 재확인, shard `mh`),
     5% 큰손 지분 공시(majorstock 응답 전체 → dart_signals.json `stakes`, 늘림·줄임 모두, shard `s5`). 기관·개인 전체 지분율은 공식 자료가 없어 안 넣음(추정치 쓰지 않음). 절대치로 보이게: 맨 위 0~100% 같은 눈금 가로 막대(외국인·최대주주·5% 큰손 최근값), 외국인 선 그래프는 값 근처로 확대(위아래 폭 최소 2%, 눈금에 실제 지분율·범위 표시) + 60일 전 값 점선(기준선).
     미국 금리·물가 추이(`MACRO`, `macro_series` → `temperature.macro`, 화면 시장 칸 `macroTile`): FRED 키 없이 기준금리 상단·국채 2·10년·10년−2년 금리차(일별, 2년, 주 1회로 줄임)와
-    CPI·근원 CPI·근원 PCE(1년 전 대비 %)·실업률(월별, 3년). 월별 값은 관측 달 다음 달 1일 + 발표 지연(`lag`)일 뒤부터만 씀(재계산 미래 정보 차단). 보여 주기만 — 온도 점수·필터엔 안 넣음.
+    CPI·근원 CPI·근원 PCE(1년 전 대비 %)·실업률(월별, 3년), 한국은 `MACRO_KR`(한국은행 ECOS `sources.ecos`, Secrets `ECOS_API_KEY` — 없으면 건너뜀, `main.kr_macro`): 기준금리·국고채 3·10년(일별)·CPI 상승률(월별). probe/ecos.py로 코드 확인. 월별 값은 관측 달 다음 달 1일 + 발표 지연(`lag`)일 뒤부터만 씀(재계산 미래 정보 차단). 보여 주기만 — 온도 점수·필터엔 안 넣음.
     미국 발표 일정(`main.us_events` → `logic.us_events` → `temperature.us_events`, 한국 시각): CPI·고용·PCE는 FRED 발표 달력(`sources.fred_release_dates`, BLS는 자동 접속 403),
     FOMC는 연준 달력(`sources.fomc_meetings`, 성명 = 마지막 날 14:00 미 동부, 점도표 `sep`). 서머타임은 zoneinfo로. 못 받은 종류는 전날 파일 일정을 씀.
     화면: 오늘 한눈에 '미국 발표 일정'(`eventRow`, 7일 안, 없으면 다음 하나) · 아침 요약 경고(`eventWarn`, 24시간 안) · 시장 칸 60일 목록(`EV_DESC` '왜 중요?'). 날짜·시각은 한국 시각 문자열 그대로 읽음(`evParts`, 기기 시간대 무관).

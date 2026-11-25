@@ -256,6 +256,27 @@ def fred(series_id):
     return rows
 
 
+def ecos(stat, cycle, start, end, item):
+    """한국은행 ECOS 통계 → [('YYYY-MM-DD', 값)]. Secrets ECOS_API_KEY 필요 (probe/ecos.py 로 코드 확인).
+    cycle D: start/end 'YYYYMMDD', M: 'YYYYMM' (월별은 그 달 1일 날짜로)."""
+    key = os.environ.get("ECOS_API_KEY")
+    if not key:
+        raise RuntimeError("ECOS_API_KEY 없음")
+    url = f"https://ecos.bok.or.kr/api/StatisticSearch/{key}/json/kr/1/10000/{stat}/{cycle}/{start}/{end}/{item}"
+    j = retry(lambda: get(url, ua=False, timeout=30)).json()
+    if "StatisticSearch" not in j:
+        raise RuntimeError(str(j.get("RESULT", j))[:200])
+    out = []
+    for x in j["StatisticSearch"]["row"]:
+        t = x["TIME"]
+        d = f"{t[:4]}-{t[4:6]}-{t[6:8]}" if len(t) == 8 else f"{t[:4]}-{t[4:6]}-01"
+        try:
+            out.append((d, float(x["DATA_VALUE"])))
+        except (TypeError, ValueError):
+            continue
+    return sorted(out)
+
+
 MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August",
           "September", "October", "November", "December"]
 

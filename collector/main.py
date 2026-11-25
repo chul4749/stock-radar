@@ -391,6 +391,7 @@ def main(argv):
         m = logic.macro_series(rows, kind, lag, iso(base))
         if m:
             macro[key] = m
+    macro.update(kr_macro(base, errors))
     if macro:
         temp["macro"] = macro
     temp["us_events"] = us_events(base, errors)
@@ -1272,6 +1273,22 @@ def load_record(d):
     with open(path, encoding="utf-8") as f:
         rec = json.load(f)
     return rec, ("live" if path == lp else logic.classify_record(rec, d))
+
+
+def kr_macro(base, errors):
+    """한국 기준금리·국고채 3년·CPI 상승률 (한국은행 ECOS). 키가 없으면 조용히 건너뛴다."""
+    if not os.environ.get("ECOS_API_KEY"):
+        return {}
+    iso_b = f"{base[:4]}-{base[4:6]}-{base[6:]}"
+    d0 = (datetime.strptime(base, "%Y%m%d") - timedelta(days=1100)).strftime("%Y%m%d")
+    out = {}
+    for key, stat, cyc, item, kind, lag, _name in logic.MACRO_KR:
+        start, end = (d0, base) if cyc == "D" else (d0[:6], base[:6])
+        rows = safe(f"한국 지표 {stat}", lambda: sources.ecos(stat, cyc, start, end, item), errors)
+        m = logic.macro_series(rows, kind, lag, iso_b)
+        if m:
+            out[key] = m
+    return out
 
 
 def us_events(base, errors):
