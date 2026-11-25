@@ -957,6 +957,45 @@ def parse_profile(integ, fin):
     return out
 
 
+# 가격에 반영된 기대 (S-RIM 거꾸로 풀기): 이익을 자기자본 대비 ROE로 계속 낸다고 보면 적정 PBR ≈ ROE ÷ 요구수익률.
+# 그러니 지금 PBR × 요구수익률 = '지금 가격이 앞으로 계속 낼 거라 보는 ROE'. 숫자보다 높게/비슷/낮게 세 칸으로만 말한다.
+REQ_RETURN = 8.0     # 요구수익률 % (국내 개인투자자 S-RIM에서 흔히 쓰는 BBB- 회사채 금리 수준, 고정)
+EXP_FIN_WORDS = ("금융지주", "은행", "보험", "증권", "캐피탈", "카드", "지주", "홀딩스", "리츠", "스팩")
+
+
+def priced_expectation(p, name=""):
+    """기업 정보(parse_profile) → 가격에 반영된 ROE vs 실제 ROE.
+    lv: high(기대가 실적보다 높게 반영) / mid(비슷) / low(낮게 반영) / na(계산이 안 맞는 회사). 자료가 없으면 None."""
+    if not p:
+        return None
+    ind = p.get("industry") or ""
+    if any(w in (name or "") for w in EXP_FIN_WORDS) or any(w in ind for w in ("은행", "보험", "증권", "금융", "지주")):
+        return {"lv": "na", "why": "금융·지주회사는 자본 구조가 달라 이 계산이 잘 안 맞아요"}
+    pbr, a = p.get("pbr"), p.get("annual")
+    if pbr is None or pbr <= 0 or not a:
+        return None
+    row = next((r for r in a["rows"] if r["title"] == "ROE"), None)
+    if not row:
+        return None
+    est = [y["est"] for y in a["years"]]
+    actual = [v for v, e in zip(row["values"], est) if not e and v is not None][-3:]
+    fwd = next((v for v, e in zip(row["values"], est) if e and v is not None), None)
+    if not actual:
+        return None
+    avg = sum(actual) / len(actual)
+    implied = round(pbr * REQ_RETURN, 1)
+    base = {"implied": implied, "avg3": round(avg, 1), "fwd": None if fwd is None else round(fwd, 1),
+            "n": len(actual), "r": REQ_RETURN, "pbr": pbr}
+    if avg <= 0 or (fwd is not None and fwd <= 0):
+        return {**base, "lv": "na", "why": "이익이 적자(ROE 마이너스)라 이 계산이 맞지 않아요"}
+    # 기준 ROE: 추정이 있으면 최근 평균과 반반 (저평가 이익 항목과 같은 방식 — 추정은 낙관적으로 나오는 일이 많아 혼자 쓰지 않음)
+    basis = (avg + fwd) / 2 if fwd is not None else avg
+    diff = implied - basis
+    lv = "high" if diff >= 3 and implied >= basis * 1.3 else "low" if diff <= -3 and implied <= basis * 0.7 else "mid"
+    return {**base, "basis": round(basis, 1), "lv": lv,
+            "falling": len(actual) >= 2 and actual[-1] < actual[0] - 3}   # ROE가 몇 년째 떨어지는 중
+
+
 def enrich(items, closes, sectors, quality):
     """후보 종목에 업종, 60일 차트, 수급의 질(연기금·투신·사모·외국인 지분율)을 붙인다.
 
@@ -3526,6 +3565,7 @@ VALUE_FEATURES = {
     "report": "최근 2주 증권사 리포트",
     "report_fresh": "오랜만에 나온 리포트",
     "search_top": "네이버 검색 상위 100",
+    "exp_low": "가격에 반영된 기대가 실적보다 낮음",
 }
 
 FEATURES = {
@@ -3537,6 +3577,7 @@ FEATURES = {
     "report": "최근 2주 증권사 리포트",
     "report_fresh": "오랜만에 나온 리포트",
     "search_top": "네이버 검색 상위 100",
+    "exp_high": "가격에 반영된 기대가 실적보다 높음",
 }
 
 
@@ -3555,6 +3596,9 @@ def features_of(x):
         "report": None if x.get("reports") is None else x["reports"]["n"] > 0,
         "report_fresh": None if not (x.get("reports") or {}).get("known") else x["reports"]["fresh"],
         "search_top": None if "search_rank" not in x else x["search_rank"] is not None,   # 검색 순위를 못 받은 날은 뺌
+        # 가격에 반영된 기대: 계산 안 되는 회사(na)·기록 안 하던 날은 양쪽에서 뺌
+        "exp_high": None if (x.get("exp") or {}).get("lv") in (None, "na") else x["exp"]["lv"] == "high",
+        "exp_low": None if (x.get("exp") or {}).get("lv") in (None, "na") else x["exp"]["lv"] == "low",
     }
 
 

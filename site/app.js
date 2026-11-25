@@ -85,6 +85,7 @@ function render() {
 /* ---------------- 지표 설명(ⓘ)과 한 줄 해석 ---------------- */
 
 const INFO = {
+  exp: "📌 무엇을 보나: 지금 주가가 이 회사에 '얼마나 잘할 거라고' 기대하고 있는지를 거꾸로 풀어 봅니다.\n· 계산: 지금 PBR × 8% = 가격에 반영된 ROE. (S-RIM이라는 적정가 공식을 거꾸로 푼 것 — 회사가 자기자본으로 매년 ROE만큼 벌면 적정 PBR ≈ ROE ÷ 요구수익률)\n· ROE: 회사가 가진 자기 돈(자기자본)으로 1년에 몇 %를 버는지. 8%는 투자자가 이 정도 위험이면 바라는 최소 수익(회사채 금리 수준)이에요.\n📌 무슨 뜻(상징)인가:\n· 높게 반영: 시장이 '앞으로 더 잘할 것'에 이미 돈을 낸 상태. 성장주·인기주가 보통 여기. 실적이 기대에 못 미치면 실망 매도가 크게 나오기 쉬움(기대가 높을수록 넘어야 할 문턱이 높음)\n· 비슷: 가격이 실력과 맞음\n· 낮게 반영: 시장이 '앞으로 못할 것'이라고 걱정하는 상태. 걱정이 지나치면 오를 여지, 걱정이 맞으면(이익이 계속 줄면) 싸 보여도 싼 게 아님 — 가치 함정\n📌 주의: 적정 주가가 아니라 '기대 수준'을 보는 참고값이에요. 요구수익률을 8%로 고정해서 숫자 자체보다 높게·비슷·낮게 세 칸만 봐요. 금융·지주회사와 적자 회사는 계산이 맞지 않아 '해당 없음'. 오르는 신호로 검증된 게 아니라, 성적표에 '기대 높게/낮게 반영' 조건별 성적으로 쌓아 확인 중이에요.",
   usev: "미국에서 큰 지표가 나오는 날입니다. 한국 시각으로 밤·새벽에 나와서 그다음 날 한국 장에 반영돼요.\n· CPI: 미국 소비자 물가 — 예상보다 높으면 '금리를 늦게 내리겠다'는 걱정에 크게 흔들리기 쉬움\n· 고용 보고서: 일자리 수·실업률 — 너무 좋아도(금리 걱정) 너무 나빠도(경기 걱정) 흔들림\n· PCE: 연준이 직접 보는 물가 — 보통 CPI보다 반응이 작음\n· FOMC: 미국 기준금리 결정 — 점도표가 같이 나오는 회의는 더 크게 흔들리기 쉬움\n발표 전날 새로 사거나 크게 늘리면 결과 하나에 크게 휘둘릴 수 있다는 정도로 참고하세요. 일정은 연준·FRED 발표 달력에서 받아요.",
   macro: "미국 금리와 물가가 지금 어느 쪽으로 가고 있는지 보는 배경 자료입니다.\n· 기준금리: 연준이 정하는 금리. 내리면 돈이 풀리는 쪽\n· 국채 2년: 시장이 보는 앞으로 1~2년 기준금리\n· 국채 10년: 전 세계 금리의 기준 — 오르면 성장주에 부담\n· 10년−2년 금리차: 마이너스(역전)면 시장이 경기 둔화를 걱정한다는 뜻으로 많이 봄 (꼭 침체가 온다는 뜻은 아님)\n· CPI·근원 CPI·근원 PCE: 1년 전보다 물가가 몇 % 올랐나. 연준 목표는 2% (근원 = 값이 크게 출렁이는 식료품·에너지를 뺀 것)\n· 실업률: 빠르게 오르면 경기가 식는 신호일 수 있음\n몇 달 단위로 천천히 움직여서 며칠~몇 주 매매 신호로 쓰기엔 약해요. 온도 점수에는 넣지 않습니다.",
   thermo: "지금 시장 분위기가 '겁먹은 쪽'인지 '들뜬 쪽'인지 0~100점으로 보여 줍니다.\n· 25점 아래: 다들 겁먹음 (극단적 공포)\n· 50점 근처: 보통\n· 75점 위: 다들 들뜸 (극단적 탐욕)\n아래 '무엇으로 계산했나'의 여러 지표를 점수로 바꿔 평균했습니다. 공포가 크다고 바로 바닥이라는 뜻은 아닙니다.",
@@ -1114,6 +1115,32 @@ function renderOverlap() {
 
 // 급락장 점검 ①: 이익 전망을 20% 낮춰 잡아도 싼가 (올해 추정 EPS가 있으면 그것, 없으면 지난 이익 기준)
 const STRESS = 0.8;
+// 가격에 반영된 기대 (S-RIM 거꾸로): 지금 PBR × 요구수익률 8% = 지금 가격이 '계속 낼 거라 보는 ROE'
+const EXP_WORD = {
+  high: ["기대가 실적보다 높게 반영됨", "지금 실력보다 더 잘할 거라는 기대가 이미 가격에 들어 있어요. 실적이 조금만 빗나가도 크게 빠지기 쉬운 상태예요."],
+  mid: ["기대와 실적이 비슷함", "지금 가격이 회사의 최근 실력과 대체로 맞아요."],
+  low: ["기대가 실적보다 낮게 반영됨", "지금 실력만큼도 못 할 거라고 보는 가격이에요. 그 걱정이 틀리면 오를 여지가, 맞으면(이익이 줄면) 싼 게 아닐 수 있어요."],
+};
+function expLine(e, short = false) {
+  if (!e) return "";
+  if (e.lv === "na") return short ? "" : `<p class="xexp na">🎯 가격에 반영된 기대 — 해당 없음 <small>(${esc(e.why)})</small></p>`;
+  const [head, body] = EXP_WORD[e.lv];
+  const basisTxt = e.fwd != null ? `실제 ROE ${num(e.basis, 1)}% (최근 ${e.n}년 평균 ${num(e.avg3, 1)}%와 올해 추정 ${num(e.fwd, 1)}%를 반반)` : `실제 ROE 최근 ${e.n}년 평균 ${num(e.avg3, 1)}%`;
+  const nums = `지금 가격은 ROE 약 <b>${num(e.implied, 1)}%</b>를 계속 낸다고 보는 값 · ${basisTxt}`;
+  const fall = e.falling && e.lv === "low" ? " · ⚠ ROE가 몇 년째 떨어지는 중 — 낮은 기대가 맞을 수도" : e.falling ? " · ROE가 몇 년째 떨어지는 중" : "";
+  if (short) return `<p class="xexp ${e.lv}">🎯 <b>${head}</b> <small>${nums}${fall}</small></p>`;
+  return `<div class="xexp ${e.lv}"><p>🎯 <b>${head}</b> ${infoBtn("exp")}</p><p class="interp">${nums}${fall}</p><p class="hint" style="margin:2px 0 0">${body}</p>${expBar(e)}${infoBox("exp")}</div>`;
+}
+// 반영된 ROE와 실제 ROE를 같은 눈금 위 두 점으로
+function expBar(e) {
+  const basis = e.basis ?? e.avg3, hi = Math.max(25, e.implied, basis) * 1.1;
+  const at = (v) => Math.max(1, Math.min(99, (v / hi) * 100)).toFixed(1);
+  return `<div class="expbar"><div class="eb-line"></div>` +
+    `<span class="eb-dot act" style="left:${at(basis)}%" title="실제"></span><span class="eb-dot imp" style="left:${at(e.implied)}%" title="가격에 반영"></span>` +
+    `<div class="eb-lab"><span>ROE 0%</span><span>${num(hi, 0)}%</span></div>` +
+    `<div class="legend"><span><i class="imp"></i>가격에 반영 ${num(e.implied, 1)}%</span><span><i class="act"></i>실제 ${num(basis, 1)}%</span></div></div>`;
+}
+
 function stressLine(x) {
   if (!x.per || x.per <= 0) return "";
   const fwd = x.eps_fwd_ratio && x.eps_fwd_ratio > 0 ? x.per / x.eps_fwd_ratio : null;
@@ -1136,6 +1163,7 @@ function valueCard(x) {
     </div>
     ${x.flow && x.flow.daily ? `<div class="l" style="font-size:12px;color:var(--sub)">최근 5일 기관+외국인 순매수 (억)</div>${bars(x.flow.daily)}` : ""}
     ${stressLine(x)}
+    ${expLine(x.exp, true)}
     ${exitBlock(x)}
     ${scoreRow(x)}
     <ul class="checks">${x.checks.map((c) => `<li><span>${esc(c.label)}</span><span>${esc(c.value)}</span></li>`).join("")}</ul>
@@ -2628,7 +2656,7 @@ function companyBlock(x) {
   const help = `<details class="rules"><summary>지표 설명 보기</summary><ul class="finhelp">${Object.entries(FIN_INFO).map(([k, v]) => `<li><b>${k}</b> ${esc(v)}</li>`).join("")}</ul></details>`;
   return `<div class="company"><h3>기업 정보 <small>네이버 증권 · ${esc((p.as_of || "").slice(5))} 수집 (시총·PER 등은 수집 시점 값)</small></h3>` +
     (p.summary ? `<p class="summary">${esc(p.summary)}</p>` : "") +
-    `<div class="nums">${metrics}</div>${table}${flow}${help}</div>`;
+    `<div class="nums">${metrics}</div>${expLine(p.exp || x.exp)}${table}${flow}${help}</div>`;
 }
 
 /* ---------------- 전체 종목 찾기 ---------------- */

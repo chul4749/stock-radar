@@ -63,6 +63,9 @@
     지분 추세(공식 자료만, 검색 팝업 `ownBlock`): 외국인 지분율 KRX 날마다(`long_fratio` → hist/fratio.csv.gz, 60영업일, 차트 shard `f`),
     최대주주·특수관계인 보통주 지분 정기보고서(`sources.opendart_major_holder` hyslrSttus, `update_holders` → hist/holders.json, 최근 4분기, 후보 먼저·하루 `HOLDER_BUDGET`번, 빈 분기는 2주 뒤 재확인, shard `mh`),
     5% 큰손 지분 공시(majorstock 응답 전체 → dart_signals.json `stakes`, 늘림·줄임 모두, shard `s5`). 기관·개인 전체 지분율은 공식 자료가 없어 안 넣음(추정치 쓰지 않음). 절대치로 보이게: 맨 위 0~100% 같은 눈금 가로 막대(외국인·최대주주·5% 큰손 최근값), 외국인 선 그래프는 값 근처로 확대(위아래 폭 최소 2%, 눈금에 실제 지분율·범위 표시) + 60일 전 값 점선(기준선).
+    가격에 반영된 기대(`priced_expectation`, S-RIM 거꾸로): 반영된 ROE = PBR × `REQ_RETURN`(8% 고정) vs 실제 ROE(최근 3년 평균, 추정 있으면 반반) → high/mid/low(차이 3%p↑이면서 1.3배↑/0.7배↓), 금융·지주·적자는 na.
+    후보 `x.exp`(실제 기록에도 남음)·재무 캐시 `fin/`의 `exp`(저장할 때 다시 계산). 화면: 기업 정보 `expLine`(두 점 눈금 `expBar`, ⓘ `exp` = 뜻·상징·주의), 저평가 카드 한 줄.
+    성적표 조건 `exp_high`(스윙·단타)·`exp_low`(저평가)로 쌓아 확인 — 오르는 신호로 검증 안 됨, 점수·필터엔 안 넣음.
     미국 금리·물가 추이(`MACRO`, `macro_series` → `temperature.macro`, 화면 시장 칸 `macroTile`): FRED 키 없이 기준금리 상단·국채 2·10년·10년−2년 금리차(일별, 2년, 주 1회로 줄임)와
     CPI·근원 CPI·근원 PCE(1년 전 대비 %)·실업률(월별, 3년), 한국은 `MACRO_KR`(한국은행 ECOS `sources.ecos`, Secrets `ECOS_API_KEY` — 없으면 건너뜀, `main.kr_macro`): 기준금리·국고채 3·10년(일별)·CPI 상승률(월별). probe/ecos.py로 코드 확인. 월별 값은 관측 달 다음 달 1일 + 발표 지연(`lag`)일 뒤부터만 씀(재계산 미래 정보 차단). 보여 주기만 — 온도 점수·필터엔 안 넣음.
     미국 발표 일정(`main.us_events` → `logic.us_events` → `temperature.us_events`, 한국 시각): CPI·고용·PCE는 FRED 발표 달력(`sources.fred_release_dates`, BLS는 자동 접속 403),

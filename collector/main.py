@@ -280,6 +280,7 @@ def main(argv):
     for x in (scalp[:10] + swing[:10] + value[:10] if live_now else []):
         if profile(x["code"]):
             x["profile"] = profiles[x["code"]]
+            x["exp"] = logic.priced_expectation(x["profile"], x.get("name"))   # 가격에 반영된 기대 (작은 값이라 실제 기록에도 남김)
     # 증권사 리포트(참고 정보: 오랜만에 다뤄지기 시작했나)와 네이버 검색 상위(관심 집중 표시)
     reports = update_reports(base, errors)
     search_top = (safe("검색 상위", sources.naver_search_top, errors) or []) if live_now else []
@@ -337,7 +338,7 @@ def main(argv):
             atr = logic.atr_wilder(highs[c], lows[c], closes[c], breaks_s=breaks[c]) if c in highs.columns else None
             x["risk"] = logic.entry_risk(float(closes[c].iloc[-1]), (x.get("exit") or {}).get("stop"), atr)
     log(f"  기업 정보 {len(profiles) - failed}/{len(profiles)}")
-    save_fin_cache(fin_cache, profiles, base)
+    save_fin_cache(fin_cache, profiles, base, {c: v["name"] for c, v in universe_all.items()})
     if profiles and failed == len(profiles):
         errors.append("기업 정보: 전부 실패")
     sector_flow = logic.sector_flows(universe, sectors, flows_5d, closes)
@@ -1230,11 +1231,15 @@ def load_fin_cache():
     return out
 
 
-def save_fin_cache(cache, profiles, base):
-    """이번에 받은 기업 정보(후보 + 돌아가며 받은 종목)를 재무 캐시에 합쳐 끝자리별로 나눠 쓴다."""
+def save_fin_cache(cache, profiles, base, names=None):
+    """이번에 받은 기업 정보(후보 + 돌아가며 받은 종목)를 재무 캐시에 합쳐 끝자리별로 나눠 쓴다.
+    가격에 반영된 기대(exp)는 그 정보를 받은 날 PBR로 매번 다시 계산해 붙인다."""
     for c, p in profiles.items():
         if p:
             cache[c] = p
+    for c, p in cache.items():
+        if p:
+            p["exp"] = logic.priced_expectation(p, (names or {}).get(c, ""))
     d = os.path.join(DATA, "fin")
     os.makedirs(d, exist_ok=True)
     _clear_json(d)

@@ -725,3 +725,19 @@ table.mythsum th { font-size: 13px; }
 .evlist summary { color: var(--sub); cursor: pointer; }
 .tile h4.sub { margin: 12px 0 2px; font-size: 13px; }
 .tile h4.sub small { color: var(--faint); font-weight: 400; }
+
+/* 가격에 반영된 기대 */
+.xexp { margin: 6px 0; font-size: 13px; }
+.xexp p { margin: 0; }
+div.xexp { padding: 8px 10px; border-radius: 8px; background: var(--neutral-bg); margin: 10px 0; }
+.xexp small { color: var(--sub); }
+.xexp.high b:first-child, .xexp.high > p > b { color: var(--up); }
+.xexp.low > p > b { color: var(--down); }
+.expbar { position: relative; margin: 10px 4px 2px; }
+.expbar .eb-line { height: 4px; border-radius: 2px; background: var(--line); margin: 6px 0; }
+.expbar .eb-dot { position: absolute; top: 0; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; border: 2px solid var(--card); }
+.expbar .eb-dot.imp, .expbar .legend i.imp { background: var(--up); }
+.expbar .eb-dot.act, .expbar .legend i.act { background: var(--text); }
+.expbar .eb-lab { display: flex; justify-content: space-between; font-size: 10px; color: var(--faint); }
+.expbar .legend { margin-top: 2px; }
+.expbar .legend i { width: 8px; height: 8px; border-radius: 50%; }

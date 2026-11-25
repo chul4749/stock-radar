@@ -1384,3 +1384,28 @@ def test_us_events_converts_to_kst_and_dst():
     assert next(e for e in ev if e["kind"] == "fomc")["sep"] is True
     summer = logic.us_events({"jobs": ["2026-07-02"]}, [], "2026-06-20")
     assert summer[0]["at"] == "2026-07-02T21:30+09:00"      # 서머타임(UTC-4)이면 한국 21:30
+
+
+def _prof(pbr, roes, fwd=None, industry=None):
+    years = [{"label": y, "est": False} for y in ("2023.12", "2024.12", "2025.12")] + [{"label": "2026.12 (추정)", "est": True}]
+    return {"pbr": pbr, "industry": industry,
+            "annual": {"years": years, "rows": [{"title": "ROE", "values": list(roes) + [fwd]}]}}
+
+
+def test_priced_expectation_levels():
+    # PBR 2배 × 8% = 반영된 ROE 16% vs 실제 9% → 높게 반영
+    hi = logic.priced_expectation(_prof(2.0, [8, 9, 10]), "어떤전자")
+    assert hi["implied"] == 16.0 and hi["lv"] == "high" and hi["basis"] == 9.0
+    # PBR 0.4 × 8% = 3.2% vs (최근 평균 11 + 추정 13)/2 = 12% → 낮게 반영 (추정은 반반 섞음)
+    lo = logic.priced_expectation(_prof(0.4, [10, 11, 12], fwd=13), "")
+    assert lo["lv"] == "low" and lo["basis"] == 12.0
+    assert logic.priced_expectation(_prof(1.2, [9, 10, 11]), "")["lv"] == "mid"
+
+
+def test_priced_expectation_excludes_financials_and_losses():
+    assert logic.priced_expectation(_prof(0.4, [8, 9, 10]), "KB금융지주")["lv"] == "na"
+    assert logic.priced_expectation(_prof(0.4, [8, 9, 10], industry="은행"), "")["lv"] == "na"
+    assert logic.priced_expectation(_prof(1.0, [-5, -3, 2]), "")["lv"] == "na"
+    assert logic.priced_expectation(_prof(None, [8, 9, 10]), "") is None
+    f = logic.priced_expectation(_prof(1.0, [15, 11, 8]), "")
+    assert f["falling"] is True
