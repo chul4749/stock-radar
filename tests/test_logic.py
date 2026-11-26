@@ -1409,3 +1409,20 @@ def test_priced_expectation_excludes_financials_and_losses():
     assert logic.priced_expectation(_prof(None, [8, 9, 10]), "") is None
     f = logic.priced_expectation(_prof(1.0, [15, 11, 8]), "")
     assert f["falling"] is True
+
+
+def test_us_market_stale_after_us_holiday():
+    it = lambda d: [{"key": "ewy", "date": d}]
+    assert logic.us_market_stale(it("2026-11-25"), "20261127") is True     # 추수감사절(11/26) 다음 날
+    assert logic.us_market_stale(it("2026-11-26"), "20261127") is False
+    assert logic.us_market_stale(it("2026-11-20"), "20261123") is False    # 월요일 아침 ← 금요일 미국장
+    assert logic.us_market_stale([], "20261127") is False
+
+
+def test_morning_log_drops_stale_day(tmp_path, monkeypatch):
+    from collector import morning
+    import json
+    monkeypatch.setattr(morning, "DATA", str(tmp_path))
+    (tmp_path / "morning_log.json").write_text(json.dumps({"days": {"20261127": {"tone": "down"}}}))
+    morning.log_prediction({"date": "20261127", "at": "2026-11-27T07:50+09:00", "summary": {"tone": "neutral", "stale": True}})
+    assert "20261127" not in json.loads((tmp_path / "morning_log.json").read_text())["days"]

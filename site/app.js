@@ -2360,7 +2360,7 @@ function renderMorning() {
   el.innerHTML = `<h2>아침 요약 <small>${m.at.slice(5, 10).replace("-", "/")} ${m.at.slice(11, 16)} · 새벽 미국장 마감 기준</small>${infoBtn("morning")}<span class="mlegend">오름 <b class="up">▲ 빨강</b> · 내림 <b class="down">▼ 파랑</b></span></h2>${infoBox("morning")}
     <div class="tile wide msumbox"><p class="msum" style="color:${color}"><b>${esc(sm.label || "")}</b></p><p class="hint" style="margin:2px 0 8px">${esc(sm.text || "")}</p>
     ${res ? `<p class="mres ${res.hit ? "hit" : "miss"}">${res.hit ? "✓ 맞음" : "✗ 빗나감"} — 실제 코스피 아침 출발 <b class="${cls(res.kospi.open)}">${signed(res.kospi.open, 2, "%")}</b> · 마감 <b class="${cls(res.kospi.close)}">${signed(res.kospi.close, 2, "%")}</b>${res.kosdaq ? ` <small>(코스닥 출발 ${signed(res.kosdaq.open, 2, "%")} · 마감 ${signed(res.kosdaq.close, 2, "%")})</small>` : ""}</p>`
-      : m.date <= (state.data.base_date || "") ? `<p class="hint">실제 결과는 저녁 수집 때 붙어요.</p>` : ""}
+      : m.date <= (state.data.base_date || "") && !sm.stale ? `<p class="hint">실제 결과는 저녁 수집 때 붙어요.</p>` : ""}
     <div class="nums mnums">${keyNums}</div>${eventWarn()}</div>
     ${mlogBlock(lg)}
     <div class="mgrid">${card("주요국 지수", grp("idx"))}${card("금리·환율", grp("rate"))}${card("원자재·암호화폐", grp("cmd"))}</div>

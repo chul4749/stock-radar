@@ -1367,6 +1367,18 @@ def entry_signals(t):
 
 # ---------------------------------------------------------------- 아침 요약
 
+def us_market_stale(items, today_ymd):
+    """미국 휴장 다음 날(추수감사절 등): 미국 지수 마감일이 '어젯밤 미국장'(한국 오늘의 전 평일)보다 이르면 True.
+    이때 숫자는 이미 전날 한국장이 반영한 것이라 새 신호가 아니다."""
+    d = next((x["date"] for x in items if x["key"] in ("ewy", "sp500") and x.get("date")), None)
+    if not d:
+        return False
+    exp = datetime.strptime(today_ymd, "%Y%m%d") - timedelta(days=1)
+    while exp.weekday() >= 5:
+        exp -= timedelta(days=1)
+    return d < exp.strftime("%Y-%m-%d")
+
+
 def morning_summary(items):
     """미국장 마감 결과 → 오늘 한국장 출발 분위기 한 줄. EWY(미국 상장 한국 ETF)를 가장 무겁게 본다."""
     ch = {x["key"]: x["change"] for x in items}

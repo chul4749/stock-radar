@@ -56,8 +56,11 @@ def log_prediction(out, keep=250):
         st = {"days": {}}
     sm = out["summary"]
     keep_res = (st["days"].get(out["date"]) or {}).get("res")
-    st["days"][out["date"]] = {"at": out["at"], "tone": sm.get("tone"), "label": sm.get("label"), "score": sm.get("score"),
-                               "text": sm.get("text"), **({"res": keep_res} if keep_res else {})}
+    if sm.get("stale"):            # 미국 휴장 다음 날은 예측이 아니라 기록하지 않음 (먼저 잘못 남긴 게 있으면 지움)
+        st["days"].pop(out["date"], None)
+    else:
+        st["days"][out["date"]] = {"at": out["at"], "tone": sm.get("tone"), "label": sm.get("label"), "score": sm.get("score"),
+                                   "text": sm.get("text"), **({"res": keep_res} if keep_res else {})}
     st["days"] = dict(sorted(st["days"].items())[-keep:])
     with open(path, "w", encoding="utf-8") as f:
         json.dump(st, f, ensure_ascii=False, separators=(",", ":"))
@@ -104,8 +107,13 @@ def main():
     except Exception as e:
         errors.append(f"CNN 공포·탐욕: {type(e).__name__}")
         log(f"  CNN 실패: {type(e).__name__}: {e}")
+    summary = logic.morning_summary(items)
+    if logic.us_market_stale(items, now.strftime("%Y%m%d")):
+        # 어젯밤 미국장이 쉬었음 → 숫자는 그 전날 것(이미 한국장에 반영) — 출발 판단을 내지 않고 기록에서도 뺀다
+        summary = {"tone": "neutral", "label": "미국 휴장 — 새 신호 없음", "stale": True, "score": None,
+                   "text": "지난밤 미국 증시가 쉬어서 아래 미국 숫자는 그 전날 것(이미 어제 한국장에 반영)이에요. 오늘은 아시아 시장·환율을 보세요."}
     out = {"at": now.isoformat(timespec="minutes"), "date": now.strftime("%Y%m%d"),
-           "items": items, "summary": logic.morning_summary(items), "fg": fg, "errors": errors}
+           "items": items, "summary": summary, "fg": fg, "errors": errors}
     os.makedirs(DATA, exist_ok=True)
     with open(os.path.join(DATA, "morning.json"), "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
